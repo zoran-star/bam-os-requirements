@@ -104,9 +104,13 @@
 //       MUTATE=submittededitable cannot see: that one covers a save that
 //       arrives late, this one covers a save already in flight.
 //
-//   MUTATE=emptycardblocks     node api/_workbook.test.mjs
-//       every card counts again, including one with nothing on it - the eighth
-//       mandatory click the product owner cut two cards to avoid.
+//   MUTATE=emptycardsdontcount node api/_workbook.test.mjs
+//       cardCounts goes back to "has answers", so the denominator GROWS when an
+//       addition lands (0-of-7 becomes 5-of-8 under the owner's cursor) and the
+//       empty add-a-plan card can ship with nobody able to tell "he was asked
+//       and had nothing to add" from "he never looked". (The old
+//       MUTATE=emptycardblocks was RETIRED by the D6 ruling: the behaviour it
+//       reintroduced - every card counts - is now the correct one.)
 //   MUTATE=countsflag          node api/_workbook.test.mjs
 //       "does this card count" becomes writable by a card_key or a meta flag, so
 //       seeding can make a REAL question invisible to the submit gate. The
@@ -136,12 +140,39 @@
 //   MUTATE=blankadd            node api/_workbook.test.mjs
 //       the same ghost through the autosave door: an addition emptied by a save
 //       rather than removed.
+//   MUTATE=seeduntrimmed       node api/_workbook.test.mjs
+//       the seed's class-twin mapper stops trimming, so a padded class value
+//       ("9 ") seeds a padded `proposed`, the owner confirming unedited
+//       materialises it as `answered`, and the apply-side translator then
+//       rightly refuses " 9" - a refusal manufactured by our own seed. This
+//       control pins scripts/seed-sj-age-rows.mjs, not api/workbook.js.
+//   MUTATE=blankkeysrestrict   node api/_workbook.test.mjs
+//       cleanAppliesTo (api/_coupon-guardrails.js) stops trimming - raw
+//       `.filter(Boolean)` - so `[" "]` reads as a restriction to the confirm
+//       guard while the Stripe coupon builder still trims it to "everything":
+//       the direct-POST hole exactly as the adversarial tester found it. This
+//       control pins api/_coupon-guardrails.js (the workbook copy under test
+//       imports a mutant guardrails copy); the SAME pin is carried by
+//       api/_coupon-guardrails.test.mjs, api/_workbook-apply.test.mjs and
+//       scripts/verify-workbook-contract.mjs.
+//   MUTATE=noncanonicalindex   node api/_workbook.test.mjs
+//       classifyIndexed's one-spelling check becomes `if (false)`, so
+//       `codes.00.applies_to` is a VALID address distinct from
+//       `codes.0.applies_to` again - the mint dedupes by exact string and
+//       creates a twin row for one logical answer.
+//   MUTATE=mintuncapped        node api/_workbook.test.mjs
+//       the mint ceiling comparison becomes `>= Infinity`, so a scripted loop
+//       of null-id saves creates rows without end - the addition caps'
+//       denial-of-service reasoning, defeated through the mint door.
 //
-// TWENTY-ONE controls, in three families: PRODUCT rules (partialsubmit,
+// TWENTY-EIGHT controls: twenty-six over the route in three families, plus the
+// seed-side seeduntrimmed and the guardrails-side blankkeysrestrict above. The route's: PRODUCT rules (partialsubmit,
 // confirmblind, confirmnomaterialize, submittededitable, echoacts, orphanmint,
-// metawritable, dropnulls, addconfirmed, ghostremove, blankadd), DISCLOSURE AND
+// metawritable, dropnulls, addconfirmed, ghostremove, blankadd,
+// serverconfirmsuntargeted), DISCLOSURE AND
 // BLAST RADIUS (tokenecho, voidreadable, crosscard, rawcredential, noguard,
-// addforeign, payloadtarget, addcap, addsubmitted) and ORDERING (latewrite,
+// addforeign, payloadtarget, addcap, addsubmitted, codesunmintable,
+// codesmintany) and ORDERING (latewrite,
 // and the addition half of it inside section 12). A pin that no longer matches
 // the source reports NEGATIVE CONTROL FAILED rather than passing quietly - which
 // is not theoretical: rewriting a comment on the echo-is-not-an-act line broke
@@ -149,6 +180,41 @@
 //
 // A control run exits ZERO when the mutation IS caught. CI greps for the banner
 // and for the MUTATE= names above, not for the exit code.
+//
+// MEASURED CATCH COUNTS - controls added or re-pointed in the 2026-08-06
+// remediation pass, each run and counted on that date (re-measure and update
+// this block whenever one of THESE pins moves; the older controls keep their
+// proof in CI, which runs every name and greps for the banner):
+//   seeduntrimmed -> 4 failures (the padded, whitespace-only and newline/tab
+//                    mapper pins, and the tAgeStrOrEmpty round trip)
+//   codesunmintable -> 18 failures (re-measured 2026-08-06, twice: 7 -> 13
+//                    when the whitespace pass's confirm-guard part-2 battery
+//                    joined the same mint door, 13 -> 18 when the Step 2
+//                    mint-door section's canonical-save, ceiling and row
+//                    pins joined it too)
+//   codesmintany  -> 10 failures (re-measured 2026-08-06, Step 2 pass: was 4;
+//                    with the allowlist gutted the non-canonical spellings
+//                    MINT, so the twin refusals, the one-row pin, the flood
+//                    pin and the two new battery refusals all trip)
+//   serverconfirmsuntargeted -> 7 failures (re-measured 2026-08-06, whitespace
+//                    pass: was 2; the confirm-guard part-2 battery's five
+//                    verbatim refusals run through the same D3 guard)
+//   blankkeysrestrict -> 2 failures (measured 2026-08-06, whitespace pass: the
+//                    [" "] and ["\t"] battery iterations - the raw filter
+//                    reads them as targeted, so the confirm goes through and
+//                    both verbatim-refusal pins trip. Catches elsewhere: 4 in
+//                    api/_coupon-guardrails.test.mjs, 4 in
+//                    api/_workbook-apply.test.mjs, 2 in
+//                    scripts/verify-workbook-contract.mjs)
+//   noncanonicalindex -> 6 failures (measured 2026-08-06, Step 2 pass: the
+//                    codes.00/codes.000 twin refusals, the one-row pin, the
+//                    33-variant flood pin and the two battery entries; the
+//                    same pin catches 1 in scripts/verify-workbook-contract
+//                    .mjs - its direct-POST 404)
+//   mintuncapped  -> 1 failure (measured 2026-08-06, Step 2 pass: the
+//                    91st-row cap-sentence pin, DB pinned at 90. This control
+//                    lives ONLY here - the contract flow has no 90-row card,
+//                    and building one would prove nothing this pin does not)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -401,6 +467,28 @@ const BLANKADD = [[
   `    if (false && isAddition(row)) {   // (control blankadd) an addition can be emptied by a save
       const what = String(row.target_field).slice(ADD_PREFIX.length);`]];
 
+// MUTATE=codesunmintable  the codes branch of canMint returns false, which is
+// the fix reverted: the live defect exactly as the dress rehearsal found it. A
+// null-id save of codes.0.applies_to 404s, so the codes card's mandatory
+// applies-to answer has no row to live in and confirm blocks forever.
+const CODESUNMINTABLE = [[
+  `    return cls.kind === "code" && !!cls.t;`,
+  `    return false; // (control codesunmintable) the codes branch is gone - the live SJ defect`]];
+
+// MUTATE=codesmintany  the codes branch stops consulting classifyField and
+// mints ANY field name on the codes card - `hacker`, `constructor`, an
+// unbounded index. The refusal assertions are what has to catch it.
+const CODESMINTANY = [[
+  `    return cls.kind === "code" && !!cls.t;`,
+  `    return true; // (control codesmintany) the allowlist is gutted`]];
+
+// MUTATE=serverconfirmsuntargeted  the server-side codes confirm guard is gone,
+// so a direct POST confirms a named code with no applies-to list - exactly what
+// the dress rehearsal found succeeding while the page promised a refusal.
+const SERVERCONFIRMSUNTARGETED = [[
+  `      if (loose.length) throw bad('Say what ' + loose[0].code + ' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');`,
+  `      if (false && loose.length) throw bad("unreachable");   // (control serverconfirmsuntargeted) the server confirms it anyway`]];
+
 // MUTATE=typingisapproving  puts the gate back on the STATE STRING instead of on
 // the deliberate act. This is the defect exactly as it shipped: a card the owner
 // typed into and never confirmed satisfied "every row has to be confirmed", and
@@ -420,32 +508,32 @@ const CONFIRMSURVIVESEDIT = [[
   `  const retire = actedNow && !!card.confirmed_at;`,
   `  const retire = false && actedNow && !!card.confirmed_at;   // (control confirmsurvivesedit)`]];
 
-// ── the emptiness rule, and the loophole it could become ─────────────────────
+// ── the counting rule, and the loophole it could become ──────────────────────
 
-// EVERY CARD COUNTS AGAIN, including the empty one. This is the eighth
-// mandatory click the product owner cut two cards to avoid: a card with nothing
-// on it sits reading "Not reviewed yet" and holds Send hostage over a question
-// with no content.
-const EMPTYCARDBLOCKS = [[
-  `const cardCounts = (answers) => (answers || []).length > 0;`,
-  `const cardCounts = (answers) => true; // (control emptycardblocks) an empty card holds Send hostage`]];
+// THE DENOMINATOR GROWS AGAIN. cardCounts goes back to "has answers", which is
+// the pre-D6 rule: an addition landing on the empty add-a-plan card grows the
+// total mid-session, and "he was asked and had nothing to add" becomes
+// unrecordable because the empty card never demands its confirm.
+const EMPTYCARDSDONTCOUNT = [[
+  `const cardCounts = (answers) => true;`,
+  `const cardCounts = (answers) => (answers || []).length > 0; // (control emptycardsdontcount) empty cards stop counting`]];
 
 // THE RULE KEYS ON SOMETHING WRITABLE. The moment "does this card count" can be
-// set by seeding, a card_key or a payload, the no-partial-submit ruling is
+// set by seeding, a card_key or a meta flag, the no-partial-submit ruling is
 // defeated from the inside by the people it binds - a REAL question can be made
 // invisible to the gate.
 const COUNTSFLAG = [[
-  `const cardCounts = (answers) => (answers || []).length > 0;`,
+  `const cardCounts = (answers) => true;`,
   `const cardCounts = (answers, card) => { // (control countsflag) an exemption anyone can write
   if (card && card.card_key === "plans") return false;
   if (card && card.meta && card.meta.counts === false) return false;
-  return (answers || []).length > 0;
+  return true;
 };`],
   [`  for (const c of cards) {
     if (!cardCounts(grouped.get(c.id))) continue;`,
    `  for (const c of cards) {
     if (!cardCounts(grouped.get(c.id), c)) continue;`],
-  [`    if (!cardCounts(answers)) continue;      // nothing to review, nothing to hold Send for`,
+  [`    if (!cardCounts(answers)) continue;`,
    `    if (!cardCounts(answers, card)) continue;`]];
 
 // AN ADDITION MADE AFTER A CONFIRM LEAVES THE CONFIRM STANDING, so an
@@ -457,6 +545,35 @@ const ADDKEEPSCONFIRM = [[
   `  const retire = false; // (control addkeepsconfirm) adding does not retire the approval
   const confirmedAt = card.confirmed_at;`]];
 
+// The Other-cycle follow-up requirement is gone, so '$85 other' - a request
+// staff cannot act on - stores as if it were complete.
+const OTHERNOFOLLOWUP = [[
+  `    : String(v.billing_cycle || "") === "Other" && !str(v.billing_cycle_other) ? "Please say how often this plan bills before adding it." : ""),`,
+  `    : ""),   // (control othernofollowup) the follow-up requirement is gone`]];
+
+// MUTATE=noncanonicalindex  the one-spelling check in classifyIndexed becomes
+// `if (false)`, so `codes.00.applies_to` is a VALID address distinct from
+// `codes.0.applies_to` again - the mint dedupes by exact string and creates a
+// twin row for one logical answer.
+const NONCANONICALINDEX = [[
+  `  if (String(index) !== m[1]) {`,
+  `  if (false) {   // (control noncanonicalindex) every spelling is an address`]];
+
+// MUTATE=mintuncapped  the mint ceiling comparison becomes `>= Infinity`, so
+// the mint branch creates rows without end again - the denial-of-service the
+// addition caps exist to stop, through the door next to them.
+const MINTUNCAPPED = [[
+  `          if (mine.filter((a) => !isAddition(a)).length >= MAX_MINT_ROWS_PER_CARD) {`,
+  `          if (mine.filter((a) => !isAddition(a)).length >= Infinity) {   // (control mintuncapped) no ceiling`]];
+
+// MUTATE=blankkeysrestrict  the ONE emptiness rule loses its trim. The pinned
+// line lives in api/_coupon-guardrails.js, so the control writes a mutant
+// guardrails copy (below) and the workbook copy under test imports THAT - the
+// same two-file shape seeduntrimmed uses for the seed mapper.
+const BLANKKEYSRESTRICT = [[
+  `import { cleanAppliesTo } from "./_coupon-guardrails.js";`,
+  `import { cleanAppliesTo } from "./.mutant-coupon-guardrails.js";   // (control blankkeysrestrict)`]];
+
 const EDITS = {
   partialsubmit: PARTIALSUBMIT, confirmblind: CONFIRMBLIND,
   confirmnomaterialize: CONFIRMNOMATERIALIZE, submittededitable: SUBMITTEDEDITABLE,
@@ -465,10 +582,39 @@ const EDITS = {
   metawritable: METAWRITABLE, latewrite: LATEWRITE, dropnulls: DROPNULLS,
   addforeign: ADDFOREIGN, payloadtarget: PAYLOADTARGET, addcap: ADDCAP,
   addsubmitted: ADDSUBMITTED, addconfirmed: ADDCONFIRMED, ghostremove: GHOSTREMOVE,
-  emptycardblocks: EMPTYCARDBLOCKS, countsflag: COUNTSFLAG, addkeepsconfirm: ADDKEEPSCONFIRM,
+  emptycardsdontcount: EMPTYCARDSDONTCOUNT, countsflag: COUNTSFLAG, addkeepsconfirm: ADDKEEPSCONFIRM,
+  othernofollowup: OTHERNOFOLLOWUP,
+  codesunmintable: CODESUNMINTABLE, codesmintany: CODESMINTANY,
+  serverconfirmsuntargeted: SERVERCONFIRMSUNTARGETED,
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
+  blankkeysrestrict: BLANKKEYSRESTRICT,   // + a mutant _coupon-guardrails.js copy, written below
+  noncanonicalindex: NONCANONICALINDEX, mintuncapped: MINTUNCAPPED,
+  seeduntrimmed: [],   // pins scripts/seed-sj-age-rows.mjs, not workbook.js - see below
 };
+
+// ── the guardrails half of blankkeysrestrict, BEFORE the module import ───────
+// The pin is the one line that IS the emptiness rule; a copy of the module
+// with that line reverted is what the workbook copy above imports.
+const GUARDRAILS_PATH = path.join(HERE, "_coupon-guardrails.js");
+const GUARDRAILS_PIN = [[
+  `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.map((k) => String(k == null ? "" : k).trim()).filter(Boolean) : []);`,
+  `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.filter(Boolean) : []);   // (control blankkeysrestrict) raw values, no trim`]];
+if (MUTATE === "blankkeysrestrict") {
+  let gSrc = fs.readFileSync(GUARDRAILS_PATH, "utf8");
+  for (const [find, repl] of GUARDRAILS_PIN) {
+    if (!gSrc.includes(find)) {
+      controlBroken = `MUTATE=blankkeysrestrict is pinned to text that is no longer in api/_coupon-guardrails.js:\n\n${find}\n\nRe-point it or delete it - a pin that fails to apply looks exactly like a check that passed.`;
+      throw new Error(controlBroken);
+    }
+    gSrc = gSrc.split(find).join(repl);
+  }
+  const gCopy = path.join(HERE, ".mutant-coupon-guardrails.js");
+  fs.writeFileSync(gCopy, gSrc);
+  tmpFiles.push(gCopy);
+}
 
 const edits = MUTATE
   ? (EDITS[MUTATE] || (() => { controlBroken = `unknown control MUTATE=${MUTATE}`; throw new Error(controlBroken); })())
@@ -477,6 +623,31 @@ if (!sentryOk) console.log("  (note) @sentry/node is not installed here, so the 
 const modulePath = (!MUTATE && sentryOk)
   ? path.join(HERE, "workbook.js")
   : copyWith(sentryOk ? edits : [...edits, [SENTRY_IMPORT, SENTRY_STUB]]);
+
+// ── the seed mapper under test (R5) ─────────────────────────────────────────
+// scripts/seed-sj-age-rows.mjs gates its script body on being invoked
+// directly, so importing it runs NOTHING - the suite gets the pure mapper and
+// no Supabase key is ever in sight. MUTATE=seeduntrimmed drops the trim, the
+// exact regression that made our own seed manufacture a refusal at apply.
+const SEED_PATH = path.join(HERE, "..", "scripts", "seed-sj-age-rows.mjs");
+const SEEDUNTRIMMED = [[
+  `    const s = String(v).trim();`,
+  `    const s = String(v);   // (control seeduntrimmed) the paste artifact survives`]];
+let seedModulePath = SEED_PATH;
+if (MUTATE === "seeduntrimmed") {
+  let seedSrc = fs.readFileSync(SEED_PATH, "utf8");
+  for (const [find, repl] of SEEDUNTRIMMED) {
+    if (!seedSrc.includes(find)) {
+      controlBroken = `MUTATE=seeduntrimmed is pinned to text that is no longer in scripts/seed-sj-age-rows.mjs:\n\n${find}\n\nRe-point it or delete it - a pin that fails to apply looks exactly like a check that passed.`;
+      throw new Error(controlBroken);
+    }
+    seedSrc = seedSrc.split(find).join(repl);
+  }
+  seedModulePath = path.join(HERE, ".mutant-seed-sj-age-rows.mjs");
+  fs.writeFileSync(seedModulePath, seedSrc);
+  tmpFiles.push(seedModulePath);
+}
+const { proposedFromClass } = await import(pathToFileURL(seedModulePath).href);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // ── the in-memory world ──────────────────────────────────────────────────────
@@ -1331,56 +1502,59 @@ console.log("\n── 12. the caps, the ghost, and the ordering, on the addition
   reset();
 }
 
-console.log("\n── 13. a card with nothing to review, and the loophole that rule could become ──");
+console.log("\n── 13. every card counts, and confirm-it-empty is a real answer ──");
 {
-  // The product owner approved a SEVEN-card workbook, and got there by cutting
-  // two cards because a card that could only ever answer "none" was a mandatory
-  // click that taught us nothing. The empty "anything missing?" card exists in
-  // the TABLE because an addition needs a card to belong to, but it must not
-  // become the eighth mandatory click by the back door.
-  //
-  // THE RULE SHIPPED WITH NO BEHAVIOURAL ASSERTION AT ALL - only the shape pin
-  // knew `counts` existed. Everything below is that gap closed.
+  // D6 (2026-08-06): the gate counts CARDS, from first render. The previous
+  // rule (a card with no answers cannot hold Send) grew the denominator when
+  // an addition landed - the owner watched "0 of 7" become "5 of 8" - and let
+  // the add-a-plan card ship with nobody able to tell "he was asked and had
+  // nothing to add" from "he never looked", while the card's own hint promised
+  // "confirm it empty and we will know you were asked".
   const plansCard = () => DB.workbook_cards.push({ id: "c-plans", workbook_id: "wb1", card_key: "plans", title: "Anything missing?", sort_order: 3, state: "untouched", confirmed_at: null });
   const confirmAll = async () => { for (const k of ["tax", "plan:p1", "plan:p2"]) await post({ token: TOKEN, action: "confirm", card_key: k }); };
 
-  // ── TRANSITION 1: empty does not block ────────────────────────────────────
+  // ── the empty card COUNTS, and holds Send until confirmed empty ───────────
   plansCard();
   let r = await getWb(TOKEN);
-  const plans = r.body.cards.find((c) => c.card_key === "plans");
-  ok(plans.counts === false && r.body.cards.filter((c) => c.card_key !== "plans").every((c) => c.counts === true),
-    "an empty card reports counts:false; every card with answers reports counts:true");
+  ok(r.body.cards.every((c) => c.counts === true),
+    "every card reports counts:true - the empty add-a-plan card included");
   await confirmAll();
+  const heldEmpty = await post({ token: TOKEN, action: "submit" });
+  ok(heldEmpty.body.ok === false && heldEmpty.body.remaining === 1,
+    `with the other three confirmed, Send still waits for the empty card (remaining ${heldEmpty.body.remaining})`);
+  const emptyConfirm = await post({ token: TOKEN, action: "confirm", card_key: "plans" });
+  ok(emptyConfirm.body.ok === true && !!row("workbook_cards", "c-plans").confirmed_at,
+    "confirming it EMPTY is accepted - 'he was asked, nothing to add' now has a record");
   const sent = await post({ token: TOKEN, action: "submit" });
   ok(sent.body.ok === true && sent.body.remaining === 0,
-    "with the other three confirmed, Send goes through - the empty card never held it hostage");
-  ok(stateOf("c-plans") === "untouched",
-    "and it was never confirmed - it is not a click he had to make");
+    "and Send goes through with the deliberate act on every card");
 
-  // ── TRANSITION 2: the moment it holds an addition it counts AND blocks ─────
+  // ── an addition does not move the denominator ─────────────────────────────
   reset(); plansCard();
   await confirmAll();
+  const preTotal = (await getWb(TOKEN)).body.cards.filter((c) => c.counts).length;
   const added = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Summer 1x/week", price: 150 } });
-  ok(added.body.card.counts === true && added.body.remaining === 1,
-    `one addition makes the card count, and remaining goes back to 1 (saw ${added.body.remaining})`);
+  const postTotal = (await getWb(TOKEN)).body.cards.filter((c) => c.counts).length;
+  ok(preTotal === 4 && postTotal === 4 && added.body.card.counts === true,
+    `the denominator is ${preTotal} before the add and ${postTotal} after - it cannot grow mid-session (the 0-of-7 -> 5-of-8 defect)`);
+  ok(added.body.remaining === 1, `and remaining is 1 - the card holds Send for the request (saw ${added.body.remaining})`);
   const held = await post({ token: TOKEN, action: "submit" });
   ok(held.body.ok === false && held.body.remaining === 1,
-    "and Send is REFUSED until he confirms it - an unreviewed request is not a sent workbook");
+    "Send is REFUSED until he confirms it - an unreviewed request is not a sent workbook");
   const okNow = await post({ token: TOKEN, action: "confirm", card_key: "plans" });
   ok(okNow.body.remaining === 0 && (await post({ token: TOKEN, action: "submit" })).body.ok === true,
-    "confirming it releases Send, like any other card that has something on it");
+    "confirming it releases Send, like any other card");
 
-  // ── TRANSITION 3: remove it and it stops blocking ─────────────────────────
+  // ── removing the addition does not un-count the card ──────────────────────
   reset(); plansCard();
   await confirmAll();
   const temp = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Never mind", price: 10 } });
   const back = await post({ token: TOKEN, action: "remove", card_key: "plans", id: temp.body.answer.id });
-  ok(back.body.card.counts === false && back.body.remaining === 0,
-    "removing the addition empties the card again and it stops counting");
-  ok(stateOf("c-plans") === "untouched",
-    "its stored state is 'untouched' - which under the old rule would have blocked Send forever");
+  ok(back.body.card.counts === true && back.body.remaining === 1,
+    `emptied again, the card STILL counts and still waits for its confirm (remaining ${back.body.remaining})`);
+  await post({ token: TOKEN, action: "confirm", card_key: "plans" });
   ok((await post({ token: TOKEN, action: "submit" })).body.ok === true,
-    "and Send goes through, on a card carrying a state that is not ready");
+    "and confirm-it-empty sends it");
 
   // ── THE LOOPHOLE: emptiness is the ONLY discriminator ──────────────────────
   // If seeding, a card_key or a payload could mark a card exempt, the
@@ -1471,6 +1645,380 @@ console.log("\n── 15. the shapes the page is built against, pinned ──");
   const wrongMethod = await call({ method: "DELETE", url: "/api/workbook" });
   ok(wrongMethod.status === 405 && wrongMethod.body.ok === false, "and an unsupported method is 405 with a JSON body");
   reset();
+}
+
+console.log("\n── the mint whitelist: a question added after seeding can grow its row ──");
+{
+  reset();
+  // The page's setA creates { id: null } rows for fields the seed never made,
+  // and doSave refuses unknown ids - so the live San Jose workbook could not
+  // store a tax registration number at all. mintableOn() is the narrow
+  // exception: the tax card may grow exactly that one row.
+  const before = DB.workbook_answers.length;
+  const r1 = await post({ token: TOKEN, action: "save", card_key: "tax", answers: [{ id: null, target_field: "tax_registration_number", answered: "123-456-789" }] });
+  ok(r1.status === 200 && r1.body.ok === true, "a null-id save of tax_registration_number on the tax card is accepted");
+  const minted = DB.workbook_answers.filter((a) => a.card_id === "c-tax" && a.target_field === "tax_registration_number");
+  ok(minted.length === 1 && DB.workbook_answers.length === before + 1 && minted[0].answered === "123-456-789",
+    `exactly ONE row is minted, carrying the answer (id ${minted[0] && minted[0].id})`);
+  ok(minted.length === 1 && minted[0].target_kind === "academy_setting" && minted[0].target_table === "clients" && minted[0].target_id === "sj",
+    "aimed by the card's own tax_config sibling - academy_setting on clients - never by the payload");
+
+  // The save reply carries no answer ids, so the page's next autosave sends
+  // null again: it must land on the SAME row, never mint a twin.
+  const r2 = await post({ token: TOKEN, action: "save", card_key: "tax", answers: [{ id: null, target_field: "tax_registration_number", answered: "987-654" }] });
+  const again = DB.workbook_answers.filter((a) => a.card_id === "c-tax" && a.target_field === "tax_registration_number");
+  ok(r2.body.ok === true && again.length === 1 && again[0].id === minted[0].id && again[0].answered === "987-654",
+    `a second null-id save updates the SAME row (${again[0] && again[0].id}), not a twin`);
+
+  // Everything else keeps today's refusal, byte for byte - the whitelist is
+  // the whole of the exception and it fails closed.
+  for (const [key, field] of [["tax", "sneaky_field"], ["plan:p1", "tax_registration_number"], ["plan:p1", "price"]]) {
+    const r = await post({ token: TOKEN, action: "save", card_key: key, answers: [{ id: null, target_field: field, answered: "x" }] });
+    ok(r.status === 404 && /does not belong to this card/.test(String(r.body.error)),
+      `a null-id save of ${field} on the ${key} card still refuses with the existing sentence ("${r.body.error}")`);
+  }
+  reset();
+}
+
+console.log("\n── the mint whitelist, plan cards: the age question can grow its rows ──");
+{
+  reset();
+  // Step 12: plan cards seeded before the per-plan age question existed have no
+  // age_min/age_max rows for the page to save into. mintableOn("plan:*") allows
+  // exactly those two fields, aimed by the card's own siblings.
+  const before = DB.workbook_answers.length;
+  const r1 = await post({ token: TOKEN, action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "age_min", answered: "9" }] });
+  ok(r1.status === 200 && r1.body.ok === true, "a null-id save of age_min on a plan card is accepted");
+  const minted = DB.workbook_answers.filter((a) => a.card_id === "c-p1" && a.target_field === "age_min");
+  ok(minted.length === 1 && DB.workbook_answers.length === before + 1 && minted[0].answered === "9",
+    `exactly ONE row is minted, carrying the answer as a STRING (id ${minted[0] && minted[0].id}, answered ${JSON.stringify(minted[0] && minted[0].answered)})`);
+  ok(minted.length === 1 && minted[0].target_kind === "price_row" && minted[0].target_table === "offer_prices" && minted[0].target_id === "p1",
+    "aimed at the plan's own offer row by the card's title sibling - never by the payload");
+
+  // The save reply carries no answer ids, so the page's next autosave sends
+  // null again: it must land on the SAME row, never mint a twin.
+  const r2 = await post({ token: TOKEN, action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "age_min", answered: "10" }] });
+  const again = DB.workbook_answers.filter((a) => a.card_id === "c-p1" && a.target_field === "age_min");
+  ok(r2.body.ok === true && again.length === 1 && again[0].id === minted[0].id && again[0].answered === "10",
+    `a second null-id save updates the SAME row (${again[0] && again[0].id}), not a twin`);
+
+  // The whitelist is per card: the codes card grows nothing, so the same
+  // null-id age_min save there keeps today's refusal, byte for byte.
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  const r3 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "age_min", answered: "9" }] });
+  ok(r3.status === 404 && /does not belong to this card/.test(String(r3.body.error)),
+    `a null-id save of age_min on the CODES card still refuses with the existing sentence ("${r3.body.error}")`);
+  reset();
+}
+
+console.log("\n── the mint whitelist, codes cards: every CODE_T leaf can grow its row ──");
+{
+  reset();
+  // THE LIVE SAN JOSE BLOCKER (D1): the seed writes 5 rows per code and none
+  // for applies_to / duration_months / expires_at / max_redemptions. The page
+  // saves those with a null id; the exact-string gate refused them, so the
+  // codes card's MANDATORY applies-to answer had nowhere to live and confirm
+  // blocked forever. The fixture here is exactly SJ-shaped: 5 rows for code 0,
+  // targets on the offer.
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  let seedAt = 0;
+  const codeRow = (field, proposed) => DB.workbook_answers.push({
+    id: "a-code-" + (++seedAt), workbook_id: "wb1", card_id: "c-codes", client_id: "sj",
+    target_kind: "price_row", target_table: "offers", target_id: "off1",
+    target_field: field, current_value: null, proposed: proposed === undefined ? null : proposed,
+    answered: null, applied_at: null, created_at: `2026-08-04T00:01:0${seedAt}Z`,
+  });
+  codeRow("codes.0.code", "SIBLING10");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  codeRow("codes.0.duration", "Every payment");
+  codeRow("codes.0.once_per_customer", "yes");
+
+  const sib = DB.workbook_answers.find((a) => a.card_id === "c-codes" && a.target_field === "codes.0.code");
+  const before = DB.workbook_answers.length;
+  const r1 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: ["Academy 2x/week|monthly"], target_table: "workbooks", target_id: "wb2" }] });
+  ok(r1.status === 200 && r1.body.ok === true, "a null-id save of codes.0.applies_to on the codes card is accepted - the exact save that 404'd in production");
+  const minted = DB.workbook_answers.filter((a) => a.card_id === "c-codes" && a.target_field === "codes.0.applies_to");
+  ok(minted.length === 1 && DB.workbook_answers.length === before + 1 && JSON.stringify(minted[0].answered) === JSON.stringify(["Academy 2x/week|monthly"]),
+    `exactly ONE row is minted, carrying the answer (id ${minted[0] && minted[0].id})`);
+  ok(minted.length === 1 && minted[0].target_kind === sib.target_kind && minted[0].target_table === sib.target_table && minted[0].target_id === sib.target_id,
+    `aimed by the codes card's own codes.0.code sibling (${sib.target_kind}/${sib.target_table}/${sib.target_id}) - never by the payload, which named another table`);
+
+  // The save reply carries no answer ids, so the page's next autosave sends
+  // null again: it must land on the SAME row, never mint a twin.
+  const r2 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: [] }] });
+  const again = DB.workbook_answers.filter((a) => a.card_id === "c-codes" && a.target_field === "codes.0.applies_to");
+  ok(r2.body.ok === true && again.length === 1 && again[0].id === minted[0].id && JSON.stringify(again[0].answered) === JSON.stringify([]),
+    `a second null-id save updates the SAME row (${again[0] && again[0].id}), not a twin`);
+
+  // A NEW INDEX: an owner adding a second code needs codes.1.* rows the seed
+  // never wrote. Every CODE_T leaf is mintable, so the new code's fields grow
+  // their rows too, aimed at the same sibling-derived target.
+  const r3 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.1.code", answered: "TEAM20" }] });
+  const r4 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.1.applies_to", answered: ["Academy 2x/week|monthly"] }] });
+  const c1code = DB.workbook_answers.find((a) => a.card_id === "c-codes" && a.target_field === "codes.1.code");
+  const c1app = DB.workbook_answers.find((a) => a.card_id === "c-codes" && a.target_field === "codes.1.applies_to");
+  ok(r3.body.ok === true && r4.body.ok === true && !!c1code && !!c1app && c1code.answered === "TEAM20",
+    `a NEW code index mints too: codes.1.code (id ${c1code && c1code.id}) and codes.1.applies_to (id ${c1app && c1app.id})`);
+  ok(!!c1code && !!c1app && [c1code, c1app].every((a) => a.target_kind === sib.target_kind && a.target_table === sib.target_table && a.target_id === sib.target_id),
+    "both aimed at the same sibling-derived target as code 0");
+
+  // FAIL-CLOSED DID NOT WEAKEN. Everything outside the CODE_T leaves keeps
+  // today's refusal, byte for byte: an unknown leaf, an inherited property, an
+  // index past the bound, a codes field on a plan card, the unindexed leaf
+  // name on the codes card itself - and (Step 2) the non-canonical index
+  // spellings, which are two addresses for one answer.
+  for (const [key, field] of [
+    ["codes", "codes.0.hacker"],
+    ["codes", "codes.0.constructor"],
+    ["codes", "codes.200000.applies_to"],
+    ["plan:p1", "codes.0.applies_to"],
+    ["codes", "applies_to"],
+    ["codes", "codes.00.applies_to"],
+    ["codes", "codes.01.code"],
+  ]) {
+    const r = await post({ token: TOKEN, action: "save", card_key: key, answers: [{ id: null, target_field: field, answered: "x" }] });
+    ok(r.status === 404 && r.body.error === "that answer does not belong to this card",
+      `a null-id save of ${field} on the ${key} card still refuses byte-for-byte ("${r.body.error}")`);
+  }
+  reset();
+}
+
+console.log("\n── the mint door: one spelling per address, and a ceiling on rows ──");
+{
+  // Step 2 (2026-08-06): `+m[1]` collapsed "00" and "0" into the same number,
+  // but the mint dedupes by the exact target_field STRING - so
+  // `codes.00.applies_to` minted a TWIN row for logical code 0. And the mint
+  // branch had no row cap at all, so a scripted loop of null-id saves could
+  // create rows without end on a no-login link. classifyIndexed now refuses
+  // every non-canonical spelling and the mint door carries the caps.
+  // MUTATE=noncanonicalindex / MUTATE=mintuncapped.
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  let seedAt = 0;
+  const codeRow = (field, proposed) => DB.workbook_answers.push({
+    id: "a-code-" + (++seedAt), workbook_id: "wb1", card_id: "c-codes", client_id: "sj",
+    target_kind: "price_row", target_table: "offers", target_id: "off1",
+    target_field: field, current_value: null, proposed: proposed === undefined ? null : proposed,
+    answered: null, applied_at: null, created_at: `2026-08-04T00:01:${String(seedAt).padStart(2, "0")}Z`,
+  });
+  codeRow("codes.0.code", "SIBLING10");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  codeRow("codes.0.duration", "Every payment");
+  codeRow("codes.0.once_per_customer", "yes");
+
+  // ── (i) the tester's exact repro: the twin cannot mint ────────────────────
+  const save = (field, answered) => post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: field, answered }] });
+  const before = DB.workbook_answers.length;
+  const rCanon = await save("codes.0.applies_to", ["Academy 2x/week|monthly"]);
+  const rTwin = await save("codes.00.applies_to", ["Academy 2x/week|monthly"]);
+  const rTwin2 = await save("codes.000.applies_to", ["Academy 2x/week|monthly"]);
+  const rows0 = DB.workbook_answers.filter((a) => a.card_id === "c-codes" && /^codes\.0+\.applies_to$/.test(a.target_field));
+  ok(rCanon.status === 200 && rCanon.body.ok === true, "codes.0.applies_to (the one spelling) mints and saves");
+  for (const [f, r] of [["codes.00.applies_to", rTwin], ["codes.000.applies_to", rTwin2]]) {
+    ok(r.status === 404 && r.body.error === "that answer does not belong to this card",
+      `${f} refuses byte-for-byte ("${r.body.error}")`);
+  }
+  ok(rows0.length === 1 && DB.workbook_answers.length === before + 1,
+    `EXACTLY ONE row exists for logical code 0 afterwards (${rows0.length} row; DB ${before} -> ${DB.workbook_answers.length})`);
+
+  // ── (ii) a flood of spelled variants in ONE save mints nothing ────────────
+  const beforeFlood = DB.workbook_answers.length;
+  const variants = Array.from({ length: 33 }, (_, i) => ({ id: null, target_field: `codes.${"0".repeat(i + 2)}.applies_to`, answered: ["x"] }));
+  const flood = await post({ token: TOKEN, action: "save", card_key: "codes", answers: variants });
+  ok(flood.status === 404 && DB.workbook_answers.length === beforeFlood,
+    `one save carrying 33 spelled-variant items refuses without minting any of them (DB ${beforeFlood} -> ${DB.workbook_answers.length})`);
+
+  // ── (iv) the size cap, at the same door as the ADD path's ─────────────────
+  const big = await save("codes.1.code", "x".repeat(2001));
+  ok(big.status === 400 && big.body.error === "That is too long to add here. Please shorten it, or tell us the details directly."
+    && big.body.code === "add_too_long"
+    && !DB.workbook_answers.some((a) => a.card_id === "c-codes" && a.target_field === "codes.1.code"),
+    `a 2001-char answered value on a mintable field refuses with the ADD sentence verbatim ("${big.body.error}") and mints nothing`);
+
+  // ── (iii) the ceiling: 90 rows and not one more ───────────────────────────
+  // Seeded straight into the stub: ten codes' worth of rows minus one leaf,
+  // which is 89 - the largest card the ceiling still admits a mint on.
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  const LEAVES = ["code", "kind", "value", "duration", "duration_months", "applies_to", "expires_at", "max_redemptions", "once_per_customer"];
+  seedAt = 0;
+  for (let i = 0; i < 10; i++) {
+    for (const leaf of LEAVES) {
+      if (i === 9 && leaf === "once_per_customer") continue;   // 89 rows, one short
+      codeRow(`codes.${i}.${leaf}`, null);
+    }
+  }
+  const countRows = () => DB.workbook_answers.filter((a) => a.card_id === "c-codes").length;
+  ok(countRows() === 89, `the fixture holds 89 non-addition rows (${countRows()})`);
+  const at90 = await save("codes.9.once_per_customer", "yes");
+  ok(at90.status === 200 && at90.body.ok === true && countRows() === 90,
+    `the 90th row still mints - ten fully-answered codes is above any real card (rows ${countRows()})`);
+  const over = await save("codes.10.code", "EXTRA");
+  ok(over.status === 400 && over.body.error === "This card cannot take any more answers. Tell BAM directly and we will sort it out." && countRows() === 90,
+    `the 91st refuses with the cap sentence verbatim ("${over.body.error}") and the DB is pinned at ${countRows()} rows`);
+  reset();
+}
+
+console.log("\n── the codes confirm guard: a named code must say what it applies to ──");
+{
+  reset();
+  // D3: the page refuses this confirm at the moment of the deliberate act, and
+  // the server must refuse it too - in the SAME sentence - or a direct POST
+  // walks straight past a rule the page promises. SJ-shaped fixture again: a
+  // named code, no applies_to row at all.
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  let seedAt = 0;
+  const codeRow = (field, proposed) => DB.workbook_answers.push({
+    id: "a-code-" + (++seedAt), workbook_id: "wb1", card_id: "c-codes", client_id: "sj",
+    target_kind: "price_row", target_table: "offers", target_id: "off1",
+    target_field: field, current_value: null, proposed: proposed === undefined ? null : proposed,
+    answered: null, applied_at: null, created_at: `2026-08-04T00:01:0${seedAt}Z`,
+  });
+  codeRow("codes.0.code", "SIBLING10");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  codeRow("codes.0.duration", "Every payment");
+  codeRow("codes.0.once_per_customer", "yes");
+
+  const WANT = 'Say what SIBLING10 applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".';
+  const r1 = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(r1.status === 400 && r1.body.ok === false && r1.body.error === WANT,
+    `confirming a named code with a blank applies-to refuses 400, sentence verbatim ("${r1.body.error}")`);
+  ok(row("workbook_cards", "c-codes").confirmed_at === null && DB.workbook_answers.every((a) => a.card_id !== "c-codes" || a.answered === null),
+    "and the refusal left no half-stamped card behind - nothing was materialized, nothing confirmed");
+
+  // With the list filled (through the D1 mint door, the way the live page
+  // does), the same confirm succeeds.
+  const fill = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: ["Academy 2x/week|monthly"] }] });
+  const r2 = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(fill.body.ok === true && r2.status === 200 && r2.body.ok === true && !!row("workbook_cards", "c-codes").confirmed_at,
+    "with the applies-to list filled the same confirm succeeds");
+
+  // A codes card with NO named code is "confirm it empty": there is nothing
+  // loose, so the deliberate act goes through.
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  const r3 = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(r3.status === 200 && r3.body.ok === true && !!row("workbook_cards", "c-codes").confirmed_at,
+    "a codes card with no named code still confirms - 'no codes' is an answer");
+  reset();
+}
+
+console.log("\n── the codes confirm guard, part 2: a whitespace key restricts nothing ──");
+{
+  // The adversarial finding (2026-08-06): `applies_to: [" "]` read as targeted
+  // to the guards' raw length checks while couponAppliesToKeys trimmed it to
+  // null = EVERYTHING - so a direct POST could confirm a code the Stripe
+  // builder would scope to every line of the first invoice, the joining fee
+  // included. cleanAppliesTo (api/_coupon-guardrails.js) is now the ONE
+  // emptiness rule for every reader. MUTATE=blankkeysrestrict.
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  let seedAt = 0;
+  const codeRow = (field, proposed) => DB.workbook_answers.push({
+    id: "a-code-" + (++seedAt), workbook_id: "wb1", card_id: "c-codes", client_id: "sj",
+    target_kind: "price_row", target_table: "offers", target_id: "off1",
+    target_field: field, current_value: null, proposed: proposed === undefined ? null : proposed,
+    answered: null, applied_at: null, created_at: `2026-08-04T00:01:0${seedAt}Z`,
+  });
+  codeRow("codes.0.code", "SIBLING10");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  codeRow("codes.0.duration", "Every payment");
+  codeRow("codes.0.once_per_customer", "yes");
+
+  // The tester's exact battery, as a loop: every shape that is EMPTY once the
+  // shared rule reads it must refuse the confirm 400, sentence verbatim.
+  const WANT = 'Say what SIBLING10 applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".';
+  for (const shape of [[], [""], [" "], ["\t"], ""]) {
+    const s = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: shape }] });
+    const r = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+    ok(s.body.ok === true && r.status === 400 && r.body.ok === false && r.body.error === WANT && !row("workbook_cards", "c-codes").confirmed_at,
+      `applies_to ${JSON.stringify(shape)} saves but the confirm refuses 400, sentence verbatim ("${r.body.error}")`);
+  }
+
+  // Trim must never over-refuse: a PADDED REAL KEY is a real key.
+  const padded = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: ["  Academy 2x/week|monthly  "] }] });
+  const okPadded = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(padded.body.ok === true && okPadded.status === 200 && okPadded.body.ok === true && !!row("workbook_cards", "c-codes").confirmed_at,
+    'a padded real key ["  Academy 2x/week|monthly  "] confirms - the trim refuses whitespace, never keys');
+
+  // And the whitespace-only code NAME resolves as NO CODE: nothing is loose,
+  // so the confirm goes through - the same reading looseCodesIn, the page and
+  // unrestrictedCodes all share (the coupon-mint path skips it too, pinned in
+  // api/_coupon-guardrails.test.mjs).
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  seedAt = 0;
+  codeRow("codes.0.code", "   ");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  const rName = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(rName.status === 200 && rName.body.ok === true && !!row("workbook_cards", "c-codes").confirmed_at,
+    'a code NAMED "   " with an answered value and no applies_to still confirms - a name that trims blank IS no code, so nothing is loose and no warning would name it');
+  reset();
+}
+
+console.log("\n── the add-a-plan cadence follow-up: 'Other' must say how often ──");
+{
+  reset();
+  DB.workbook_cards.push({ id: "c-plans", workbook_id: "wb1", card_key: "plans", title: "Anything missing?", sort_order: 3, state: "untouched", confirmed_at: null });
+  // A plan billed on a cadence the chip list cannot name, with the follow-up
+  // missing: staff cannot create '$85 other' by hand, so it is a riddle, not
+  // a request, and it refuses in the page's own promised sentence.
+  const bad = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Skills clinic", price: 85, billing_cycle: "Other" } });
+  ok(bad.status === 400 && bad.body.error === "Please say how often this plan bills before adding it.",
+    `an Other cycle with no follow-up refuses, sentence verbatim ("${bad.body.error}")`);
+  const good = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Skills clinic", price: 85, billing_cycle: "Other", billing_cycle_other: "every 6 weeks" } });
+  ok(good.status === 200 && good.body.ok === true && good.body.answer.answered.billing_cycle_other === "every 6 weeks",
+    `with the follow-up it stores, carrying the text (${JSON.stringify(good.body.answer && good.body.answer.answered)})`);
+  reset();
+}
+
+console.log("\n── the seed's class-twin prefill: trimmed, and never refusing its own apply ──");
+{
+  // R5. A padded class value ("9 ") used to seed a padded `proposed`; the
+  // owner confirming unedited materialises it as `answered`, and the
+  // apply-side translator then rightly refuses " 9" - a refusal manufactured
+  // by our own seed. The mapper trims, treats whitespace-only as NO proposal
+  // (null, the prefill-is-a-claim rule), and the round trip below closes the
+  // loop with the translator pin in api/_workbook-apply.test.mjs section 22:
+  // every value the seed can propose passes tAgeStrOrEmpty.
+  // MUTATE=seeduntrimmed.
+  const battery = [
+    [{ age_min: "9 ", age_max: " 12" }, { age_min: "9", age_max: "12" }],
+    [{ age_min: 9, age_max: 12 }, { age_min: "9", age_max: "12" }],
+    [{ age_min: "", age_max: "14" }, { age_min: null, age_max: "14" }],
+    [{ age_min: "   ", age_max: null }, { age_min: null, age_max: null }],
+    [{}, { age_min: null, age_max: null }],
+    [{ age_min: "9\n", age_max: "\t12" }, { age_min: "9", age_max: "12" }],
+  ];
+  for (const [input, want] of battery) {
+    const got = proposedFromClass(input);
+    ok(JSON.stringify(got) === JSON.stringify(want),
+      `proposedFromClass(${JSON.stringify(input)}) -> ${JSON.stringify(got)} (want ${JSON.stringify(want)})`);
+  }
+
+  // THE ROUND TRIP. The translator is extracted from api/workbook.js SOURCE
+  // (the real one, not this suite's mutant copy), so this holds the seed
+  // against the refusal rule as it actually ships - a hand-kept copy here
+  // could agree with nothing.
+  const wbSrc = fs.readFileSync(path.join(HERE, "workbook.js"), "utf8");
+  const mAge = wbSrc.match(/const tAgeStrOrEmpty = \(v\) => \{[\s\S]*?\n\};/);
+  ok(!!mAge, "tAgeStrOrEmpty is still extractable from api/workbook.js source (re-point this extraction if it moved)");
+  if (mAge) {
+    const tOk = (value) => ({ ok: true, value });
+    const tErr = (error) => ({ ok: false, error });
+    const tAgeStrOrEmpty = new Function("tOk", "tErr", `${mAge[0]}\nreturn tAgeStrOrEmpty;`)(tOk, tErr);
+    const proposals = battery
+      .flatMap(([input]) => { const p = proposedFromClass(input); return [p.age_min, p.age_max]; })
+      .filter((v) => v != null);
+    const refused = proposals.filter((v) => !tAgeStrOrEmpty(v).ok);
+    ok(proposals.length > 0 && refused.length === 0,
+      `every value the seed can propose passes tAgeStrOrEmpty - a seeded proposal can never refuse its own apply (${proposals.length} proposals ${JSON.stringify(proposals)}${refused.length ? ", REFUSED: " + JSON.stringify(refused) : ""})`);
+  }
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────

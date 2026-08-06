@@ -139,10 +139,77 @@
 //   MUTATE=answercolumn       node api/_workbook-apply.test.mjs
 //       the staff answers read loses its 42703 fallback, so a missing
 //       apply_error column 500s the entire review surface.
+//   MUTATE=agesunknownfield   node api/_workbook-apply.test.mjs
+//       age_min loses its PLAN_T home, so the row the page really produced
+//       must REFUSE the apply (fail closed) rather than land on a guessed key.
+//   MUTATE=agebandunchecked   node api/_workbook-apply.test.mjs
+//       the min>max refusal is deleted, so a plan no athlete could ever fit
+//       lands in the offer jsonb with ok:true.
+//   MUTATE=agenotegone        node api/_workbook-apply.test.mjs
+//       the age_note is dropped from the apply response, so an apply that
+//       stored plan ages stops saying that nothing reads them yet - and the
+//       person who typed 9-12 reasonably believes routing just moved.
+//   MUTATE=agesanythinggoes   node api/_workbook-apply.test.mjs
+//       the body of tAgeStrOrEmpty becomes `return tOk(String(v))`, so every
+//       value - an injection shape, a negative, a fraction, a padded string,
+//       a boolean - becomes an age the offer stores verbatim. Section 22's
+//       table is what has to catch it; before that table, this mutation
+//       passed every gate.
+//   MUTATE=onepagestripe      node api/_workbook-apply.test.mjs
+//       the live-Stripe price read stops paginating (`page < 10` -> `page < 1`),
+//       so in production every price past #100 reads exists:false and the
+//       mint duplicates real prices. The fixture serves the real hits on
+//       PAGE TWO, so section 18 catches the missed matches and the missing
+//       starting_after request. Before the paginated fixture, this mutation
+//       passed every gate.
+//   MUTATE=monthsunbounded    node api/_workbook-apply.test.mjs
+//       CODE_T.duration_months goes back to the unbounded tIntOrNull, so a
+//       discount code claiming 0 or 25 billing months - months this build can
+//       never sell - lands in the offer jsonb with ok:true.
+//   MUTATE=blankkeysrestrict  node api/_workbook-apply.test.mjs
+//       cleanAppliesTo (api/_coupon-guardrails.js) stops trimming, so
+//       `applies_to: [" "]` reads as a RESTRICTION to unrestrictedCodes - the
+//       joining-fee withhold never fires - while couponAppliesToKeys still
+//       trims it to "everything" for the Stripe coupon, and tStrArray lets
+//       the whitespace key land in the offer jsonb. Section 15b is what has
+//       to catch it. Pins the guardrails module (two mutant copies, wired
+//       above the module import); the SAME pin is carried by
+//       api/_coupon-guardrails.test.mjs, api/_workbook.test.mjs and
+//       scripts/verify-workbook-contract.mjs.
 //
 // A pin that no longer matches api/workbook.js reports NEGATIVE CONTROL FAILED
 // rather than passing quietly. A control run exits ZERO when the mutation IS
 // caught; CI greps for the banner and the MUTATE= names above.
+//
+// MEASURED CATCH COUNTS - controls added or re-pointed in the 2026-08-06
+// remediation pass, each run and counted on that date (re-measure and update
+// this block whenever one of THESE pins moves; the older controls above keep
+// their proof in CI, which runs every name and greps for the banner):
+//   agesanythinggoes -> 18 failures (all 16 MUST-REFUSE assertions in the
+//                       section 22 table, plus both "012"-normalisation pins)
+//   vocabdrift       -> 9 failures (re-pointed: Step 12's blank-age skip landed
+//                       inside the old three-line anchor and the control
+//                       ERRORED instead of tripping; the pin is now the one
+//                       moving push line, and it catches the casing, typing,
+//                       rung-creation and age-string assertions on its own;
+//                       8 when re-pointed, 9 since section 23's blank-months
+//                       pin joined)
+//   onepagestripe    -> 4 failures (the starting_after read-pattern pin, the
+//                       exists/mint counts, the page-two 12-week match and its
+//                       product name; also pinned in
+//                       scripts/verify-workbook-contract.mjs, where it catches
+//                       the read-pattern assertion -> 1)
+//   monthsunbounded  -> 2 failures (section 23's 0-months and 25-months
+//                       refusals; also pinned in
+//                       scripts/verify-workbook-contract.mjs, where section J's
+//                       real-page 25 catches 3)
+//   blankkeysrestrict -> 4 failures (measured 2026-08-06, whitespace pass:
+//                       section 15b's withhold-fires and no-fee-target pins on
+//                       the poisoned offer, plus the cleaned-list-lands and
+//                       withholds-out-loud pins on the answered [" "]. Catches
+//                       elsewhere: 4 in api/_coupon-guardrails.test.mjs, 2 in
+//                       api/_workbook.test.mjs, 2 in
+//                       scripts/verify-workbook-contract.mjs)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -157,6 +224,10 @@ process.env.SUPABASE_URL = SB_BASE;
 process.env.VITE_SUPABASE_URL = SB_BASE;
 process.env.SUPABASE_SERVICE_ROLE_KEY = "stub-service-key";
 delete process.env.SUPABASE_SERVICE_KEY;
+// The transport the live-Stripe read routes through needs a platform key; the
+// stub has no client_stripe_direct row, so every call takes the Connect path
+// (platform key + Stripe-Account header) - which is exactly the assertion.
+process.env.STRIPE_CONNECT_SECRET_KEY = "sk_stub_platform_key";
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -239,10 +310,16 @@ const REAPPLY = [[
   `    if (a.applied_at) { skipped.already_applied.push(a.id); continue; }`,
   `    // (control reapply) already-applied answers are written again`]];
 
+// Re-pointed 2026-08-06: Step 12's blank-age skip landed inside the old
+// three-line anchor, so the pin stopped applying and the control ERRORED
+// instead of tripping - a decorative control, the exact thing the measured
+// block exists to prevent. The push line is unique in api/workbook.js, so the
+// pin is now the ONE moving line. The translation and its refusal above it
+// stay: tChip translates case-insensitively, so a page-cased "Waive" still
+// translates ok and the mutant pushes the RAW value - the same drift this
+// control always reintroduced.
 const VOCABDRIFT = [[
-  `    const out = cls.t(eff);
-    if (!out.ok) { refuse(a, out.error); continue; }
-    offerPending.push({ a, cls, value: out.value });`,
+  `    offerPending.push({ a, cls, value: out.value });`,
   `    offerPending.push({ a, cls, value: eff });   // (control vocabdrift) the page's own casing lands`]];
 
 const OWNERTOKEN = [[
@@ -336,8 +413,8 @@ const PREVIEWLIES = [
       "offer_prices billing_cadence"
     ),`,
    `    Promise.resolve({ state: "read", rows: [] }),   // (control previewlies) the typed row is never read`],
-  ["        rhythm_note: `the commitment length declares a ${weeks}-week billing rhythm. ${CADENCE_UNKNOWABLE}`,",
-   "        rhythm_note: `the commitment length declares a ${weeks}-week billing rhythm; the mint resolves it through create-price.js cadence rules`,   // (control previewlies)"],
+  [`    const typedCad = typed === undefined ? null : mod.pricer.normCadence(typed);`,
+   `    const typedCad = null;   // (control previewlies) the typed row no longer outranks the label`],
 ];
 
 const LATELOAD = [
@@ -357,8 +434,126 @@ const ANSWERCOLUMN = [[
     return { answers: (await sb(q(ANSWER_SELECT))) || [], degraded: true };`,
   `    throw e;   // (control answercolumn) a missing apply_error column 500s the review surface`]];
 
+// The withhold goes back to being stdout: the report key is dropped from the
+// phase3 return, so a plan's joining fee silently vanishes from the rehearsal
+// with only a server-side console.warn to show for it - the exact shape Step 1
+// (D1 groundwork) closed.
+const FEEWITHHELDSILENTLY = [[
+  `    withheld_signup_fees: withheld,`,
+  `    // (control feewithheldsilently) the withhold is dropped from the response`]];
+
+// The deliberate No collapses back into never-asked: canonicalTax stores null
+// for { charges_tax: false }, so the owner's answer and an unasked academy are
+// the same nothing again, and a future workbook asks him a question he already
+// answered.
+const NOISNULL = [[
+  `  if (v.charges_tax === false) return tOk({ charges_tax: false });`,
+  `  if (v.charges_tax === false) return tOk(null);   // (control noisnull) the deliberate no collapses into never-asked`]];
+
+// The registration number loses its classifyField home. Fail-closed means the
+// row must then REFUSE (unknown field, refusal printed on the row) - never
+// land somewhere guessed - and the clients write must not happen.
+const TAXREGNOWHERE = [[
+  `  if (f === "tax_registration_number") return { kind: "taxreg" };`,
+  `  // (control taxregnowhere) the field has no home`]];
+
+// The live-Stripe read's catch swallows the failure into "nothing exists": a
+// dead read reports exists:false everywhere and zero counts, which is "mint
+// them all" said with false confidence against real cards.
+const STRIPEQUIETFAIL = [[
+  `      livePrices = null;
+      stripeCheck = "could_not_read";`,
+  `      livePrices = [];                    // (control stripequietfail)
+      stripeCheck = "read";               // the failure is swallowed into "nothing exists"`]];
+
+// One POST sneaks into the read loop. The harness's WRITTEN-TO throw must
+// fire, proving the no-write tripwire is live - observable as the whole read
+// degrading to could_not_read instead of answering.
+const STRIPEWRITE = [[
+  "        const r = await mod.stripe.stripeFetch(`/prices?${qs.toString()}`, { stripeAccount: acct });",
+  "        await mod.stripe.stripeFetch(\"/prices\", { method: \"POST\", body: { unit_amount: 1 }, stripeAccount: acct });   // (control stripewrite)\n        const r = await mod.stripe.stripeFetch(`/prices?${qs.toString()}`, { stripeAccount: acct });"]];
+
+// The stale-note clear is skipped, so BAM-authored prose about prices the
+// apply just changed survives inside the offer jsonb, wrong forever.
+const STALENOTESKEPT = [[
+  `        rung.discount_notes = "";`,
+  `        return;   // (control stalenoteskept) the stale note survives the apply`]];
+
+// age_min loses its home in the plan whitelist. The row the page really
+// produced must then REFUSE the whole apply (unknown field, fail closed),
+// never land on a guessed key - same proof shape as taxregnowhere.
+const AGESUNKNOWNFIELD = [[
+  `  age_min: tAgeStrOrEmpty, age_max: tAgeStrOrEmpty,`,
+  `  age_max: tAgeStrOrEmpty,   // (control agesunknownfield) age_min has no home`]];
+
+// The inverted-band refusal is deleted, so a plan whose youngest age is above
+// its oldest - a plan no athlete could ever fit - writes with ok:true.
+const AGEBANDUNCHECKED = [[
+  "        refuse(lo.a, `age_min ${lo.value} is above age_max ${hi.value}, so no athlete could ever fit this plan. Fix the ages first.`);",
+  "        // (control agebandunchecked) the inverted band sails through"]];
+
+// CODE_T.duration_months goes back to the unbounded tIntOrNull, so a code
+// claiming 0 or 25 billing months - months this build can never sell - lands
+// in the offer jsonb with ok:true. Section 23's edges are what has to catch it.
+const MONTHSUNBOUNDED = [[
+  `  duration: tChip(V_DUR, "duration"), duration_months: tMonths1to24,`,
+  `  duration: tChip(V_DUR, "duration"), duration_months: tIntOrNull,   // (control monthsunbounded)`]];
+
+// The live-Stripe read stops paginating: one page of 100 and the loop ends,
+// so every price past #100 reads exists:false and the rehearsal says "mint
+// them all" against real cards. The fixture serves the real hits on PAGE TWO
+// on purpose, so this control must trip the match assertions AND the
+// read-pattern assertion. The non-GET "STRIPE WAS WRITTEN TO" throw is
+// untouched.
+const ONEPAGESTRIPE = [[
+  `      for (let page = 0; page < 10; page++) {   // cap ~1000 prices; an academy past that is a conversation`,
+  `      for (let page = 0; page < 1; page++) {    // (control onepagestripe) the first page is the whole truth`]];
+
+// The translator body becomes the tester's mutation: any value stringifies
+// into an age. The early `""` return above it stays, which changes nothing -
+// String("") is "" - so this is ONE moving line and the whole anything-goes
+// behaviour. Section 22's table is what has to catch it.
+const AGESANYTHINGGOES = [[
+  "  return Number.isInteger(n) && n >= 1 && n <= 99 ? tOk(String(n)) : tErr(`not an age this can store: ${JSON.stringify(v)}`);",
+  "  return tOk(String(v));   // (control agesanythinggoes) anything goes"]];
+
+// The stored-for-later note is dropped from the response, so an apply that
+// wrote plan ages stops saying that nothing consumes them yet.
+const AGENOTEGONE = [[
+  `    ...(wroteAges ? { age_note: "Plan ages were stored on the offer for later use. Nothing reads plan ages yet: class age routing still reads the class list, so no routing changed." } : {}),`,
+  `    // (control agenotegone) the note is gone`]];
+
+// The ONE emptiness rule (cleanAppliesTo, api/_coupon-guardrails.js) loses its
+// trim, so `applies_to: [" "]` reads as a RESTRICTION to unrestrictedCodes and
+// the joining-fee withhold never fires - while couponAppliesToKeys still trims
+// it to "everything" for the Stripe coupon. The pinned line lives in the
+// guardrails module, so this control writes a mutant guardrails copy plus a
+// mutant match-prices copy that imports it, and repoints the workbook copy's
+// two imports at them (below). The SAME pin is carried by
+// api/_coupon-guardrails.test.mjs, api/_workbook.test.mjs and
+// scripts/verify-workbook-contract.mjs.
+const BLANKKEYSRESTRICT = [
+  [`import { cleanAppliesTo } from "./_coupon-guardrails.js";`,
+   `import { cleanAppliesTo } from "./.mutant-coupon-guardrails.js";   // (control blankkeysrestrict)`],
+  [`await import("./offers/match-prices.js")`,
+   `await import("./offers/.mutant-match-prices.js")`],
+];
+
 const EDITS = {
   applybeforereview: APPLYBEFOREREVIEW,
+  feewithheldsilently: FEEWITHHELDSILENTLY,
+  blankkeysrestrict: BLANKKEYSRESTRICT,
+  noisnull: NOISNULL,
+  taxregnowhere: TAXREGNOWHERE,
+  stripequietfail: STRIPEQUIETFAIL,
+  stripewrite: STRIPEWRITE,
+  stalenoteskept: STALENOTESKEPT,
+  agesunknownfield: AGESUNKNOWNFIELD,
+  agebandunchecked: AGEBANDUNCHECKED,
+  agenotegone: AGENOTEGONE,
+  agesanythinggoes: AGESANYTHINGGOES,
+  onepagestripe: ONEPAGESTRIPE,
+  monthsunbounded: MONTHSUNBOUNDED,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -382,6 +577,39 @@ const EDITS = {
 const edits = MUTATE
   ? (EDITS[MUTATE] || (() => { controlBroken = `unknown control MUTATE=${MUTATE}`; throw new Error(controlBroken); })())
   : [];
+
+// ── the guardrails half of blankkeysrestrict, BEFORE any module import ───────
+// The pin is the one line that IS the emptiness rule. Two mutant copies are
+// written: the guardrails module with the trim reverted, and a match-prices
+// copy whose guardrails import points at it (so unrestrictedCodes on the
+// apply path really runs the mutant, not the real rule).
+if (MUTATE === "blankkeysrestrict") {
+  const G_PIN = [
+    `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.map((k) => String(k == null ? "" : k).trim()).filter(Boolean) : []);`,
+    `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.filter(Boolean) : []);   // (control blankkeysrestrict) raw values, no trim`];
+  let gSrc = fs.readFileSync(path.join(HERE, "_coupon-guardrails.js"), "utf8");
+  if (!gSrc.includes(G_PIN[0])) {
+    controlBroken = `MUTATE=blankkeysrestrict is pinned to text that is no longer in api/_coupon-guardrails.js:\n\n${G_PIN[0]}\n\nRe-point it or delete it - a pin that fails to apply looks exactly like a check that passed.`;
+    throw new Error(controlBroken);
+  }
+  const gCopy = path.join(HERE, ".mutant-coupon-guardrails.js");
+  fs.writeFileSync(gCopy, gSrc.split(G_PIN[0]).join(G_PIN[1]));
+  tmpFiles.push(gCopy);
+
+  const MP_PIN = [
+    `import { cleanAppliesTo } from "../_coupon-guardrails.js";`,
+    `import { cleanAppliesTo } from "../.mutant-coupon-guardrails.js";   // (control blankkeysrestrict)`];
+  let mpSrc = fs.readFileSync(path.join(HERE, "offers", "match-prices.js"), "utf8");
+  if (!mpSrc.includes(MP_PIN[0])) {
+    controlBroken = `MUTATE=blankkeysrestrict is pinned to an import that is no longer in api/offers/match-prices.js:\n\n${MP_PIN[0]}\n\nRe-point it or delete it.`;
+    throw new Error(controlBroken);
+  }
+  const mpCopy = path.join(HERE, "offers", ".mutant-match-prices.js");
+  fs.writeFileSync(mpCopy, mpSrc.split(MP_PIN[0]).join(MP_PIN[1]));
+  tmpFiles.push(mpCopy);
+}
 if (!sentryOk) console.log("  (note) @sentry/node is not installed here, so the copy under test has its _sentry import replaced by an identity wrapper. Nothing else is changed. NOTE: apply's phase-3 preview imports match-prices.js, whose chain also needs node_modules - expect it to refuse here.");
 const modulePath = (!MUTATE && sentryOk)
   ? path.join(HERE, "workbook.js")
@@ -397,7 +625,10 @@ const TOKEN = "wbk_" + "tok_" + "applySanJose";
 const STAFF_BEARER = "staff-session-" + "bearer-Kp3";
 
 const COLUMNS = {
-  clients: ["id", "public_name", "business_name", "tax_config"],
+  clients: ["id", "public_name", "business_name", "tax_config", "tax_registration_number", "stripe_connect_account_id"],
+  // The transport's direct-row lookup: no rows here, so every academy routes
+  // through Connect - the caller must not be able to tell, and does not ask.
+  client_stripe_direct: ["client_id", "status", "secret_key_enc", "secret_key_last4", "publishable_key", "stripe_account_id", "capabilities", "key_last_verified_at"],
   staff: ["id", "user_id", "name", "email"],
   offers: ["id", "client_id", "status", "title", "type", "data"],
   workbooks: ["id", "client_id", "kind", "token", "status", "expires_at", "sent_at", "submitted_at", "reviewed_at", "applied_at", "snapshot", "created_by", "created_by_name", "created_at", "updated_at"],
@@ -454,7 +685,7 @@ let seq = 0;
 function reset() {
   seq = 0;
   DB = {
-    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null }],
+    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null, stripe_connect_account_id: "acct_1RDtSMK6ZS1cqefu" }],
     staff: [{ id: "staff-1", user_id: "user-1", name: "Zoran", email: "zoran@byanymeansbball.com" }],
     offers: [{ id: "off1", client_id: "sj", status: "active", title: "Training", type: "training", data: OFFER_DATA() }],
     workbooks: [
@@ -564,6 +795,41 @@ function project(table, rows, params) {
   return rows.map((r) => Object.fromEntries(cols.map((c) => [c, r[c] === undefined ? null : r[c]])));
 }
 
+// ── THE LIVE STRIPE FIXTURE (D7) ─────────────────────────────────────────────
+// Four of the fixture's seven post-apply targets already exist live - amounts
+// AND recurring shapes both matching what the mint would create - including
+// the 12-week rung, so the rhythm half of the match is exercised. One decoy
+// sits at the 12-month prepay's exact amount on a 4-week clock: amount alone
+// must never read as existence. GETs are served from here; ANY other method
+// still throws, which keeps the no-writes gate and makes it sharper
+// (MUTATE=stripewrite proves the tripwire is live).
+const STRIPE_PRICES = [
+  { id: "price_live_ele_m", object: "price", unit_amount: 21875, currency: "usd", product: "prod_ele", recurring: { interval: "week", interval_count: 4 } },
+  { id: "price_live_two_m", object: "price", unit_amount: 27344, currency: "usd", product: "prod_two", recurring: { interval: "week", interval_count: 4 } },
+  { id: "price_live_two_3m", object: "price", unit_amount: 60047, currency: "usd", product: "prod_two", recurring: { interval: "week", interval_count: 12 } },
+  { id: "price_live_fee", object: "price", unit_amount: 4375, currency: "usd", product: "prod_fee", recurring: null },
+  // The decoy: right amount, wrong clock. Not the 12-month prepay.
+  { id: "price_live_decoy", object: "price", unit_amount: 218641, currency: "usd", product: "prod_ele", recurring: { interval: "week", interval_count: 4 } },
+];
+const STRIPE_PRODUCTS = [
+  { id: "prod_ele", name: "Elementary Academy" },
+  { id: "prod_two", name: "Academy 2x/week" },
+  { id: "prod_fee", name: "Joining fee" },
+];
+// PAGE ONE, on purpose (R3): 100 fillers whose amounts (1-100 cents) match no
+// target, served with has_more:true. The REAL hits above live on PAGE TWO,
+// behind a starting_after cursor - so a read that stops paginating
+// (`page < 10` -> `page < 1`) reads every real price as missing and the
+// rehearsal says "mint them all" against real cards. That regression survived
+// every gate while the fixture was one page deep.
+const STRIPE_FILLERS = Array.from({ length: 100 }, (_, i) => ({
+  id: `price_filler_${i + 1}`, object: "price", unit_amount: i + 1, currency: "usd",
+  product: "prod_filler", recurring: { interval: "week", interval_count: 4 },
+}));
+const STRIPE_CURSOR = STRIPE_FILLERS[STRIPE_FILLERS.length - 1].id;
+const STRIPE_READS = [];           // every GET, with its headers, for the right-account assertion
+const STRIPE_FAIL = new Set();     // "prices" -> GET /v1/prices answers 503
+
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
   const method = String(init.method || "GET").toUpperCase();
@@ -571,7 +837,19 @@ globalThis.fetch = async (url, init = {}) => {
   new Headers(init.headers || {});
   const json = (v, status = 200) => new Response(JSON.stringify(v), { status, headers: { "content-type": "application/json" } });
 
-  if (u.startsWith("https://api.stripe.com/")) throw new Error(`STRIPE WAS CALLED: ${method} ${u} - nothing in this pass may talk to Stripe`);
+  if (u.startsWith("https://api.stripe.com/")) {
+    if (method !== "GET") throw new Error(`STRIPE WAS WRITTEN TO: ${method} ${u} - the rehearsal may READ Stripe, never write it`);
+    STRIPE_READS.push({ url: u, headers: init.headers || {} });
+    if (u.includes("/v1/prices")) {
+      if (STRIPE_FAIL.has("prices")) return json({ error: { message: "the stub database went away mid-read" } }, 503);
+      const after = new URL(u).searchParams.get("starting_after");
+      if (!after) return json({ object: "list", data: STRIPE_FILLERS, has_more: true });
+      if (after === STRIPE_CURSOR) return json({ object: "list", data: STRIPE_PRICES, has_more: false });
+      return json({ object: "list", data: [], has_more: false });
+    }
+    if (u.includes("/v1/products")) return json({ object: "list", data: STRIPE_PRODUCTS, has_more: false });
+    return json({ object: "list", data: [], has_more: false });
+  }
   if (u.startsWith(`${SB_BASE}/auth/v1/`)) {
     const bearer = String((init.headers || {}).Authorization || "");
     if (bearer !== `Bearer ${STAFF_BEARER}`) return json({ msg: "invalid" }, 401);
@@ -626,9 +904,13 @@ const WB = await import(pathToFileURL(modulePath).href);
 // fails", and you cannot answer it against an import that works. MUTATE=lateload
 // moves the load back to where it used to be, and this copy is where that shows
 // up as tax and offer writes that landed before the refusal.
+// Any control pin that already repoints the match-prices import (only
+// blankkeysrestrict today) is dropped for THIS copy: the whole point of the
+// noload copy is that the price machinery cannot load, and which mutant fails
+// to load is not part of any claim.
 const noloadEdits = [
   ...(sentryOk ? [] : [[SENTRY_IMPORT, SENTRY_STUB]]),
-  ...edits,
+  ...edits.filter(([find]) => !find.includes(`import("./offers/match-prices.js")`)),
   [`await import("./offers/match-prices.js")`, `await import("./offers/no-such-price-machinery.js")`],
 ];
 const WB_NOLOAD = await import(pathToFileURL(copyWith(noloadEdits, ".mutant-workbook-noload.js")).href);
@@ -858,11 +1140,14 @@ console.log("\n── 4. apply: gated, ordered, dry by default ──");
   ok(!!two3 && two3.allin_cents === 60047 && JSON.stringify(two3.recurring) === JSON.stringify({ interval: "month", interval_count: 3 }),
     "the 3-month rung previews on the 3-month clock with the NEW 549 price, taxed");
   // THE RHYTHM San Jose actually bills on. "3 Months (12 Weeks)" declares a
-  // 12-week clock; his real members ride it, and the rehearsal must show it.
-  ok(!!two3 && two3.declared_weeks === 12 && /12-week billing rhythm/.test(String(two3.rhythm_note)),
-    `the declared 12-week rhythm is visible on the 3-month rung ("${two3 && two3.rhythm_note}")`);
-  ok(!!twoM && twoM.declared_weeks === undefined,
-    "while the monthly target carries no declared rhythm - its label has no week count");
+  // 12-week clock; his real members ride it, and the rehearsal now STATES it
+  // as the mint's answer - computed by the mint's own exported functions,
+  // with its source attached.
+  ok(!!two3 && two3.declared_weeks === 12 && two3.billing_rhythm && two3.billing_rhythm.source === "length_label"
+    && JSON.stringify(two3.billing_rhythm.recurring) === JSON.stringify({ interval: "week", interval_count: 12 }),
+    `the declared 12-week rhythm IS the mint's answer on the 3-month rung ("${two3 && two3.billing_rhythm && two3.billing_rhythm.sentence}")`);
+  ok(!!twoM && twoM.declared_weeks === undefined && twoM.billing_rhythm && twoM.billing_rhythm.source === "term_shape",
+    "while the monthly target rides the term's own shape - its label has no week count");
   // The OPEN term vocabulary: a 12-month rung previews on a 12-month calendar
   // clock, not collapsed to the 4-week default and not to 6_months.
   const ele12 = byKey["Elementary Academy|12_months"];
@@ -1126,15 +1411,18 @@ console.log("\n── 10. a read that FAILED is never reported as a read that fo
   reset();
 }
 
-console.log("\n── 11. the preview does not promise a rhythm it cannot verify ──");
+console.log("\n── 11. the rehearsal states the REAL billing rhythm, with its source ──");
 {
   reset();
   approveAll();
-  // The typed row the MINT would obey, which the preview never used to read.
-  DB.offer_prices.push({ id: "op1", tenant_id: "sj", source_offer_id: "off1", source_offer_price_key: "Academy 2x/week|3_months", billing_cadence: "12_weeks", is_active: true, is_routable: true, sort_order: 0 });
+  // A typed row that DIFFERS from the label: the label declares 12 weeks, the
+  // row says 3 calendar months. The mint honours the typed row, so the
+  // rehearsal must say month x3 sourced from the row - never average the two,
+  // never hedge that it cannot know (the cadence machinery is exported now).
+  DB.offer_prices.push({ id: "op1", tenant_id: "sj", source_offer_id: "off1", source_offer_price_key: "Academy 2x/week|3_months", billing_cadence: "3_calendar_months", is_active: true, is_routable: true, sort_order: 0 });
   // A superseded row on the same key, deactivated rather than deleted - exactly
   // what offers-sync leaves behind, and exactly what a looser scope would read.
-  DB.offer_prices.push({ id: "op0", tenant_id: "sj", source_offer_id: "off1", source_offer_price_key: "Academy 2x/week|3_months", billing_cadence: "3_calendar_months", is_active: false, is_routable: false, sort_order: 1 });
+  DB.offer_prices.push({ id: "op0", tenant_id: "sj", source_offer_id: "off1", source_offer_price_key: "Academy 2x/week|3_months", billing_cadence: "12_weeks", is_active: false, is_routable: false, sort_order: 1 });
   // A label declaring a rhythm the mint's cadence vocabulary does not contain.
   row("workbook_answers", "a-ele-c0-len").answered = "2 Months (8 Weeks)";
   row("workbook_answers", "a-ele-c0-len").proposed = "2 Months (8 Weeks)";
@@ -1143,18 +1431,20 @@ console.log("\n── 11. the preview does not promise a rhythm it cannot verify
   const p3 = r.body.phase3;
   const byKey = Object.fromEntries(p3.targets.map((t) => [t.key, t]));
   const two3 = byKey["Academy 2x/week|3_months"] || {};
-  ok(two3.typed_cadence === "12_weeks",
-    `the preview READS the typed offer_prices row - the thing that actually outranks the label at mint time (saw ${JSON.stringify(two3.typed_cadence)})`);
-  ok(/OUTRANKS the length label/.test(String(two3.typed_cadence_note)) && noEmDash(String(two3.typed_cadence_note)),
-    `and says which way the priority runs ("${two3.typed_cadence_note}")`);
-  ok(p3.typed_cadence_source === "read", `and reports where that came from (${p3.typed_cadence_source})`);
+  ok(two3.typed_cadence === "3_calendar_months" && p3.typed_cadence_source === "read",
+    `the preview READS the typed offer_prices row, scoped exactly as the mint scopes it (saw ${JSON.stringify(two3.typed_cadence)}, table ${p3.typed_cadence_source})`);
+  ok(!!two3.billing_rhythm && two3.billing_rhythm.source === "typed_row"
+    && JSON.stringify(two3.billing_rhythm.recurring) === JSON.stringify({ interval: "month", interval_count: 3 }),
+    `and the rhythm is the TYPED row's month x3 though the label says 12 weeks (${JSON.stringify(two3.billing_rhythm && two3.billing_rhythm.recurring)})`);
+  ok(/every 3 months/.test(String(two3.billing_rhythm && two3.billing_rhythm.sentence)) && /typed offer_prices row/.test(String((two3.billing_rhythm || {}).sentence)) && noEmDash(String((two3.billing_rhythm || {}).sentence)),
+    `in a sentence that names its source ("${(two3.billing_rhythm || {}).sentence}")`);
 
   const ele2 = byKey["Elementary Academy|2_months"] || {};
-  ok(ele2.declared_weeks === 8, `an 8-week label still SHOWS its declared rhythm (saw ${JSON.stringify(ele2.declared_weeks)})`);
-  ok(/cannot say which billing rhythm/.test(String(ele2.rhythm_note)) && !/the mint resolves it/.test(String(ele2.rhythm_note)),
-    `but the note no longer promises the mint will honour it ("${ele2.rhythm_note}")`);
-  ok(typeof p3.cadence_caveat === "string" && /not exported/.test(p3.cadence_caveat) && noEmDash(p3.cadence_caveat),
-    "and the rehearsal carries the caveat once, at the top, whether or not any row declares a rhythm");
+  ok(ele2.declared_weeks === 8 && !!ele2.billing_rhythm && ele2.billing_rhythm.source === "term_shape"
+    && JSON.stringify(ele2.billing_rhythm.recurring) === JSON.stringify({ interval: "month", interval_count: 2 }),
+    `an 8-week label FALLS BACK to the calendar shape - the vocabulary cannot honour it (${JSON.stringify(ele2.billing_rhythm && ele2.billing_rhythm.recurring)})`);
+  ok(/FALL BACK/.test(String(ele2.rhythm_fallback)) && noEmDash(String(ele2.rhythm_fallback)),
+    `and the fallback is STATED, not guessed at ("${ele2.rhythm_fallback}")`);
   reset();
 }
 
@@ -1215,6 +1505,465 @@ console.log("\n── 14. the snapshot filter decides the race the branch guard 
     `the FIRST photograph stands - the loser's PATCH matched nothing (saw taken_by ${JSON.stringify(wbRow().snapshot && wbRow().snapshot.taken_by)})`);
   ok(r.body.snapshot === "already",
     `and the loser SAYS it did not take one, rather than claiming a photograph it never wrote (saw ${JSON.stringify(r.body.snapshot)})`);
+  reset();
+}
+
+console.log("\n── 15. a withheld joining fee is DATA in the response, not a console.warn ──");
+{
+  // ── an unrestricted code + a charged fee: the withhold is reported ────────
+  reset();
+  approveAll();
+  // The code loses its applies-to list, so it discounts every line on the
+  // first invoice - the fee included. Elementary charges its fee on base in
+  // the offer, so its fee target must be WITHHELD, and the response must say
+  // which plan and which code, because a console.warn in a server log is not
+  // something a reviewer reads.
+  row("workbook_answers", "a-code-applies").answered = [];
+  // The review side works from the workbook's own answers, so the ele card
+  // carries its fee facts the way a real capture would.
+  addAnswer("c-ele", "signup_fee", "40", { current_value: "40" });
+  addAnswer("c-ele", "signup_fee_on_base", "charge", { current_value: "charge" });
+
+  const rev = await staffPost({ action: "review", workbook_id: "wb1" });
+  const w0 = (Array.isArray(rev.body.warnings) && rev.body.warnings[0]) || {};
+  ok(Array.isArray(rev.body.warnings) && rev.body.warnings.length === 1
+    && w0.plan_card_key === "plan:ele" && w0.card_key === "codes",
+    `review WARNS before apply, naming the plan card and the codes card (${JSON.stringify({ plan: w0.plan_card_key, codes: w0.card_key })})`);
+  ok(/joining fee/.test(String(w0.sentence)) && /"club"/.test(String(w0.sentence)) && noEmDash(String(w0.sentence)),
+    `in a sentence that names the code ("${w0.sentence}")`);
+
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const wh = r.body.phase3 && r.body.phase3.withheld_signup_fees;
+  const wh0 = (Array.isArray(wh) && wh[0]) || {};
+  ok(r.body.ok === true && Array.isArray(wh) && wh.length === 1
+    && wh0.offering === "Elementary Academy" && Array.isArray(wh0.because_codes) && wh0.because_codes.includes("club"),
+    `the withheld fee rides the apply response, naming plan and code (${JSON.stringify(wh)})`);
+  ok(/"club"/.test(String(wh0.reason)) && /applies-to/.test(String(wh0.reason)) && noEmDash(String(wh0.reason)),
+    `with a reason a human can act on ("${wh0.reason}")`);
+  ok(Array.isArray(r.body.phase3.targets) && !r.body.phase3.targets.some((t) => String(t.key).endsWith("|signup_fee")),
+    `and NO |signup_fee key is in the targets - the withhold is real, not just reported (${r.body.phase3.targets.length} targets)`);
+  ok(r.body.phase3.withheld_fees === 1,
+    `the counts area carries it too (withheld_fees ${JSON.stringify(r.body.phase3.withheld_fees)})`);
+  reset();
+
+  // ── the positive control: a restricted code withholds nothing ─────────────
+  reset();
+  approveAll();
+  const rev2 = await staffPost({ action: "review", workbook_id: "wb1" });
+  ok(Array.isArray(rev2.body.warnings) && rev2.body.warnings.length === 0,
+    "a code WITH an applies-to list raises no review warning");
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const wh2 = r2.body.phase3 && r2.body.phase3.withheld_signup_fees;
+  ok(Array.isArray(wh2) && wh2.length === 0,
+    `and withholds nothing - the EMPTY ARRAY, never null, because "nothing withheld" is a claim this run actually checked (saw ${JSON.stringify(wh2)})`);
+  ok(r2.body.phase3.targets.some((t) => t.key === "Elementary Academy|signup_fee"),
+    "while the fee target is present in the targets");
+  reset();
+}
+
+console.log("\n── 15b. a whitespace-only applies_to is UNRESTRICTED, everywhere it is read ──");
+{
+  // The adversarial finding (2026-08-06): `[" "]` read as a restriction to raw
+  // length checks while couponAppliesToKeys trimmed it to null = EVERYTHING,
+  // so the fee withhold stayed quiet about a coupon Stripe would apply to the
+  // joining fee. cleanAppliesTo (api/_coupon-guardrails.js) is now the ONE
+  // emptiness rule. MUTATE=blankkeysrestrict.
+  //
+  // ── the reader: an offer already holding the poisoned list ────────────────
+  // The shape a direct POST could have left before the write-side
+  // canonicalization existed; the workbook's own applies answer is removed so
+  // apply cannot repair it on the way through.
+  reset();
+  approveAll();
+  row("offers", "off1").data.pricing.discount_codes = [{ code: "club", kind: "Dollar off", value: "100", applies_to: [" "] }];
+  DB.workbook_answers = DB.workbook_answers.filter((a) => a.id !== "a-code-applies");
+  addAnswer("c-ele", "signup_fee", "40", { current_value: "40" });
+  addAnswer("c-ele", "signup_fee_on_base", "charge", { current_value: "charge" });
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const wh = r.body.phase3 && r.body.phase3.withheld_signup_fees;
+  const wh0 = (Array.isArray(wh) && wh[0]) || {};
+  ok(r.body.ok === true && Array.isArray(wh) && wh.length === 1
+    && Array.isArray(wh0.because_codes) && wh0.because_codes.includes("club"),
+    `hasUnrestrictedDiscountCodes reads applies_to [" "] as UNRESTRICTED - the withhold fires, because_codes ${JSON.stringify(wh0.because_codes)}`);
+  ok(Array.isArray(r.body.phase3 && r.body.phase3.targets) && !r.body.phase3.targets.some((t) => String(t.key).endsWith("|signup_fee")),
+    "and no |signup_fee key reaches the targets - a key nobody can type into a chip restricts nothing");
+  reset();
+
+  // ── the writer: an answered [" "] can no longer LAND in the offer ─────────
+  // tStrArray canonicalizes through the same shared rule, so the stored list
+  // is the cleaned list and the three readers plus the stored value agree.
+  reset();
+  approveAll();
+  row("workbook_answers", "a-code-applies").answered = [" "];
+  addAnswer("c-ele", "signup_fee", "40", { current_value: "40" });
+  addAnswer("c-ele", "signup_fee_on_base", "charge", { current_value: "charge" });
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const stored = ((row("offers", "off1").data.pricing.discount_codes || [])[0]) || {};
+  const wh2 = r2.body.phase3 && r2.body.phase3.withheld_signup_fees;
+  ok(r2.body.ok === true && JSON.stringify(stored.applies_to) === JSON.stringify([]),
+    `an answered [" "] lands in the offer as the CLEANED empty list (saw ${JSON.stringify(stored.applies_to)}), never as a whitespace key`);
+  ok(Array.isArray(wh2) && wh2.length === 1,
+    "so the same apply withholds the fee out loud rather than shipping a scope nobody chose");
+  reset();
+
+  // ── the whitespace-only code NAME is no code, all the way down ────────────
+  // Review's loose-code warning does not name it, nothing is withheld for it,
+  // and the fee target mints - the same reading looseCodesIn, the page and the
+  // coupon-mint path share (the mint skip is pinned in
+  // api/_coupon-guardrails.test.mjs).
+  reset();
+  approveAll();
+  row("workbook_answers", "a-code-code").answered = "   ";
+  DB.workbook_answers = DB.workbook_answers.filter((a) => a.id !== "a-code-applies");
+  addAnswer("c-ele", "signup_fee", "40", { current_value: "40" });
+  addAnswer("c-ele", "signup_fee_on_base", "charge", { current_value: "charge" });
+  const rev3 = await staffPost({ action: "review", workbook_id: "wb1" });
+  ok(Array.isArray(rev3.body.warnings) && rev3.body.warnings.length === 0,
+    "review's loose-code warning does not name a code whose name trims blank - it is no code");
+  const r3 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const wh3 = r3.body.phase3 && r3.body.phase3.withheld_signup_fees;
+  ok(r3.body.ok === true && Array.isArray(wh3) && wh3.length === 0
+    && r3.body.phase3.targets.some((t) => t.key === "Elementary Academy|signup_fee"),
+    "and apply withholds nothing for it - the fee target mints, because a nameless code can never reach Stripe");
+  reset();
+}
+
+console.log("\n── 16. a confirmed No to tax is a VALUE, never null ──");
+{
+  // ── the No lands as { charges_tax: false } and the rehearsal says so ──────
+  reset();
+  approveAll();
+  // What the page's writeTax really sends for a No: the marker plus passengers.
+  row("workbook_answers", "a-tax").answered = { charges_tax: false, pct: null, label: "Sales tax" };
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const cfg = row("clients", "sj").tax_config;
+  ok(r.body.ok === true && JSON.stringify(cfg) === JSON.stringify({ charges_tax: false }),
+    `a No lands as clients.tax_config = { charges_tax: false } - a value, not null (saw ${JSON.stringify(cfg)})`);
+  ok(r.body.phase3.tax_state === "confirmed_no",
+    `and the rehearsal states it (tax_state ${JSON.stringify(r.body.phase3.tax_state)})`);
+  const byKey16 = Object.fromEntries(r.body.phase3.targets.map((t) => [t.key, t]));
+  const eleM16 = byKey16["Elementary Academy|monthly"] || {};
+  ok(eleM16.allin_cents === 20000 && eleM16.base_cents === 20000,
+    `while every amount is the BASE amount - a confirmed no taxes nothing (Elementary monthly all-in ${eleM16.allin_cents})`);
+  reset();
+
+  // ── never-asked stays its own answer ──────────────────────────────────────
+  reset();
+  approveAll();
+  row("workbook_answers", "a-tax").answered = null;
+  row("workbook_answers", "a-tax").proposed = null;
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(row("clients", "sj").tax_config === null && r2.body.phase3.tax_state === "never_asked",
+    `an academy nobody asked stays null and reports never_asked (saw ${JSON.stringify(r2.body.phase3.tax_state)})`);
+  reset();
+
+  // ── and a configured academy reports configured ───────────────────────────
+  reset();
+  approveAll();
+  const r3 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r3.body.phase3.tax_state === "configured",
+    `a real rate reports configured (saw ${JSON.stringify(r3.body.phase3.tax_state)})`);
+  reset();
+
+  // ── the _fees guard: a confirmed no beats a stale typed string ────────────
+  const fees = await import("./_fees.js");
+  const resolved = fees.resolveFee({ taxConfig: { charges_tax: false }, legacyText: "13% HST" });
+  ok(resolved === null,
+    `resolveFee: a confirmed no beats a stale typed "13% HST" instead of falling through to it (resolved ${JSON.stringify(resolved)})`);
+}
+
+console.log("\n── 17. the tax registration number lands on the academy row ──");
+{
+  reset();
+  approveAll();
+  DB.clients[0].tax_registration_number = "OLD-000";
+  addAnswer("c-tax", "tax_registration_number", "123-456-789", { target_kind: "academy_setting", target_table: "clients", target_id: "sj" });
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r.body.ok === true && DB.clients[0].tax_registration_number === "123-456-789",
+    `the answered number lands on clients.tax_registration_number (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
+  ok(!!r.body.tax_registration && r.body.tax_registration.tax_registration_number === "123-456-789",
+    "and the apply response says it did");
+  // Read defensively: under MUTATE=taxregnowhere the apply REFUSES, no
+  // snapshot exists, and a control that crashes the harness exits without its
+  // banner.
+  ok((wbRow().snapshot || {}).tax_registration_number === "OLD-000",
+    `while the snapshot photographs the PRIOR value (saw ${JSON.stringify((wbRow().snapshot || {}).tax_registration_number)})`);
+  const rb = await staffPost({ action: "rollback", workbook_id: "wb1" });
+  ok(rb.body.ok === true && DB.clients[0].tax_registration_number === "OLD-000",
+    `and rollback restores it (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
+  reset();
+
+  // ── blank means "he left the optional box alone", never an erase ──────────
+  reset();
+  approveAll();
+  DB.clients[0].tax_registration_number = "KEEP-ME";
+  addAnswer("c-tax", "tax_registration_number", "", { target_kind: "academy_setting", target_table: "clients", target_id: "sj" });
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r2.body.ok === true && DB.clients[0].tax_registration_number === "KEEP-ME",
+    `a blank answer writes nothing - the stored number survives (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
+  reset();
+}
+
+console.log("\n── 18. the dry run answers match-vs-mint from LIVE Stripe, read-only ──");
+{
+  reset();
+  approveAll();
+  STRIPE_READS.length = 0;
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const p3 = r.body.phase3;
+  ok(p3.stripe_check === "read", `the live read happened (stripe_check ${JSON.stringify(p3.stripe_check)})`);
+  ok(STRIPE_READS.length > 0 && STRIPE_READS.every((c) => (c.headers || {})["Stripe-Account"] === "acct_1RDtSMK6ZS1cqefu"),
+    `every Stripe call was a GET carrying the Stripe-Account header for the right account (${STRIPE_READS.length} reads, saw ${JSON.stringify(((STRIPE_READS[0] || {}).headers || {})["Stripe-Account"])})`);
+  // THE READ PATTERN, not just the result: the fixture's real hits live on
+  // PAGE TWO, so the harness must have RECORDED a request carrying the
+  // starting_after cursor - a read that never asks for page two can only get
+  // the right answer by luck. MUTATE=onepagestripe.
+  const pagedRead = STRIPE_READS.find((c) => c.url.includes("/v1/prices") && c.url.includes(`starting_after=${STRIPE_CURSOR}`));
+  ok(!!pagedRead,
+    `the read PAGINATED: a request with starting_after=${STRIPE_CURSOR} arrived (saw ${JSON.stringify(STRIPE_READS.filter((c) => c.url.includes("/v1/prices")).map((c) => c.url.split("?")[1]))})`);
+  // The counts are UNCHANGED by the 100 page-one fillers - they match nothing,
+  // so 4-exist / 2-mint is the same answer the one-page fixture gave.
+  ok(p3.exists_in_stripe === 4 && p3.would_mint_new === 2,
+    `4 of the 6 targets already exist live, 2 would mint new (saw ${JSON.stringify(p3.exists_in_stripe)}/${JSON.stringify(p3.would_mint_new)})`);
+  const byKey = Object.fromEntries(p3.targets.map((t) => [t.key, t]));
+  const two3 = byKey["Academy 2x/week|3_months"] || {};
+  ok(!!two3.stripe && two3.stripe.exists === true && two3.stripe.price_id === "price_live_two_3m" && two3.stripe.interval === "12 week",
+    `the 12-week rung matched the live price ON ITS RHYTHM, named by price_id (${JSON.stringify(two3.stripe)})`);
+  const ele12 = byKey["Elementary Academy|12_months"] || {};
+  ok(!!ele12.stripe && ele12.stripe.exists === false,
+    `the 12-month prepay does NOT match the decoy at the same amount on a 4-week clock (${JSON.stringify(ele12.stripe)})`);
+  const eleM = byKey["Elementary Academy|monthly"] || {};
+  ok(!!eleM.stripe && eleM.stripe.exists === true && eleM.stripe.product_name === "Elementary Academy",
+    `and a hit carries its product name (${JSON.stringify(eleM.stripe && eleM.stripe.product_name)})`);
+  reset();
+
+  // ── FAIL LOUD: a dead read can never say exists:false ─────────────────────
+  reset();
+  approveAll();
+  STRIPE_FAIL.add("prices");
+  const bad = await staffPost({ action: "apply", workbook_id: "wb1" });
+  STRIPE_FAIL.delete("prices");
+  const bp3 = bad.body.phase3 || {};
+  ok(bp3.stripe_check === "could_not_read" && typeof bp3.stripe_error === "string"
+    && /Do not treat would-mint counts as real/.test(bp3.stripe_error) && noEmDash(bp3.stripe_error),
+    `a failed read says so out loud ("${bp3.stripe_error}")`);
+  ok(bp3.exists_in_stripe === null && bp3.would_mint_new === null,
+    `counts are NULL, never zero (saw ${JSON.stringify(bp3.exists_in_stripe)}/${JSON.stringify(bp3.would_mint_new)})`);
+  ok(Array.isArray(bp3.targets) && bp3.targets.length > 0 && bp3.targets.every((t) => t.stripe === null),
+    `and every per-target stripe is null - exists:false cannot come out of a failed read (${(bp3.targets || []).length} targets)`);
+  reset();
+
+  // ── not connected is its own answer ───────────────────────────────────────
+  reset();
+  approveAll();
+  DB.clients[0].stripe_connect_account_id = null;
+  const nc = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(nc.body.phase3.stripe_check === "not_connected" && nc.body.phase3.exists_in_stripe === null,
+    `a missing account id reports not_connected with counts null (saw ${JSON.stringify(nc.body.phase3.stripe_check)})`);
+  reset();
+}
+
+console.log("\n── 19. stale discount_notes are cleared at apply, and the clear is reported ──");
+{
+  reset();
+  approveAll();
+  // A BAM-authored note about the old price, stored on the rung the apply is
+  // about to re-price from 599 to 549. Nobody edited it in this workbook, so
+  // after the apply it is prose about a price that no longer exists.
+  offerings()[0].commitments[0].discount_notes = "was $599, early-bird promo from March";
+  // And a note the OWNER typed this workbook, on the Elementary rung the apply
+  // creates: an owner edit, so it must survive verbatim.
+  addAnswer("c-ele", "commitments.0.discount_notes", "bring a friend month");
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r.body.ok === true && offerings()[0].commitments[0].discount_notes === "",
+    `the stale BAM-authored note is CLEARED, not left describing a dead price (saw ${JSON.stringify(offerings()[0].commitments[0].discount_notes)})`);
+  const report = (r.body.offers.find((o) => o.offer_id === "off1") || {}).wrote || [];
+  ok(report.some((w) => w.target_field === "commitments.0.discount_notes" && w.to === ""),
+    `and the apply response REPORTS the clear - nothing silent (${JSON.stringify(report.filter((w) => /discount_notes/.test(w.target_field)))})`);
+  ok(offerings()[1].commitments[0].discount_notes === "bring a friend month",
+    `while the note the owner typed survives verbatim (saw ${JSON.stringify(offerings()[1].commitments[0].discount_notes)})`);
+  reset();
+}
+
+console.log("\n── 20. approve-card names its parameter and the valid keys ──");
+{
+  reset();
+  // The mistake a caller holding review output actually makes: card_id, which
+  // sits right next to card_key in every review row.
+  const byId20 = await staffPost({ action: "approve-card", workbook_id: "wb1", card_id: "c-two" });
+  ok(byId20.status === 400 && /card_key/.test(String(byId20.body.error)) && /plan:two/.test(String(byId20.body.error))
+    && /not by card_id/.test(String(byId20.body.error)) && noEmDash(String(byId20.body.error)),
+    `card_id instead of card_key is told which noun this action wants, with the real keys listed ("${byId20.body.error}")`);
+  const bogus = await staffPost({ action: "approve-card", workbook_id: "wb1", card_key: "plan:banana" });
+  ok(bogus.status === 404 && /no card called "plan:banana"/.test(String(bogus.body.error))
+    && /tax, plan:two, plan:ele, plans, codes, notes/.test(String(bogus.body.error)) && noEmDash(String(bogus.body.error)),
+    `an unknown key is refused with the whole vocabulary ("${bogus.body.error}")`);
+  reset();
+}
+
+console.log("\n── 21. per-plan age bands: strings on the offering, said out loud ──");
+{
+  // ── answered ages land as STRINGS, and the response says nothing reads them ──
+  reset();
+  approveAll();
+  addAnswer("c-two", "age_min", "9");
+  // A number input answers a NUMBER; the translator stores the string - the
+  // byte-identical encoding offers.data.schedule.classes already uses.
+  addAnswer("c-two", "age_max", 12);
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r.body.ok === true && offering(0).age_min === "9" && offering(0).age_max === "12",
+    `answered ages land on pricing_offerings[0] as STRINGS (age_min ${JSON.stringify(offering(0).age_min)}, age_max ${JSON.stringify(offering(0).age_max)})`);
+  ok(typeof r.body.age_note === "string" && /Nothing reads plan ages yet/.test(r.body.age_note) && noEmDash(r.body.age_note),
+    `and the apply response says so out loud: stored for later, no routing changed ("${r.body.age_note}")`);
+  reset();
+
+  // ── blank ages write nothing, and no note is claimed for it ──────────────
+  reset();
+  approveAll();
+  addAnswer("c-ele", "age_min", "");
+  addAnswer("c-ele", "age_max", "");
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r2.body.ok === true && !("age_min" in offering(1)) && !("age_max" in offering(1)),
+    `blank ages on a plan that never had bounds grow NO keys in the jsonb (offering keys: ${Object.keys(offering(1)).join(", ")})`);
+  ok(!("age_note" in r2.body),
+    "and no age_note is claimed for a write that never happened");
+  reset();
+
+  // ── an inverted band refuses the WHOLE apply, configuration untouched ─────
+  reset();
+  approveAll();
+  addAnswer("c-ele", "age_min", "14");
+  addAnswer("c-ele", "age_max", "9");
+  const before21 = worldState();
+  const r3 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  // Read defensively: under MUTATE=agebandunchecked there ARE no failures and
+  // a harness that crashes exits without its banner.
+  const f21 = (Array.isArray((r3.body || {}).failures) ? r3.body.failures : [])
+    .find((f) => /age_min 14 is above age_max 9/.test(String(f.error)));
+  ok(r3.body.ok === false && !!f21 && noEmDash(String((f21 || {}).error)),
+    `age_min 14 over age_max 9 refuses the apply with the sentence ("${(f21 || {}).error}")`);
+  ok(worldState() === before21,
+    "and NOTHING was written - not the snapshot, not the tax, not the other answers");
+  reset();
+}
+
+console.log("\n── 22. tAgeStrOrEmpty is PINNED: the exact vocabulary of an age answer ──");
+{
+  // The translator refused every one of these correctly the day Step 12
+  // shipped, and NOTHING held it: replacing its body with `return
+  // tOk(String(v))` passed every gate. This table is the pin, driven through
+  // the REAL handler - the review translation_error and the apply refusal are
+  // the same surfaces staff read. MUTATE=agesanythinggoes.
+  const refusalRe = /not an age this can store/;
+  const itemFor = (rev, field) => (((rev.body || {}).review || {}).cards || [])
+    .flatMap((c) => c.items || []).find((i) => i.target_field === field) || {};
+  const failFor = (ap, field) => (Array.isArray((ap.body || {}).failures) ? ap.body.failures : [])
+    .find((f) => f.target_field === field) || {};
+
+  const MUST_REFUSE = [
+    ["12; drop table", "an injection shape"],
+    [-3, "a negative number"],
+    [4.5, "a fraction"],
+    ["٩", "a unicode digit (Arabic-Indic nine)"],
+    ["0", "below the 1-99 range"],
+    ["100", "above the 1-99 range"],
+    [" 9", "padded - a value nobody typed must not silently normalise"],
+    [true, "a boolean"],
+  ];
+  for (const [value, why] of MUST_REFUSE) {
+    reset(); approveAll();
+    addAnswer("c-two", "age_min", value);
+    const rev = await staffPost({ action: "review", workbook_id: "wb1" });
+    const it = itemFor(rev, "age_min");
+    const ap = await staffPost({ action: "apply", workbook_id: "wb1" });
+    const f = failFor(ap, "age_min");
+    ok(it.will_write === undefined && refusalRe.test(String(it.translation_error)),
+      `MUST REFUSE ${JSON.stringify(value)} (${why}): review carries the refusal ("${it.translation_error}")`);
+    ok((ap.body || {}).ok === false && refusalRe.test(String(f.error)) && noEmDash(String(f.error))
+      && !("age_min" in offering(0)),
+      `MUST REFUSE ${JSON.stringify(value)}: apply refuses with the sentence ("${f.error}") and the offering grew no age key`);
+    reset();
+  }
+
+  // "012" -> "12": the normalisation is pinned as DELIBERATE, not accidental.
+  reset(); approveAll();
+  addAnswer("c-two", "age_min", "012");
+  const revN = await staffPost({ action: "review", workbook_id: "wb1" });
+  ok(itemFor(revN, "age_min").will_write === "12",
+    `MUST ACCEPT "012": review previews will_write "12" (saw ${JSON.stringify(itemFor(revN, "age_min").will_write)})`);
+  const apN = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok((apN.body || {}).ok === true && offering(0).age_min === "12",
+    `and apply stores "12" (saw ${JSON.stringify(offering(0).age_min)})`);
+  reset();
+
+  // The range is 1-99 per the Step 12 spec: both bottom and top edges accept
+  // ("100" refuses above, so the ceiling really is 99).
+  for (const edge of ["1", "99"]) {
+    reset(); approveAll();
+    addAnswer("c-two", "age_min", edge);
+    const apE = await staffPost({ action: "apply", workbook_id: "wb1" });
+    ok((apE.body || {}).ok === true && offering(0).age_min === edge,
+      `MUST ACCEPT ${JSON.stringify(edge)} (range edge): stored ${JSON.stringify(offering(0).age_min)}`);
+    reset();
+  }
+
+  // "" is ok and writes NOTHING - the no-bound answer on a plan with no bound.
+  reset(); approveAll();
+  addAnswer("c-two", "age_min", "");
+  const apB = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok((apB.body || {}).ok === true && !("age_min" in offering(0)),
+    `MUST ACCEPT "": apply is ok and writes nothing (offering keys: ${Object.keys(offering(0)).join(", ")})`);
+  reset();
+
+  // min === max is a one-age band, not an inversion: it applies. (The page's
+  // own confirm guard shares the strict `>` shape; the contract suite holds
+  // that half.)
+  reset(); approveAll();
+  addAnswer("c-two", "age_min", "9");
+  addAnswer("c-two", "age_max", "9");
+  const apEq = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok((apEq.body || {}).ok === true && offering(0).age_min === "9" && offering(0).age_max === "9",
+    `MUST ACCEPT min === max ("9"/"9"): a one-age band applies (stored ${JSON.stringify(offering(0).age_min)}/${JSON.stringify(offering(0).age_max)})`);
+  reset();
+}
+
+console.log("\n── 23. a code's set-number-of-months is bounded 1-24, like the terms it rides ──");
+{
+  // Ruled in the remediation pass: bound it 1-24, consistent with the 24-month
+  // ceiling of the adjustable-prepay term vocabulary. A code that outlives the
+  // longest commitment this build can sell is a claim about billing months
+  // that cannot exist, and 0 months is not "a set number of months". The
+  // translator refusal IS the enforcement - it prints in review and apply.
+  // MUTATE=monthsunbounded.
+  const monthsRe = /a set number of months must be a whole number from 1 to 24/;
+  const codeMonths = () => (((row("offers", "off1").data.pricing || {}).discount_codes || [])[0] || {}).duration_months;
+  const failMonths = (ap) => (Array.isArray((ap.body || {}).failures) ? ap.body.failures : [])
+    .find((f) => f.target_field === "codes.0.duration_months") || {};
+
+  for (const bad of [0, 25]) {
+    reset(); approveAll();
+    addAnswer("c-codes", "codes.0.duration_months", bad);
+    const ap = await staffPost({ action: "apply", workbook_id: "wb1" });
+    const f = failMonths(ap);
+    ok((ap.body || {}).ok === false && monthsRe.test(String(f.error)) && noEmDash(String(f.error)),
+      `MUST REFUSE ${bad} months: apply refuses with the sentence ("${f.error}")`);
+    reset();
+  }
+  for (const edge of [1, 24]) {
+    reset(); approveAll();
+    addAnswer("c-codes", "codes.0.duration_months", edge);
+    const ap = await staffPost({ action: "apply", workbook_id: "wb1" });
+    ok((ap.body || {}).ok === true && codeMonths() === edge,
+      `MUST ACCEPT ${edge} months (range edge): stored ${JSON.stringify(codeMonths())}`);
+    reset();
+  }
+  // Blank stays null: the duration chip, not this number, decides whether
+  // months apply at all.
+  reset(); approveAll();
+  addAnswer("c-codes", "codes.0.duration_months", "");
+  const apBk = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok((apBk.body || {}).ok === true && codeMonths() == null,
+    `blank stays null (stored ${JSON.stringify(codeMonths())})`);
   reset();
 }
 

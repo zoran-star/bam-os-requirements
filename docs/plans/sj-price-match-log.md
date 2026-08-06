@@ -256,3 +256,82 @@ Two things to carry:
 - **`club` is $100 off FOREVER, not once.** On a $250 plan that is $150/month for the life of the membership. It has never been used and there is no promotion code, so nobody can self-apply it - but a new system that starts honouring coupons automatically would inherit it silently.
 - **The failure shape, for skill 1:** a field NAME we chose became evidence. Nothing lied; nobody checked. The rule is that a value shown to a client must trace to THEIR data, not to a label in our own notes. Grep the client's own export for any identifier before putting it on a page they will read.
 
+
+### Ruling: what the wizard's retirement means (Zoran, 2026-08-06, MEMBER MANAGEMENT IV)
+Asked directly, per the handoff's "do not guess". Two answers:
+1. **Which wizard**: the onboarding wizard's *training offer setup section with the prices* - the part where an owner types plan titles, prices, prepay rungs and the joining fee. That section is what future clients skip.
+2. **What replaces it**: **workbooks plus staff setup.** The owner answers workbooks; BAM staff do the rest inside the portal on their behalf.
+
+Consequences for the skills:
+- The review-and-apply skill CAN assume a staff member is present and portal-capable at every step. It CANNOT assume the owner ever saw the wizard's pricing screens, so any fact the wizard used to collect (plan titles, prices, rungs, fee, tax) must come from the workbook or from the academy's own Stripe - never "already in the offer because the wizard put it there".
+- San Jose's draft offer got its 4 plans typed through that wizard section. For academy #2 there may be NO typed plans at all - the workbook seed builds from their Stripe + staff research. This makes the seed-building tool (the biggest template gap, per the 2026-08-06 handoff) load-bearing rather than nice-to-have.
+
+## Rehearsal run 1 (2026-08-06, MEMBER MANAGEMENT IV)
+First contact with real Postgres. Lane: real page in a browser + real API + prod DB, staff half authed with a real staff session, `apply` dry-run at the Stripe boundary per ruling. External snapshot/restore tool proven live (3 planted changes caught, restore verified clean by read-back); production restored clean at the end.
+
+**PASSED, do not re-test:** untouched-confirm renames recorded and applied as real was/now changes (all 3); tax surfaced separately in review.academy_settings; add buttons produce requests (review.additions -> skipped.additions), never writes; send gating honest (typed-not-confirmed does not count, reason shown); page fully read-only after submit (0/59 inputs); apply takes a snapshot; sales agent FAILS CLOSED with offer_prices empty ("do not quote any price"). Header from clients.public_name.
+
+**Defects (fix loop launched):**
+- D1 CRITICAL: a discount code with nothing ticked under "applies to" silently suppresses ALL four `<plan>|signup_fee` mint targets (hasUnrestrictedDiscountCodes, api/offers/match-prices.js:295-303,366-375). Only trace = server stdout. Page copy INVITES the state ("nothing ticked means it comes off everything"). $40/athlete switched off invisibly. Ruling needed on the mechanic (require targets vs warn vs fee-protected-default).
+- D2 HIGH: parent preview prints "Plus a one-time $40 joining fee" directly under prepay rungs where the fee is WAIVED (workbook.html:1274 keys only off feeOnBase). The agent's renderer gets this right; the preview contradicts it.
+- D3: codes card copy hardcodes "on the first bill" regardless of duration=Every payment.
+- D4: stale discount_notes prose in the offer (says $240/mo after price moved to $320-> $250/mo); never shown to Lij, not editable in workbook, inconsistent across plans (Elementary rungs have none). Agent never quotes it (ruled+tested) so exposure is staff/wizard only.
+- D5: tax answer No is stored as clients.tax_config=NULL, indistinguishable from never-asked. The deliberate act survives only in workbook_answers. Breaks any readiness check reading tax_config (data-mandatory arming rule).
+- D6: card denominator GROWS mid-session (7->8 when the catch-all gains content) and confirm-empty on "Something missing?" is not required, so "we will know you were asked" is not enforced. Assurance-without-connection in owner-facing form.
+- D7: dry run cannot answer match-vs-mint: matcher compares against pricing_catalog which is EMPTY for SJ, so matched:0 is ambiguous (nothing-to-compare vs will-duplicate). Also cannot state the minted billing rhythm (monthly vs every-4-weeks = 12 vs 13 charges/yr, ~7.7% of revenue). Fix direction: read his live Stripe through the direct-key transport (read-only) inside the dry run.
+- D8 LOW: approve-card takes card_key not card_id (error message correct, brief-writers beware).
+- D9 UNRESOLVED: smooth scrollIntoView did not move the page in the automation browser; plain scrollIntoView did. Needs one human look. Native alert() visibility also unverifiable in automation: NOT a pass, NOT a defect.
+
+**Forgot-to-ask yield (the round's whole point).** Raised 9; triage:
+- Already covered, no ask needed: free-trial terms (offers.data.sales.trial_duration_price = "1 hour for free"); one-time camps (ruled OUT of scope 2026-08-01).
+- Bugs, not questions: "something else" cadence has NO follow-up box (an entry came out as literally "$85 other."); tax registration number never asked on the Yes branch though receipts print it (api/_member-receipts.js:504).
+- Need Zoran ruling (popup sent): confirm-cancellation/commitment/first-charge policy card (portal asserts "cancel any time"; Lij was never asked); per-plan age band + most-popular marker (age routing is live, plans carry no ages).
+- Staff-setup items, not Lij questions: clients.stripe_portal_url null while policy promises cancel_online Yes.
+- CAUTION for the skill: the rehearsal agent role-playing Lij INVENTED facts (30-day cancellation, sibling discount, $85 private training) to probe the form. The finding is how the form handles such facts (they land unstructured in skipped.notes for staff adjudication), NOT that Lij has these policies. Never let a role-play invention harden into client data - same failure shape as NOSETUP.
+- Data observation for staff review: 1x/week 6-month rung ($875 = $145.83/4wk) is a WORSE per-period deal than its 3-month ($425 = $141.67/4wk); proposed Elementary ladder has the same shape. Visible to Lij, flagged nowhere.
+
+### Rulings from rehearsal round 1 (Zoran, 2026-08-06)
+1. **Discount codes must always state their targets.** "The client has to always say what the discount code applies to." The codes card refuses to confirm until every code has an applies-to list; an explicit "Everything, including the joining fee" choice exists so nothing is lost, it just has to be deliberate. (Fix-loop Variant A. Kills the D1 silent fee deletion at the source; the loud withhold report ships as backstop regardless.)
+2. **No policy card in the price workbook.** Cancellation / commitment / first-charge confirmation will be a SEPARATE workbook, built later. The price workbook stays price-only. (Third workbook now on the roadmap; the two-links rule presumably becomes three - flag when sequencing the Lij sends.)
+3. **Ages only.** Each plan card asks who the plan is for (age band), prefilled from his classes. NO most-popular question - staff pick the lead plan.
+
+### Premise correction (Zoran, 2026-08-06): staff work in Claude, not in portal screens
+Caught on the coupons proposal: the mockup showed a new staff portal list view for discount codes, and Zoran asked "what are staff supposed to see? i thought staff only work in claude." That is the standing model for member management: the staff surface IS the skill running in Claude. No new staff portal UI gets built for this workflow. The coupons proposal shrank to: storage on the offer record (exists), adopt-by-id for imported coupons (only new code), push-live as a skill step with a staff yes (July re-issue path). Carry this into every future proposal: if a mockup shows a staff screen for member-management work, the premise is wrong.
+
+### Ruling: coupons settled (Zoran, 2026-08-06)
+"Yes link to his coupon." An academy's pre-existing Stripe coupon is ADOPTED BY ID, never re-minted as a copy. Full coupon picture now closed:
+- Storage: the offer record's discount_codes list (exists; workbook writes it).
+- Staff surface: the review skill in Claude, which prints each code + state and asks per code before pushing live. NO portal screen.
+- Push-live: the July re-issue path (Build C + 2SIBLING fix), gated on targets ticked + duration confirmed (per the codes-always-state-targets ruling).
+- Imported coupons (club): adopt-by-id, state "on paper" until the owner wants it live.
+- Person-level deals: never on this list (2026-08-04 ruling, member workbook).
+Build cost: adopt-by-id is the only new code. Proposal doc: docs/plans/coupons-proposal.html.
+
+## Rehearsal round 2 (2026-08-06, after the full fix loop)
+Loop ran exactly as ruled: rehearsal 1 (9 defects, 9 gaps) -> planner -> builder (12 steps) -> tester FAIL (2 under-pinned fixes, 1 broken control, 0 behavioural bugs) -> planner -> builder (5 remediation steps) -> tester PASS (all bypasses dead, 556 checks, 87 controls fire) -> rehearsal 2 from the top. Age rows seeded to the live draft workbook first (8 rows, Elementary prefilled 9/12 from its class twin, others deliberately blank); restore baseline re-taken to include them.
+
+**HEADLINE: the question set is COMPLETE.** Round 2 found nothing new we would have to ask Lij after the workbook comes back. All 10 round-1 fixes verified on the real page (fee truth in the preview, loud withholding naming plan+code, tax No stored as {"charges_tax": false} with tax_state confirmed_no, fixed 8-card denominator with confirm-empty enforced, cadence follow-up making "$85 other." impossible, ages with inverted-band refusal and age_note honesty, duration-aware scope sentences).
+
+**First live-Stripe dry run against his real account: 12 of 12 recurring targets EXIST at his real amounts** (match-not-mint confirmed for tax No, as predicted); only mints = the four $40 joining fees as one-time lines. Honesty cross-check passed: editing a price to $180 flipped exactly that target to exists:false. Note for staff at adopt time: his product naming is messy (Unlimited prices under a product called "Black Friday Offer", Elementary prepays under the 1x product).
+
+**BLOCKER FOUND (D1): the codes card cannot persist its own mandatory answers.** Only 5 rows seeded per code; applies_to/duration_months/expires_at/max_redemptions have no rows and mintableOn("codes") is empty, so the save 404s ("that answer does not belong to this card") and the unsaved change blocks confirm forever. The targets ruling made applies_to MANDATORY, which turned a latent seeding gap into a dead end. With the row hand-seeded the whole flow works end to end. Also: D2 refused add wipes typed name/price; D3 the server confirm does not enforce the targets rule (page-only; review warnings + apply withholding do catch it downstream); D4 the save-failure banner blames "brand new items" for a mandatory-question save.
+
+Sequencing lesson for the skill: when a ruling makes a field mandatory, the seed and the mint whitelist must be re-audited in the same pass - the rehearsal caught what the unit gates could not, because the gates seed their own fixtures.
+
+### Loop cycle 3 (2026-08-06): the D1-D4 fixes held functionally; the bypass hunt found the safety pass's first two real items
+Tester2 verdict FAIL on two direct-POST findings (the no-login token threat model, i.e. exactly the parked safety pass territory):
+1. HIGH: whitespace applies_to ([" "]) reads as "restricted" to looseCodesIn/unrestrictedCodes (.filter(Boolean)) but as "everything" to couponAppliesToKeys (trim-then-filter) - three guards pass, Stripe coupon lands on every first-invoice line INCLUDING the joining fee. Same class: whitespace-only code name drops out of the loose list. Root cause: two normalizers for one emptiness question.
+2. MEDIUM: the D1 mint path has no row cap and accepts non-canonical indexes (codes.0/00/000 = 3 rows for one logical code; 205 rows on one card in 5 calls) - the DoS the ADD caps were explicitly written against, reopened by the mint fix.
+Lesson for the skill: a fix that OPENS a path (mint) must inherit the caps of the path it mirrors (add) in the same commit, and any emptiness/normalization question must have exactly one answerer.
+
+### Sequencing ruling (Zoran, 2026-08-06): member workbook builds DURING the price wait
+"In step 5 we should also have build the member workbook and confirm it together." While Lij has the price workbook (the wait between our send and his submit), the member workbook gets BUILT and mockup-confirmed with Zoran, so link 2 is ready to go the moment his prices come back. The member workbook build is no longer blocked behind step 5; only its SEND stays sequenced after prices land. Carry into the skills: the two workbook builds pipeline, the two sends stay ordered.
+
+### Rehearsal round 3 (2026-08-06): CLEAN. The workbook is send-ready.
+Full flow on the real page against real Postgres, codes card as centerpiece, security-fixed code. Lij reached "Sent to BAM", all 8 cards confirmed, count never grew past 8. The codes-card save that 404'd in round 2 now returns 200; untargeted confirm refuses (ruling enforced), targeted confirm saves; club stored with applies_to = 16 explicit targets including all 4 signup_fee entries, so ZERO fees silently withheld. No regression in the other 7 cards (tax No -> confirmed_no academy_setting; renames visible; price edit persisted; Elementary ages 9-12 carried, others blank; "something else" cadence follow-up parked the camp in skipped.additions; empty cards required deliberate confirm). Live-Stripe dry run: 11 exist / 5 mint (4 fees + the one price the agent edited to $260; without the edit it is the predicted 12 exist / 4 fees mint). withheld_signup_fees: []. Sales agent fails closed (offer_prices 0 after dry-run). Restore verified clean by read-back.
+
+TWO NON-BLOCKING NOTES for later polish (Zoran's call, not gating the send):
+1. UX: an untargeted-codes-card confirm refuses correctly but the only cue is the standing header pill; no fresh feedback near the button. A non-technical owner with a long card scrolled past the pill could press and see "nothing happen". Low reach (recoverable by ticking a target).
+2. Could-not-tell: whether the "Everything, including the joining fee" chip toggles OFF on re-click was not verified (deselected via an individual chip instead). Worth one check if we touch that card again.
+
+MILESTONE: steps 1-6 of the 9-step sequence are DONE and proven end to end. Next: Zoran sends Lij link 1 (price workbook); member workbook builds during the wait.

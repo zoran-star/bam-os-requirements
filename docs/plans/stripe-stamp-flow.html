@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From Lij's answers to Stripe</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;color:#1E1E24;background:#F7F6F2;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased;padding:26px 16px 70px}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:23px;margin:0 0 4px;letter-spacing:-.6px;font-weight:800}
+  .sub{font-size:13px;color:#6E6E78;margin:0 0 26px}
+
+  .step{display:flex;gap:14px;margin-bottom:0}
+  .num{flex:0 0 34px;height:34px;border-radius:50%;background:#1E1E24;color:#fff;font-weight:800;
+    display:flex;align-items:center;justify-content:center;font-size:15px}
+  .body{flex:1;padding-bottom:6px}
+  .body b.t{display:block;font-size:15px;margin:5px 0 3px}
+  .body p{margin:0;font-size:13px;color:#4A4A54}
+  .connector{width:34px;display:flex;justify-content:center}
+  .connector span{width:2.5px;background:#D9D6CD;display:block;height:26px}
+
+  .card{background:#fff;border:1.5px solid #E3E1DA;border-radius:12px;padding:12px 14px;margin-top:8px;
+    box-shadow:0 1px 2px rgba(20,20,20,.04);font-size:12.5px}
+  .split{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .half{flex:1 1 240px;border-radius:12px;padding:11px 13px;font-size:12.5px}
+  .found{background:#F4FBF6;border:1.5px solid #7DC79A}
+  .made{background:#FDF9EE;border:1.5px solid #D9B75B}
+  .half b{display:block;margin-bottom:3px}
+  .half .eg{color:#6E6E78;font-size:11.5px;margin-top:5px}
+  .pill{display:inline-block;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+    padding:2px 8px;border-radius:12px;margin-left:5px;vertical-align:1px}
+  .pf{background:#DDF2E4;color:#2E7D46}
+  .pm{background:#F8EFD4;color:#8A6D1F}
+  .never{background:#FDEAE4;border:1.5px solid #E09A85;border-radius:12px;padding:11px 14px;margin-top:24px;font-size:12.5px}
+  .never b{color:#A63A22}
+  .shelf{background:#fff;border:1.5px solid #E3E1DA;border-radius:13px;padding:14px 16px;margin:4px 0 22px 48px;box-shadow:0 1px 2px rgba(20,20,20,.04)}
+  .shelf .st{display:block;font-size:14px;margin-bottom:2px}
+  .shelf .sp{margin:0 0 9px;font-size:12.5px;color:#6E6E78}
+  .srow{font-size:12.5px;color:#4A4A54;padding:7px 0;border-top:1px solid #F0EEE7}
+  .srow i{color:#8A6D1F;font-style:normal;font-size:11.5px}
+  .sk{display:inline-block;font-weight:800;background:#F2F1EC;border-radius:7px;padding:1px 8px;margin-right:6px;font-size:11.5px}
+  @media(max-width:600px){.shelf{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>From Lij's answers to Stripe</h1>
+  <p class="sub">The whole trip, in five steps. His members never notice anything happened - that is the point.</p>
+
+  <div class="step">
+    <div class="num">1</div>
+    <div class="body">
+      <b class="t">Lij fills in the workbook</b>
+      <p>His plans, prices, prepay deals, tax answer, discount code. Nothing he types touches Stripe. It is a form, not a control panel.</p>
+      <div class="card">"2x/week is $250 every 4 weeks, $599 for 3 months, joining fee waived on prepay, no sales tax."</div>
+    </div>
+  </div>
+  <div class="connector"><span></span></div>
+
+  <div class="step">
+    <div class="num">2</div>
+    <div class="body">
+      <b class="t">Our team checks every answer</b>
+      <p>In Claude, card by card. Every change he made is shown side by side with what we had. Nothing moves forward without a human yes on each card.</p>
+    </div>
+  </div>
+  <div class="connector"><span></span></div>
+
+  <div class="shelf">
+    <b class="st">What actually lives inside his Stripe</b>
+    <p class="sp">Stripe is like a shop's back office. Five kinds of paper matter here:</p>
+    <div class="srow"><span class="sk">The menu item</span> "Academy 2x/week" as a thing he sells <i>[a Product]</i>. He has 27 of these, some messy: his Unlimited prices sit under one named "Black Friday Offer".</div>
+    <div class="srow"><span class="sk">The price tag</span> One menu item can carry several tags: $250 every 4 weeks, $599 per 12 weeks, $1,150 per 24 weeks <i>[Prices with a recurring interval]</i>. He has 119 tags, only 14 in use. The $40 joining fee is a tag with no repeat <i>[a one-time Price]</i>.</div>
+    <div class="srow"><span class="sk">The parent's file card</span> Name, card on file, history <i>[a Customer]</i>. He has 147.</div>
+    <div class="srow"><span class="sk">The standing order</span> "This customer pays this price tag every cycle" <i>[a Subscription]</i>. His 20 members are 20 of these, and each bill it produces is an <i>[Invoice]</i>; the joining fee rides the first invoice as an extra line <i>[an invoice item]</i>.</div>
+    <div class="srow"><span class="sk">The money-off stamp</span> His "club" coupon, $100 off <i>[a Coupon, which can be limited to certain menu items via applies_to]</i>. The word a parent could type at checkout to use it is separate <i>[a Promotion Code]</i>, and he has none, which is why nobody has ever used club.</div>
+  </div>
+
+  <div class="step">
+    <div class="num">3</div>
+    <div class="body">
+      <b class="t">The system looks inside his Stripe first</b>
+      <p>For every price on the approved list it asks one question: <b>does this already exist in his account?</b></p>
+      <div class="split">
+        <div class="half found"><b>Already there <span class="pill pf">link it</span></b>
+          A price tag counts as "the same" only if the amount AND the billing rhythm both match <i>[unit_amount + recurring interval]</i>. Then we point at it and create nothing; his members keep paying on the exact same tag they always have.
+          <div class="eg">San Jose: all 12 plan prices were found. $250 every 4 weeks, $599 per 12 weeks... all already his.</div>
+        </div>
+        <div class="half made"><b>Not there <span class="pill pm">create it</span></b>
+          We write a new price tag into HIS account, under his menu item, only after approval <i>[a new Price on his connected account]</i>.
+          <div class="eg">San Jose: only the four $40 joining fees need creating, one no-repeat tag per plan.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="connector"><span></span></div>
+
+  <div class="step">
+    <div class="num">4</div>
+    <div class="body">
+      <b class="t">The stamp</b>
+      <p>Approved answers are written into the portal, and each portal price now holds its Stripe twin's serial number <i>[the price id, stored as stripe_price_id]</i>. From this moment the portal and his Stripe say the same thing, provably: anyone can follow the serial number and check.</p>
+    </div>
+  </div>
+  <div class="connector"><span></span></div>
+
+  <div class="step">
+    <div class="num">5</div>
+    <div class="body">
+      <b class="t">Everything downstream reads the stamp</b>
+      <p>The sales agent quotes these prices. Checkout charges them. Receipts print them. Nobody retypes a number anywhere, so nothing can drift.</p>
+    </div>
+  </div>
+
+  <div class="never">
+    <b>What never happens:</b> we never edit or delete a price his members are paying on, we never touch his account without a per-card approval, and until the final go the whole thing runs in rehearsal mode where Stripe only gets read, never written.
+  </div>
+</div>
+</body>
+</html>

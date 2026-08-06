@@ -64,6 +64,12 @@ export function resolveFee({ taxConfig, taxable, legacyText } = {}) {
     const v = String(taxable == null ? "" : taxable).trim().toLowerCase();
     return (v === "no" || v === "false") ? null : t;
   }
+  // A CONFIRMED NO beats a stale typed string. { charges_tax: false } is the
+  // owner's deliberate "I do not charge tax" from the price workbook - a value,
+  // not an absence - so it must not fall through to a legacy "13% HST" someone
+  // typed before he answered. Only a genuinely never-asked academy (null)
+  // keeps its free text working.
+  if (taxConfig && taxConfig.charges_tax === false) return null;
   return parseFee(legacyText);
 }
 

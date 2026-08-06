@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { assertHeaderSafeCredential, safeFetch } from "./_header-safe-credential.js";
+import { cleanAppliesTo } from "./_coupon-guardrails.js";
 import { randomBytes } from "node:crypto";
 
 // Vercel Serverless Function - THE OWNER-FACING WORKBOOK, and the only surface
@@ -165,6 +166,33 @@ function jsonEqual(a, b) {
 // time - is what makes the San Jose rename record as a change.
 const effective = (a) => (isBlank(a.answered) ? a.proposed : a.answered);
 
+// A CODE WITH A NAME AND NO APPLIES-TO LIST, read from one card's own
+// effective answers. ONE extraction feeds BOTH the owner-side confirm refusal
+// (doConfirm, D3) and the staff review warning below, so the rule that blocks
+// the deliberate act and the warning staff read can never drift apart. An
+// empty applies_to is not a smaller discount: Stripe discounts every line of
+// the first invoice BY DEFAULT under it, the joining fee included, which is
+// why the apply-side mint withholds the fee target in self-defence.
+function looseCodesIn(mine) {
+  const byIdx = new Map();
+  for (const a of mine) {
+    const m = /^codes\.(\d+)\.(code|applies_to)$/.exec(String(a.target_field || ""));
+    if (!m) continue;
+    if (!byIdx.has(m[1])) byIdx.set(m[1], {});
+    byIdx.get(m[1])[m[2]] = effective(a);
+  }
+  const out = [];
+  for (const [i, c] of byIdx) {
+    const code = String(c.code == null ? "" : c.code).trim();
+    // cleanAppliesTo is the ONE emptiness rule (api/_coupon-guardrails.js):
+    // `[" "]` reads as targeted to a raw filter but as EVERYTHING to the Stripe
+    // coupon builder, and the two reading differently is the hole this closes.
+    const applies = cleanAppliesTo(c.applies_to);
+    if (code && !applies.length) out.push({ index: +i, code });
+  }
+  return out;
+}
+
 // ── OWNER ADDITIONS: a REQUEST, never a write to configuration ───────────────
 //
 // Zoran's ruling, 2026-08-05: the three "+ Add" buttons stay, and what they
@@ -203,6 +231,49 @@ function addableOn(cardKey) {
   return [];
 }
 
+// WHICH ANSWER ROWS A SAVE MAY MINT, per card - the same fail-closed shape as
+// addableOn, for a different door. The page's setA creates { id: null } rows
+// for fields the seed never made, and doSave refuses unknown ids - correctly,
+// because an id is a bearer of nothing. But a QUESTION added after a workbook
+// was seeded (the tax registration number; later the per-plan ages) has no row
+// for its answer to live in, so the live San Jose workbook literally could not
+// store one. This whitelist is the narrow exception: a null-id save whose
+// target_field is named here, on this card, with no row for the field yet,
+// MINTS the row (target derived from the card's own siblings, never the
+// payload) and then behaves as an ordinary save. Everything else keeps
+// today's refusal, byte for byte.
+function mintableOn(cardKey) {
+  const k = String(cardKey || "");
+  if (k === "tax") return ["tax_registration_number"];
+  // Per-plan age bands (Step 12): plan cards seeded before the question
+  // existed grow exactly these two rows, aimed by their own siblings.
+  if (k.startsWith("plan:")) return ["age_min", "age_max"];
+  return [];
+}
+
+// THE MINT GATE, as a predicate rather than a list, because the codes card's
+// mintable fields are INDEXED (`codes.0.applies_to`, `codes.1.code`, ...) and
+// an exact-string list can never name them. The live San Jose defect: the seed
+// writes 5 rows per code and none for applies_to / duration_months /
+// expires_at / max_redemptions, the page saves those with a null id, and the
+// exact-match gate refused them - so the codes card's MANDATORY applies-to
+// answer had no row to live in and confirm blocked forever. classifyField is
+// reused on purpose: it buys the own-property CODE_T lookup (`constructor` /
+// `__proto__` refuse), the MAX_LIST_INDEX bound, and the `codes.<i>.<leaf>`
+// shape - every leaf it admits is one the apply translator already knows how
+// to judge, and a NEW index (`codes.1.*`) is mintable the moment an owner adds
+// a code. Everything else keeps today's refusal, byte for byte.
+// MUTATE=codesunmintable / MUTATE=codesmintany.
+function canMint(cardKey, field) {
+  if (mintableOn(cardKey).includes(field)) return true;
+  const k = String(cardKey || "");
+  if (k === "codes" || k.startsWith("codes:")) {
+    const cls = classifyField(field);            // hoisted; defined below
+    return cls.kind === "code" && !!cls.t;
+  }
+  return false;
+}
+
 // ── THE CAPS, and why these numbers ─────────────────────────────────────────
 // A no-login link that can create unlimited rows is a denial of service on our
 // own database, written by us, reachable by anyone who ever sees the URL.
@@ -219,6 +290,20 @@ function addableOn(cardKey) {
 const MAX_ADD_PER_CARD = 6;
 const MAX_ADD_PER_WORKBOOK = 20;
 const MAX_ADD_CHARS = 2000;
+// THE MINT CEILING (the same denial-of-service reasoning, through the mint
+// door). The additions caps above never covered the answer-mint path, so a
+// scripted loop of null-id saves could create rows without end - and the
+// 200-index space would allow ~1,800 legitimate-looking addresses per card.
+// Why 90: the honest ceiling is codes on the card times the 9 CODE_T leaves.
+// The ADD path already rules 6 additions per card the honest maximum, our
+// largest real seed (San Jose) is 1 code at 5 rows, so 10 fully-answered
+// codes (90 rows) sits comfortably above any real card while staying 20x
+// below what the index space would otherwise permit. Counting the card's
+// non-addition rows (seeded plus minted) rather than a mint ledger keeps the
+// bound recomputable from the DB alone. Tax and plan mints are structurally
+// bounded (1 and 2 fields) but sit under the same ceiling for free.
+// MUTATE=mintuncapped.
+const MAX_MINT_ROWS_PER_CARD = 90;
 
 // The minimum an addition must carry to be ACTIONABLE. Staff have to be able to
 // create the thing by hand from this row alone, so a plan with no price is not a
@@ -269,8 +354,14 @@ function deriveTarget(mine, all) {
 }
 
 const ADD_KINDS = {
+  // The billing_cycle_other requirement is BYTE-IDENTICAL to the page's
+  // addProblem sentence (the page promises "the API's own sentences,
+  // verbatim"): a plan added with cycle "Other" and no follow-up is a request
+  // staff cannot act on - '$85 other' is a riddle, not a cadence.
+  // MUTATE=othernofollowup.
   plan: (v) => (!str(v.title) ? "Please give the plan a name before adding it."
-    : num(v.price) === null || num(v.price) < 0 ? "Please add a price for this plan before adding it." : ""),
+    : num(v.price) === null || num(v.price) < 0 ? "Please add a price for this plan before adding it."
+    : String(v.billing_cycle || "") === "Other" && !str(v.billing_cycle_other) ? "Please say how often this plan bills before adding it." : ""),
   length: (v) => (num(v.months) === null || !Number.isInteger(v.months) || v.months < 1 || v.months > 120
     ? "Please say how many months this length runs for."
     : num(v.price) === null || num(v.price) < 0 ? "Please add a price for this length before adding it." : ""),
@@ -347,28 +438,27 @@ const OPEN_STATES = new Set(["draft", "sent"]);
 // exactly San Jose's three renames.
 const cardIsReady = (card) => !!(card && card.confirmed_at);
 
-// ── WHICH CARDS THE SUBMIT GATE COUNTS ───────────────────────────────────────
+// ── WHICH CARDS THE SUBMIT GATE COUNTS: EVERY CARD, FROM FIRST RENDER ────────
 //
-// A CARD WITH NO ANSWERS AND NO ADDITIONS HAS NOTHING TO REVIEW, so it cannot
-// hold Send hostage. The product owner approved a SEVEN-card workbook and got
-// there by cutting two cards for exactly this reason: a card that could only
-// ever answer "none" was a mandatory click that taught us nothing. The empty
-// "anything missing?" card exists in the table because an addition needs a card
-// to belong to - the card is the unit of confirmation - but it must not become
-// the eighth mandatory click by the back door.
+// D6 (2026-08-06): the gate counts CARDS, and "confirm it empty" is a real
+// answer. The previous rule - a card with no answers cannot hold Send - had
+// two defects the rehearsal caught:
+//   1. THE DENOMINATOR GREW MID-SESSION. An addition landing on the empty
+//      add-a-plan card turned "0 of 7" into "5 of 8" under the owner's cursor,
+//      which reads as the page inventing work.
+//   2. "HE WAS ASKED AND HAD NOTHING TO ADD" WAS UNRECORDABLE. The empty card
+//      could ship unconfirmed, so nobody could tell it apart from "he never
+//      looked" - while the card's own hint promised "confirm it empty and we
+//      will know you were asked".
+// So every card counts, empty or not, and the deliberate act is required on
+// all of them. The page's copy already promised this; the gate now keeps it.
 //
-// THE DISCRIMINATOR IS EMPTINESS, MEASURED FROM THE ROWS, and it is nothing
-// else. Not a card_key, not a flag, not anything seeding or a payload can set.
-// That distinction is the whole safety of this rule: a "this card is optional"
-// flag would hand seeding the power to make a REAL question invisible to the
-// gate, which is the no-partial-submit ruling defeated from the inside by the
-// people it binds. A card with answers ALWAYS counts. There is no opt-out, and
-// there is deliberately no way to write one.
-//
-// A card with no answers cannot hold an answer either - there is no row for one
-// to live in - so "nothing to review" is a fact about the data rather than a
-// judgement about the card.
-const cardCounts = (answers) => (answers || []).length > 0;
+// STILL NOTHING WRITABLE DECIDES COUNTING. Not a card_key, not a meta flag,
+// not a payload: an exemption anyone can write is the no-partial-submit ruling
+// defeated from the inside (MUTATE=countsflag). The `(answers)` signature is
+// kept so every call site compiles unchanged and so the counting rule still
+// has exactly one definition to mutate.
+const cardCounts = (answers) => true;
 
 // remaining, computed from the LIVE ROWS every time, with an optional override
 // for the card this request just changed (whose new state is not in the table
@@ -645,7 +735,67 @@ async function doSave(wb, body) {
   let actedNow = false;
   const undo = [];
   for (const item of incoming) {
-    const row = byId.get(String((item || {}).id || ""));
+    let row = byId.get(String((item || {}).id || ""));
+    // ── THE MINT PATH, whitelisted per card (see mintableOn) ─────────────────
+    // A null-id save for a field the card is allowed to grow, where no row for
+    // that field exists yet, creates the row and then saves into it like any
+    // other. A SECOND save of the same field finds the existing row instead of
+    // minting a twin - the page never learns the minted id (the save reply
+    // carries no answers), so it sends null again and must land on the SAME
+    // row. The target is derived from the card's own sibling answers, never
+    // from the payload, for the same reason doAdd derives it: a token that can
+    // name its own target can aim a write at any row in the database.
+    if (!row && (item || {}).id == null) {
+      const field = String((item || {}).target_field || "");
+      if (canMint(card.card_key, field)) {
+        row = mine.find((a) => a.target_field === field) || null;
+        if (!row) {
+          // A ROW IS ABOUT TO BE CREATED, so the creation caps stand at this
+          // door the way they stand at doAdd's: the row ceiling (see
+          // MAX_MINT_ROWS_PER_CARD, with the additions caps) and the ADD
+          // path's value cap, byte-for-byte in its sentence, because a row
+          // cap is not a byte cap. An UPDATE to an existing row takes the
+          // ordinary save path below, untouched.
+          if (mine.filter((a) => !isAddition(a)).length >= MAX_MINT_ROWS_PER_CARD) {
+            throw bad("This card cannot take any more answers. Tell BAM directly and we will sort it out.");
+          }
+          if (JSON.stringify((item || {}).answered === undefined ? null : (item || {}).answered).length > MAX_ADD_CHARS) {
+            throw bad("That is too long to add here. Please shorten it, or tell us the details directly.", 400, "add_too_long");
+          }
+          const sib = mine.find((a) => !isAddition(a) && a.target_table);
+          if (sib) {
+            const created = await sb(`workbook_answers?select=${ANSWER_SELECT}`, {
+              method: "POST",
+              headers: { Prefer: "return=representation" },
+              body: JSON.stringify([{
+                workbook_id: wb.id,
+                card_id: card.id,
+                client_id: wb.client_id,
+                target_kind: sib.target_kind,
+                target_table: sib.target_table,
+                target_id: sib.target_id,
+                target_field: field,
+                current_value: null,
+                proposed: null,
+                answered: null,
+              }]),
+            });
+            row = Array.isArray(created) && created[0] ? created[0] : null;
+            if (row) {
+              // If the workbook closed while this was in flight, the minted
+              // row is a value appearing under a reviewer: the undo is a
+              // DELETE, same shape doAdd uses.
+              undo.push({ id: row.id, remove: true });
+              mine.push(row);
+              byId.set(String(row.id), row);
+            }
+          }
+          // No sibling to derive a target from: fall through to the ordinary
+          // refusal. A guessed target_table on a money row is worse than a
+          // refusal, because it looks like a fact.
+        }
+      }
+    }
     // AN ANSWER ID FROM ANOTHER CARD - OR ANOTHER ACADEMY'S WORKBOOK - IS
     // REFUSED, not quietly skipped. The token authorizes ONE workbook; an id is
     // a bearer of nothing. A silent skip would let a caller probe which ids
@@ -871,6 +1021,22 @@ async function doConfirm(wb, body) {
   const all = await readAnswers(wb.id);
   let mine = byCard(all).get(card.id) || [];
 
+  // ── A NAMED CODE WITH NO APPLIES-TO LIST CANNOT BE CONFIRMED (D3) ─────────
+  // The page refuses this at the moment of the deliberate act, and the server
+  // must refuse it too, in the SAME sentence, or a direct POST walks past a
+  // rule the page promises. Checked BEFORE the materialize loop, and that is
+  // equivalent rather than early: the loop only copies `proposed` into
+  // `answered`, and `effective` already reads `proposed`, so nothing the loop
+  // writes could change this answer - and refusing here leaves no
+  // half-stamped card behind. MUTATE=serverconfirmsuntargeted.
+  {
+    const k = String(card.card_key || "");
+    if (k === "codes" || k.startsWith("codes:")) {
+      const loose = looseCodesIn(mine);
+      if (loose.length) throw bad('Say what ' + loose[0].code + ' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');
+    }
+  }
+
   // ── MATERIALIZE THE ANSWER HE JUST GAVE ───────────────────────────────────
   // He confirmed the card AS SHOWN, so what was shown IS his answer, and it is
   // written down rather than inferred later. DO NOT DELETE THIS LOOP AS
@@ -930,16 +1096,22 @@ async function doSubmit(wb) {
   const cards = await readCards(wb.id);
   const grouped = byCard(await readAnswers(wb.id));
 
-  // Recompute EVERY card, and write back any that drifted - including the ones
-  // the gate does not count, so staff review never reads a stale state either.
+  // Recompute EVERY card, and write back any that drifted, so staff review
+  // never reads a stale state.
+  //
+  // "ANYTHING TO REVIEW" IS KEYED ON THE ROWS, not on the counting rule: with
+  // every card counting (D6), a workbook of nothing but empty cards would
+  // otherwise pass the emptiness check below by confirming its way through,
+  // and an entirely empty workbook is not finished, it is empty. Answers must
+  // belong to a card that EXISTS - an orphan row under a deleted card is not
+  // something anyone can review or confirm.
   let remaining = 0;
-  let anythingToReview = false;
+  const anythingToReview = cards.some((card) => (grouped.get(card.id) || []).length > 0);
   for (const card of cards) {
     const answers = grouped.get(card.id) || [];
     const state = cardState(card, answers);
     if (state !== card.state) await writeCardState(card, state);
-    if (!cardCounts(answers)) continue;      // nothing to review, nothing to hold Send for
-    anythingToReview = true;
+    if (!cardCounts(answers)) continue;      // every card counts now; the shape stays (see cardCounts)
     // The gate asks for the DELIBERATE ACT, not for the answer to look different.
     if (!cardIsReady(card)) remaining++;
   }
@@ -1294,6 +1466,18 @@ const tIntOrNull = (v) => {
   const n = typeof v === "number" ? v : (typeof v === "string" && /^\d+$/.test(v.trim()) ? parseInt(v, 10) : NaN);
   return Number.isInteger(n) && n >= 0 ? tOk(n) : tErr(`expected a whole number: ${JSON.stringify(v)}`);
 };
+// "For a set number of months" must name a number of months that can exist:
+// 1 to 24, consistent with the 24-month ceiling of the adjustable-prepay term
+// vocabulary - a code that outlives the longest commitment this build can sell
+// is a claim about billing months that cannot exist, and 0 months is not "a
+// set number of months". Blank stays null: the duration chip, not this number,
+// decides whether months apply at all. MUTATE=monthsunbounded.
+const tMonths1to24 = (v) => {
+  if (v === "" || v === null) return tOk(null);
+  const n = typeof v === "number" ? v : (typeof v === "string" && /^\d+$/.test(v.trim()) ? parseInt(v, 10) : NaN);
+  return Number.isInteger(n) && n >= 1 && n <= 24 ? tOk(n)
+    : tErr(`a set number of months must be a whole number from 1 to 24, the longest commitment this build can sell: ${JSON.stringify(v)}`);
+};
 const tYesNoBool = (v) => {
   if (typeof v === "boolean") return tOk(v);
   const s = String(v == null ? "" : v).trim().toLowerCase();
@@ -1301,8 +1485,27 @@ const tYesNoBool = (v) => {
   if (s === "no" || s === "false") return tOk(false);
   return tErr(`expected yes or no: ${JSON.stringify(v)}`);
 };
+// The stored list is CANONICALIZED through the shared emptiness rule: a
+// whitespace-only key would read "restricted" to a raw length check while the
+// Stripe coupon builder (couponAppliesToKeys) trims it away and scopes the
+// coupon to EVERYTHING - so no whitespace key may ever reach the offer jsonb.
+// This is depth behind the readers, not the wall: the confirm guard runs on
+// `answered` values that were never translated, so the readers share
+// cleanAppliesTo regardless. Non-string entries keep the existing refusal.
 const tStrArray = (v) =>
-  (Array.isArray(v) && v.every((x) => typeof x === "string") ? tOk(v) : tErr("expected a list of price keys"));
+  (Array.isArray(v) && v.every((x) => typeof x === "string") ? tOk(cleanAppliesTo(v)) : tErr("expected a list of price keys"));
+// Plan ages are STRINGS ("9", "12", "" = no bound) - the byte-identical
+// encoding offers.data.schedule.classes already uses (api/_offer-class-ages
+// .test.mjs pins it), so nothing downstream ever has to ask which shape a
+// stored age is in. A number input answers a number; that is a page fact, not
+// an age change, so a whole number 1-99 becomes its string and anything else
+// refuses.
+const tAgeStrOrEmpty = (v) => {
+  if (v === "") return tOk("");
+  const n = typeof v === "number" ? v
+    : (typeof v === "string" && /^\d+$/.test(v.trim()) && v.trim() === v ? parseInt(v, 10) : NaN);
+  return Number.isInteger(n) && n >= 1 && n <= 99 ? tOk(String(n)) : tErr(`not an age this can store: ${JSON.stringify(v)}`);
+};
 
 const PLAN_T = {
   title: tText, type: tChip(V_TYPE, "pricing type"), whats_included: tText,
@@ -1311,6 +1514,11 @@ const PLAN_T = {
   signup_fee: tMoneyStrOrEmpty, signup_fee_taxable: tChip(V_YESNO, "taxable answer"),
   signup_fee_on_base: tChip(V_CHARGE, "charge-or-waive answer"),
   sessions_included: tIntOrNull, expires_after: tText, other_description: tText,
+  // Who the plan is FOR. Stored on the offering, consumed by NOTHING yet
+  // (class age routing reads schedule.classes) - the apply response says so
+  // out loud (age_note). Dot-free plan leafs, so classifyField picks them up
+  // from this table automatically. MUTATE=agesunknownfield.
+  age_min: tAgeStrOrEmpty, age_max: tAgeStrOrEmpty,
   description: tText, archived: tBool,
 };
 const RUNG_T = {
@@ -1322,22 +1530,29 @@ const RUNG_T = {
 };
 const CODE_T = {
   code: tText, kind: tChip(V_KIND, "discount kind"), value: tMoneyStr,
-  duration: tChip(V_DUR, "duration"), duration_months: tIntOrNull,
+  duration: tChip(V_DUR, "duration"), duration_months: tMonths1to24,
   applies_to: tStrArray, expires_at: tText, max_redemptions: tIntOrNull,
   once_per_customer: tYesNoBool,
 };
 
 // clients.tax_config, canonical shape { pct, label } EXACTLY as GTA stores it
-// ({ pct: 13, label: "HST" }), or null when he answered no. Extra keys the
-// workbook capture carried (charges_tax, the example sentence, chip indexes)
-// are STRIPPED: resolveFee reads pct and label and nothing else, and a shape
-// with passengers is a shape someone eventually reads a passenger out of.
+// ({ pct: 13, label: "HST" }), or { charges_tax: false } when he answered no.
+// A CONFIRMED NO IS A VALUE, NEVER null: null means "never asked", and the two
+// used to collapse - the owner's deliberate "I do not charge tax" was stored
+// as the same nothing an unasked academy carries, so a future workbook asked
+// him again and nothing downstream could tell the answers apart. The page's
+// taxModel reads charges_tax === false as ANSWERED No, resolveFee (_fees.js)
+// treats it as "no tax, and do not fall back to a stale typed string", and
+// every other consumer reads .pct and sees no tax. MUTATE=noisnull.
+// Extra keys the workbook capture carried (the example sentence, chip indexes,
+// a null pct riding a No) are STRIPPED: a shape with passengers is a shape
+// someone eventually reads a passenger out of.
 function canonicalTax(v) {
-  if (v === false) return tOk(null);
+  if (v === false) return tOk({ charges_tax: false });
   if (typeof v !== "object" || v === null || Array.isArray(v)) {
     return tErr(`not a tax answer this can store: ${JSON.stringify(v)}`);
   }
-  if (v.charges_tax === false) return tOk(null);
+  if (v.charges_tax === false) return tOk({ charges_tax: false });
   const pct = Number(v.pct);
   if (!Number.isFinite(pct) || pct <= 0) return tErr("a tax rate must be a number above zero");
   return tOk({ pct, label: String(v.label == null ? "" : v.label).trim() });
@@ -1396,6 +1611,19 @@ function classifyIndexed(kind, table, m, what) {
   if (!own(table, leaf)) {
     return { kind: "unknown", why: `${JSON.stringify(leaf)} is not a ${what} field the apply step knows how to write, so it is refused rather than aimed at a guessed key in the offer` };
   }
+  // THE INDEX HAS ONE SPELLING. `+m[1]` collapses "00" and "0" into the same
+  // number, but the mint path dedupes rows by the exact target_field STRING -
+  // so `codes.00.applies_to` used to mint a TWIN row for logical code 0, two
+  // rows for one answer that review then adjudicated separately. The real page
+  // can only emit canonical indexes (codeIndices/rungIndices do `+m[1]` on
+  // rows the API itself sent), so refusing every other spelling costs nothing
+  // and closes the twin at its root: canMint reuses classifyField, so the
+  // non-canonical save 404s before a row exists. Placed AFTER the leaf check
+  // and BEFORE the bound check, so both existing refusal sentences stay
+  // byte-identical and first in priority. MUTATE=noncanonicalindex.
+  if (String(index) !== m[1]) {
+    return { kind: "unknown", why: `${JSON.stringify(m[0])} spells ${what} number ${index + 1} as ${JSON.stringify(m[1])} rather than ${JSON.stringify(String(index))}, and two spellings of one address are two rows for one answer` };
+  }
   if (!(index <= MAX_LIST_INDEX)) {
     return { kind: "unknown", why: `${JSON.stringify(m[0])} aims at ${what} number ${index + 1}, past the ${MAX_LIST_INDEX + 1} this can address. A row that far out is a typo or a script, and padding a plan out to it is a write nobody asked for` };
   }
@@ -1405,6 +1633,14 @@ function classifyIndexed(kind, table, m, what) {
 function classifyField(field) {
   const f = String(field || "");
   if (f === "tax_config") return { kind: "tax" };
+  // The registration number rides the tax card but is its own kind: it lands
+  // on clients.tax_registration_number (printed on parent receipts by
+  // api/_member-receipts.js), not inside the tax_config jsonb, and it is free
+  // text - no vocabulary to translate. MUTATE=taxregnowhere removes this
+  // branch, and the row must then REFUSE (unknown field), never write to a
+  // guessed place. That refusal-under-mutation is the proof the whitelist is
+  // still fail-closed.
+  if (f === "tax_registration_number") return { kind: "taxreg" };
   if (f === "notes") return { kind: "manual" };
   if (f.startsWith(ADD_PREFIX)) return { kind: "manual" };
   let m = f.match(/^commitments\.(\d+)\.([a-z_]+)$/);
@@ -1511,6 +1747,10 @@ function reviewItem(card, a) {
     const out = canonicalTax(eff);
     if (out.ok) entry.will_write = out.value;
     else entry.translation_error = refusalReason(out.error, a.target_field);
+  } else if (!isBlank(eff) && cls.kind === "taxreg") {
+    const out = tText(eff);
+    if (out.ok) entry.will_write = out.value;
+    else entry.translation_error = refusalReason(out.error, a.target_field);
   } else if (cls.kind === "unknown") {
     // The reason classifyField decided on, not a generic restatement: an
     // unlisted field, an unlisted rung leaf and an index past the ceiling are
@@ -1546,7 +1786,9 @@ async function doReviewStaff(req, body) {
       if (a.target_kind === "academy_setting") { academy.push(entry); continue; }
       items.push(entry);
     }
-    if (!items.length && !cardCounts(mine)) continue;   // nothing to show for an empty card
+    // An empty confirmed card APPEARS in review with items: [] (D6): "he was
+    // asked, nothing to add" is a decision staff see and approve, not a row
+    // that vanishes off the surface they read while the gate still counts it.
     cardGroups.push({
       card_key: card.card_key,
       title: card.title,
@@ -1562,10 +1804,59 @@ async function doReviewStaff(req, body) {
     });
   }
 
+  // ── THE WITHHELD-FEE WARNING, said BEFORE apply ────────────────────────────
+  // A discount code with no applies-to list discounts every line on the first
+  // invoice, the fee included, so at apply time the mint targets WITHHOLD the
+  // joining fee of every plan that charges one (match-prices.js, RISK 4 gate).
+  // That used to surface only as a console.warn during the rehearsal - after
+  // the approvals, in a server log. Staff read it here instead, while the code
+  // is still fixable in review. Computed from the workbook's own EFFECTIVE
+  // answers - no offers read - because review is about what the owner sent,
+  // and the apply-side report (phase3.withheld_signup_fees) stays the backstop
+  // that reads the offer as it really lands.
+  const warnings = [];
+  {
+    const isCharge = (v) => V_CHARGE.get(String(v == null ? "" : v).trim().toLowerCase()) === "charge";
+    const looseCodes = [];   // a code with a name and no applies-to list
+    const chargedPlans = []; // a plan whose fee somebody actually pays
+    for (const card of cards) {
+      const mine = grouped.get(card.id) || [];
+      const k = String(card.card_key || "");
+      if (k === "codes" || k.startsWith("codes:")) {
+        // Same extraction the confirm refusal runs (looseCodesIn), so the
+        // warning staff read and the rule that blocks the owner's confirm can
+        // never disagree about which codes are loose.
+        for (const lc of looseCodesIn(mine)) looseCodes.push({ card_key: card.card_key, code: lc.code });
+      }
+      if (k.startsWith("plan:")) {
+        const eff = (f) => { const a = mine.find((x) => x.target_field === f); return a ? effective(a) : undefined; };
+        const fee = parseFloat(eff("signup_fee"));
+        if (!(fee > 0)) continue;
+        const charges = isCharge(eff("signup_fee_on_base"))
+          || mine.some((a) => /^commitments\.\d+\.signup_fee_charge$/.test(String(a.target_field || "")) && isCharge(effective(a)));
+        if (!charges) continue;
+        const title = eff("title");
+        chargedPlans.push({ card_key: card.card_key, offering: (typeof title === "string" && title.trim()) ? title : card.title });
+      }
+    }
+    // Same sentence the apply-side withhold carries, so staff read ONE wording
+    // in both places rather than two descriptions of one decision.
+    for (const lc of looseCodes) {
+      for (const p of chargedPlans) {
+        warnings.push({
+          card_key: lc.card_key,
+          plan_card_key: p.card_key,
+          sentence: `The ${p.offering} joining fee was left out of the mint targets: discount code "${lc.code}" has no applies-to list, and an unrestricted code discounts every line on the first invoice, the fee included. Set what the code applies to, then rerun.`,
+        });
+      }
+    }
+  }
+
   const { counted, unapproved } = approvalGate(cards, grouped);
   const allItems = [...academy, ...cardGroups.flatMap((c) => c.items), ...additions, ...notes];
   return {
     ok: true,
+    warnings,
     workbook: {
       id: wb.id, client_id: wb.client_id, kind: wb.kind, status: wb.status,
       submitted_at: wb.submitted_at, reviewed_at: wb.reviewed_at || null,
@@ -1592,22 +1883,32 @@ async function doApproveCard(req, body) {
   const { user, wb, wbDegraded } = await resolveStaffForWorkbook(req, body);
   assertReviewable(wb);
   const cardKey = String(body.card_key || "").trim();
-  if (!cardKey) throw bad("card_key required");
 
   const { cards, degraded } = await readCardsStaff(wb.id);
   const { answers, degraded: answersDegraded } = await readAnswersStaff(wb.id);
   if (degraded || wbDegraded || answersDegraded) {
     throw bad("this environment has not run the workbook apply migration (20260806T063000), so approvals cannot be recorded here", 409);
   }
+  // THE REFUSAL NAMES THE VOCABULARY (D8). A caller holding review output has
+  // card_id in hand right next to card_key, and a bare "card_key required" /
+  // "not found" sends them guessing which noun this action wants. The
+  // emptiness check moved BELOW the reads so both refusals can list the real
+  // keys - a sentence that names the fix, not just the failure.
+  const keys = cards.map((c) => c.card_key).join(", ");
+  if (!cardKey) {
+    throw bad(`card_key required - this action names the card by its card_key, one of: ${keys}, not by card_id`);
+  }
   const card = cards.find((c) => c.card_key === cardKey);
-  if (!card) throw bad("not found", 404);
+  if (!card) {
+    throw bad(`no card called ${JSON.stringify(cardKey)} - the card_keys on this workbook are: ${keys}`, 404);
+  }
 
   const grouped = byCard(answers);
-  const mine = grouped.get(card.id) || [];
-  if (!cardCounts(mine)) throw bad("there is nothing on this card to approve", 409);
-  // STAFF APPROVE WHAT THE OWNER CONFIRMED, never more. A card he did not
-  // confirm is a card whose answer does not exist yet, and approving it would
-  // stamp the staff act onto a value nobody stands behind.
+  // STAFF APPROVE WHAT THE OWNER CONFIRMED, never more - and never less: an
+  // EMPTY confirmed card is approvable, because "he was asked and had nothing
+  // to add" is a decision staff sign off like any other (D6). The confirmed_at
+  // check below is the real gate; the old "nothing on this card to approve"
+  // refusal is gone with the counting rule that produced it.
   if (!card.confirmed_at) throw bad("the owner has not confirmed this card, so there is nothing to approve yet", 409);
 
   // Idempotent: the FIRST stamp is the record. Re-approving does not move it,
@@ -1708,6 +2009,7 @@ async function doApplyStaff(req, body) {
   // middle is exactly the state this pass exists to avoid.
   const skipped = { additions: [], notes: [], already_applied: [], no_answer: [] };
   const taxPending = [];
+  const taxRegPending = [];  // { a, value } -> clients.tax_registration_number
   const offerPending = [];   // { a, cls, value }
   const failures = [];
   // ONE door for every refusal, so a failure without a sentence a human can act
@@ -1732,6 +2034,18 @@ async function doApplyStaff(req, body) {
       taxPending.push({ a, value: out.value });
       continue;
     }
+    if (cls.kind === "taxreg") {
+      if (a.target_table !== "clients") { refuse(a, "the tax registration number must target clients"); continue; }
+      const out = tText(eff);
+      if (!out.ok) { refuse(a, out.error); continue; }
+      // An EMPTY string is "he left the optional box blank", not "erase what
+      // is stored": the question is optional and the page sends "" for an
+      // untouched input, so writing it would blank a number somebody typed
+      // into the portal earlier. Skipped, the same bucket as no answer.
+      if (!out.value.trim()) { skipped.no_answer.push(a.id); continue; }
+      taxRegPending.push({ a, value: out.value });
+      continue;
+    }
     // TWO DIFFERENT REFUSALS, said differently. A field the whitelist does not
     // carry and a row aimed at the wrong table are not the same problem, and
     // giving them one sentence sent staff looking in the wrong place.
@@ -1742,7 +2056,37 @@ async function doApplyStaff(req, body) {
     }
     const out = cls.t(eff);
     if (!out.ok) { refuse(a, out.error); continue; }
+    // A BLANK age with nothing stored writes nothing: "" is the no-bound
+    // encoding, and stamping it onto a plan that never had bounds grows keys
+    // nobody asked for. Clearing a REAL stored bound still writes "".
+    if (cls.kind === "plan" && /^age_(min|max)$/.test(String(a.target_field))
+      && out.value === "" && (isBlank(a.current_value) || a.current_value === "")) {
+      skipped.no_answer.push(a.id);
+      continue;
+    }
     offerPending.push({ a, cls, value: out.value });
+  }
+
+  // ── cross-field sanity: an inverted age band can never fit an athlete ─────
+  // Judged here in phase 0 with everything else, so the whole apply refuses
+  // while the configuration is untouched. Only a card carrying BOTH effective
+  // ages can be inverted; blank never blocks, because blank means "for
+  // everyone". Same direction as the page's own confirm guard.
+  // MUTATE=agebandunchecked.
+  {
+    const agesByCard = new Map();
+    for (const p of offerPending) {
+      if (p.cls.kind !== "plan" || !/^age_(min|max)$/.test(String(p.a.target_field))) continue;
+      if (!agesByCard.has(p.a.card_id)) agesByCard.set(p.a.card_id, {});
+      agesByCard.get(p.a.card_id)[p.a.target_field] = p;
+    }
+    for (const [, pair] of agesByCard) {
+      const lo = pair.age_min, hi = pair.age_max;
+      if (!lo || !hi || lo.value === "" || hi.value === "") continue;
+      if (+lo.value > +hi.value) {
+        refuse(lo.a, `age_min ${lo.value} is above age_max ${hi.value}, so no athlete could ever fit this plan. Fix the ages first.`);
+      }
+    }
   }
 
   // Read the live offers and resolve every card to its offering BEFORE the
@@ -1848,7 +2192,7 @@ async function doApplyStaff(req, body) {
     // here, before the first write, rather than being taken with a hole in it.
     // MUTATE=snapshotblind.
     const [clientRows, priceRead] = await Promise.all([
-      sb(`clients?id=eq.${enc(wb.client_id)}&select=tax_config&limit=1`),
+      sb(`clients?id=eq.${enc(wb.client_id)}&select=tax_config,tax_registration_number&limit=1`),
       sb(`offer_prices?tenant_id=eq.${enc(wb.client_id)}`).then(
         (rows) => ({ ok: true, rows: Array.isArray(rows) ? rows : [] }),
         (e) => ({ ok: false, why: String((e && e.message) || e) })
@@ -1870,6 +2214,7 @@ async function doApplyStaff(req, body) {
       taken_by: user.id,
       offers: offerRows.map((r) => ({ id: r.id, data: orNull(r.data) })),
       tax_config: (Array.isArray(clientRows) && clientRows[0]) ? orNull(clientRows[0].tax_config) : null,
+      tax_registration_number: (Array.isArray(clientRows) && clientRows[0]) ? orNull(clientRows[0].tax_registration_number) : null,
       offer_prices: Array.isArray(priceRows) ? priceRows : [],
     };
     const landedSnap = await sb(`workbooks?id=eq.${enc(wb.id)}&snapshot=is.null&select=id`, {
@@ -1913,6 +2258,19 @@ async function doApplyStaff(req, body) {
     await stamp([a.id]);
     taxResult = { answer_id: a.id, tax_config: value };
   }
+  // The registration number rides the same phase: an academy setting, one
+  // PATCH, printed on parent receipts by _member-receipts.js. It affects no
+  // amount, but it belongs with the tax write it was asked alongside.
+  let taxRegResult = null;
+  for (const { a, value } of taxRegPending) {
+    await sb(`clients?id=eq.${enc(wb.client_id)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ tax_registration_number: value }),
+    });
+    await stamp([a.id]);
+    taxRegResult = { answer_id: a.id, tax_registration_number: value };
+  }
 
   // ── c. OFFER jsonb writes, per offer row, per approved card ───────────────
   const offerReports = [];
@@ -1954,6 +2312,39 @@ async function doApplyStaff(req, body) {
         wrote.push({ answer_id: a.id, target_field: a.target_field, to: value });
       }
     }
+
+    // ── D4: STALE discount_notes ARE CLEARED, not regenerated ────────────────
+    // These are internal team notes never quoted to anyone (pinned by
+    // api/_discount-notes-never-quoted.test.mjs), and a note regenerated from
+    // the numbers is a second copy of the numbers that will go stale again. So
+    // for every rung of every LIVE offering an approved plan card in this
+    // workbook touched: if the workbook carries NO owner edit for that rung's
+    // note (owner edit = effective differs from current_value), a stored
+    // non-blank note is BAM-authored prose about prices that may have just
+    // changed - it is cleared to "". A note the owner actually typed survives
+    // verbatim through the ordinary write path above; a rung with no note is a
+    // no-op, never grown a key. Every clear is reported in `wrote` so the
+    // apply response says it happened - nothing silent. MUTATE=stalenoteskept.
+    for (const [cardId, ix] of offeringIdxByCard) {
+      const card = cardById.get(cardId);
+      if (!card || !String(card.card_key || "").startsWith("plan:")) continue;
+      const cardAnswers = grouped.get(cardId) || [];
+      // Only offerings living on THIS offer row.
+      const aims = cardAnswers.find((x) => x.target_table === "offers" && x.target_id);
+      if (!aims || String(aims.target_id) !== offerId) continue;
+      const off = (data.pricing.pricing_offerings || [])[ix];
+      if (!off || off.archived) continue;
+      (off.commitments || []).forEach((rung, i) => {
+        const note = rung && rung.discount_notes;
+        if (typeof note !== "string" || !note.trim()) return;
+        const field = `commitments.${i}.discount_notes`;
+        const ownerEdited = cardAnswers.some((x) => x.target_field === field && !jsonEqual(effective(x), x.current_value));
+        if (ownerEdited) return;
+        rung.discount_notes = "";
+        wrote.push({ answer_id: null, target_field: field, to: "" });
+      });
+    }
+
     if (wrote.length) {
       await sb(`offers?id=eq.${enc(offerId)}`, {
         method: "PATCH",
@@ -1961,7 +2352,9 @@ async function doApplyStaff(req, body) {
         body: JSON.stringify({ data, updated_at: nowIso() }),
       });
     }
-    await stamp([...wrote.map((w) => w.answer_id), ...agreed]);
+    // A cleared stale note has no answer row behind it (answer_id null), so it
+    // is reported but never stamped - there is nothing to stamp.
+    await stamp([...wrote.map((w) => w.answer_id).filter(Boolean), ...agreed]);
     offerReports.push({ offer_id: offerId, wrote, already_matching: agreed.length });
   }
 
@@ -1972,13 +2365,22 @@ async function doApplyStaff(req, body) {
 
   // Status DOES NOT MOVE. apply(dry) leaves the workbook where the review left
   // it; nothing reaches 'applied' until a live apply exists to earn it.
+  // STORED-FOR-LATER IS SAID OUT LOUD. Plan ages are consumed by NOTHING
+  // today - class age routing (api/agent/_class-routing.js) reads
+  // schedule.classes, and so do offer.js/fact-render.js/marketing.js - so an
+  // apply that wrote them must say no behaviour changed, or the person who
+  // typed 9-12 reasonably believes routing just moved. MUTATE=agenotegone.
+  const wroteAges = offerReports.some((rep) => (rep.wrote || []).some((w) => /^age_(min|max)$/.test(String(w.target_field))));
+
   return {
     ok: true,
     dry_run: true,
     status: wb.status,
     snapshot: snapshotState,
     tax: taxResult,
+    tax_registration: taxRegResult,
     offers: offerReports,
+    ...(wroteAges ? { age_note: "Plan ages were stored on the offer for later use. Nothing reads plan ages yet: class age routing still reads the class list, so no routing changed." } : {}),
     skipped,
     phase3,
   };
@@ -1999,16 +2401,46 @@ async function doApplyStaff(req, body) {
 // second copy of that math is a fork on a money path. Still lazy relative to the
 // MODULE: an owner autosave never drags the matcher's dependency tree in.
 async function loadPriceMachinery() {
-  let mod;
+  let matcher, pricer, stripe;
   try {
-    mod = await import("./offers/match-prices.js");
+    matcher = await import("./offers/match-prices.js");
+    // The mint's OWN cadence resolution and THE Stripe seam ride the same lazy
+    // load, for the same reason buildOfferTargets does: the rehearsal answers
+    // "what would the mint bill this on" and "does this price already exist"
+    // by calling the decision and the transport the mint will use, never a
+    // second copy of either. A failed load is the same 503 BEFORE any write.
+    pricer = await import("./offers/create-price.js");
+    stripe = await import("./_stripe-transport.js");
   } catch {
     throw bad("the phase 3 preview could not load api/offers/match-prices.js in this environment, so apply stopped before writing anything", 503, "price_machinery_unavailable");
   }
-  if (typeof mod.buildOfferTargets !== "function") {
+  if (typeof matcher.buildOfferTargets !== "function" && typeof matcher.buildOfferTargetsReport !== "function") {
     throw bad("the phase 3 preview needs buildOfferTargets exported from api/offers/match-prices.js - it is not exported yet, so apply stopped before writing anything", 503, "price_machinery_unavailable");
   }
-  return mod;
+  return { matcher, pricer, stripe };
+}
+
+// The targets plus the WITHHELD joining fees, from one build. The report export
+// is preferred because the withhold used to be a console.warn: a plan's fee
+// silently missing from the rehearsal, with the reason living in a server log
+// nobody reviewing a workbook reads. On a deployment whose match-prices.js
+// predates the report export this degrades to the bare array and SAYS SO -
+// `withheld_signup_fees: null` means "this deployment cannot say", which is a
+// different answer from "nothing was withheld" and must never collapse into it.
+async function buildTargetsWithReport(mod, clientId) {
+  if (typeof mod.buildOfferTargetsReport === "function") {
+    const rep = await mod.buildOfferTargetsReport(clientId);
+    return {
+      targets: (rep && rep.targets) || [],
+      withheld: (rep && Array.isArray(rep.withheld_signup_fees)) ? rep.withheld_signup_fees : [],
+      withheldNote: null,
+    };
+  }
+  return {
+    targets: await mod.buildOfferTargets(clientId),
+    withheld: null,
+    withheldNote: "this deployment's price machinery does not report withheld joining fees, so this run cannot say whether any were left out of the targets.",
+  };
 }
 
 // A READ THAT FAILED IS NOT A READ THAT RETURNED NOTHING. Three outcomes, the
@@ -2045,19 +2477,22 @@ async function phase3Preview(clientId, mod) {
   // staff. The preview detects them itself now (unsellable_rungs, below); this
   // catch stays for an UNEXPECTED refusal, which comes back as data rather than
   // a crash, and the writes that already landed stand.
-  let targets;
+  let targets, withheld, withheldNote;
   try {
-    targets = await mod.buildOfferTargets(clientId);
+    ({ targets, withheld, withheldNote } = await buildTargetsWithReport(mod.matcher, clientId));
   } catch (e) {
     // A sentence our own machinery wrote, about a commitment length - no
     // credential material travels this path. Counts are NULL rather than zero:
     // "no targets" and "we could not build the targets" are different answers.
+    // withheld_signup_fees is null for the same reason: a build that refused
+    // cannot claim nothing was withheld.
     return {
       targets: [], matched: null, would_mint: null, unsellable_rungs: null,
+      withheld_signup_fees: null,
       refused: String((e && e.message) || "the price machinery refused to build targets"),
     };
   }
-  const [catalogRead, offersRead, cadenceRead] = await Promise.all([
+  const [catalogRead, offersRead, cadenceRead, clientRead] = await Promise.all([
     // MUTATE=catalogblind. Executed with this read throwing under the old
     // `.catch(() => [])`: matched=1 / would_mint=4 became matched=0 /
     // would_mint=5 with status 200 - the rehearsal telling staff to mint five
@@ -2075,10 +2510,86 @@ async function phase3Preview(clientId, mod) {
       + "&select=source_offer_id,source_offer_price_key,billing_cadence,sort_order&order=sort_order.asc",
       "offer_prices billing_cadence"
     ),
+    // The academy row itself, for the READINESS surface below (tax_state) and
+    // for the live Stripe read (stripe_connect_account_id). Read fresh here
+    // rather than trusted from the apply's earlier state, because the tax
+    // write in phase b landed BEFORE this preview runs and the state reported
+    // must be the state the mint would actually see.
+    readForPreview(`clients?id=eq.${enc(clientId)}&select=tax_config,stripe_connect_account_id&limit=1`, "clients tax_config"),
   ]);
   const catalog = catalogRead.rows;
   const previewOffers = offersRead.rows;
   const canCompare = catalogRead.state === "read";
+
+  // ── TAX READINESS, three-outcome plus the confirmed no ────────────────────
+  // "confirmed_no" and "never_asked" are DIFFERENT answers and the whole point
+  // of storing { charges_tax: false }: a rehearsal that showed untaxed amounts
+  // could not previously say whether the owner decided that or nobody asked.
+  // "could_not_read" is its own outcome - a failed read must never report as
+  // either of the real states (house rule: a read that failed is not a read
+  // that found nothing).
+  let taxState;
+  if (clientRead.state !== "read") taxState = "could_not_read";
+  else {
+    const cfg = (clientRead.rows[0] || {}).tax_config;
+    if (cfg == null) taxState = "never_asked";
+    else if (cfg.charges_tax === false) taxState = "confirmed_no";
+    else if (Number(cfg.pct) > 0) taxState = "configured";
+    // A stored shape taxFee cannot price (no usable pct, not a confirmed no)
+    // charges nothing, exactly as never-asked does - and unlike a confirmed
+    // no, somebody should still ask.
+    else taxState = "never_asked";
+  }
+
+  // ── THE LIVE STRIPE READ, read-only, through THE seam (D7) ────────────────
+  // The rehearsal used to answer match-vs-mint from the pricing_catalog table
+  // alone - a snapshot that can be stale or empty while the academy's real
+  // Stripe already carries the price. So the dry run now reads the LIVE
+  // active prices through _stripe-transport.stripeFetch, which routes San
+  // Jose's direct key or a Connect header without this caller ever asking
+  // which it got. GETs only: the harnesses throw STRIPE WAS WRITTEN TO on
+  // anything else, and that tripwire is proven live by MUTATE=stripewrite.
+  //
+  // FAIL LOUD, three outcomes: "read" / "not_connected" / "could_not_read".
+  // It must be impossible to read exists:false out of a failed read - a
+  // swallowed failure here says "mint them all" against real cards
+  // (MUTATE=stripequietfail).
+  let livePrices = null, productNames = null, stripeError = null;
+  let stripeCheck;
+  const acct = clientRead.state === "read"
+    ? String((clientRead.rows[0] || {}).stripe_connect_account_id || "").trim()
+    : "";
+  if (clientRead.state !== "read") {
+    stripeCheck = "could_not_read";
+    stripeError = "the academy row could not be read, so this run cannot say which Stripe account to look in. Do not treat would-mint counts as real until this reads.";
+  } else if (!acct) {
+    stripeCheck = "not_connected";
+  } else {
+    try {
+      livePrices = [];
+      let after = null;
+      for (let page = 0; page < 10; page++) {   // cap ~1000 prices; an academy past that is a conversation
+        const qs = new URLSearchParams({ active: "true", limit: "100" });
+        if (after) qs.set("starting_after", after);
+        const r = await mod.stripe.stripeFetch(`/prices?${qs.toString()}`, { stripeAccount: acct });
+        const data = (r && r.data) || [];
+        livePrices.push(...data);
+        if (!r || !r.has_more || !data.length) break;
+        after = data[data.length - 1].id;
+      }
+      stripeCheck = "read";
+      // Names are cosmetic: a failed products pass leaves them null without
+      // demoting the EXISTENCE answer, which really was read.
+      try { productNames = await mod.matcher.fetchProductNames(acct); } catch { productNames = null; }
+    } catch (e) {
+      // Logged, never forwarded: it is a throw we did not write, and the
+      // transport's own guards have already kept key material out of it.
+      console.error("workbook: the phase 3 preview could not read live Stripe prices -", String((e && e.message) || e));
+      livePrices = null;
+      stripeCheck = "could_not_read";
+      stripeError = "the academy's live Stripe prices could not be read, so this run cannot say which targets already exist. Do not treat would-mint counts as real until this reads.";
+    }
+  }
 
   // REPORT-ONLY shape. The live mint (when it exists) goes through
   // create-price.js recurringFor, which also honors declared week rhythms and
@@ -2095,12 +2606,12 @@ async function phase3Preview(clientId, mod) {
     return { interval: null, recurring: null };   // render whatever arrived; match nothing
   };
 
-  // THE DECLARED RHYTHM, best effort, so staff SEE it in the rehearsal: San
-  // Jose's "3 Months (12 Weeks)" bills his real members every 12 weeks, and a
-  // mint on 3 calendar months would put new signups on a different clock
-  // forever. The commitment is joined back by its price and its week count is
-  // read off the label only when that join is unambiguous.
-  const declaredWeeksFor = (t) => {
+  // THE DECLARED LENGTH LABEL, joined back so the rehearsal can resolve the
+  // rhythm the way the MINT does: San Jose's "3 Months (12 Weeks)" bills his
+  // real members every 12 weeks, and a mint on 3 calendar months would put new
+  // signups on a different clock forever. The commitment is joined by its
+  // price, and the label is used only when that join is unambiguous.
+  const declaredLengthFor = (t) => {
     if (!/^\d+_months$/.test(String(t.term || ""))) return null;
     for (const o of previewOffers) {
       const offerings = (((o.data || {}).pricing) || {}).pricing_offerings || [];
@@ -2110,14 +2621,25 @@ async function phase3Preview(clientId, mod) {
           (c) => c && Math.round(parseFloat(c.price) * 100) === Number(t.base_cents)
         );
         if (hits.length !== 1) return null;
-        const w = String(hits[0].length || "").toLowerCase().match(/(\d+)\s*week/);
-        return w ? +w[1] : null;
+        return hits[0].length == null ? null : String(hits[0].length);
       }
     }
     return null;
   };
 
-  // ── WHAT THE MINT WOULD ACTUALLY HONOUR, as far as this side can know it ──
+  // The rhythm sentence a human reads, with its SOURCE attached, because "every
+  // 12 weeks" from a typed row and "every 12 weeks" from a label are different
+  // claims to go verify.
+  const rhythmSentence = (rec, source) => {
+    const src = source === "typed_row" ? "from the typed offer_prices row"
+      : source === "length_label" ? "from the week count the length label declares"
+        : "from the term's calendar shape";
+    if (rec === null) return "the mint would bill this once, as a one-time line, never a subscription";
+    const unit = Number(rec.interval_count) === 1 ? rec.interval : `${rec.interval_count} ${rec.interval}s`;
+    return `the mint would bill this every ${unit} (${src})`;
+  };
+
+  // ── WHAT THE MINT WOULD ACTUALLY HONOUR - answered, no longer hedged ──────
   //
   // create-price.js recurringFor decides in this order: an explicit request
   // cadence, then the TYPED offer_prices row, then the length label, then the
@@ -2130,12 +2652,14 @@ async function phase3Preview(clientId, mod) {
   // ascending, because an unordered pick can change between two identical reads.
   // Anything looser and the two disagree about money.
   //
-  // WHAT IT STILL CANNOT KNOW, said out loud instead of asserted: CADENCES and
-  // cadenceFromLength are not exported from create-price.js, so this side cannot
-  // tell a declared 12-week rhythm (in the vocabulary, minted on weeks) from a
-  // declared 8-week one (not in it, warned about and minted on calendar months).
-  // A second copy of the cadence table here would be a fork on a money path, so
-  // the gap is NAMED rather than filled in with a guess that reads as a fact.
+  // The hedge this used to carry ("the cadence vocabulary is not exported, so
+  // this preview cannot say") is GONE because the gap it named was closed:
+  // normCadence, cadenceFromLength and recurringFor are exported from
+  // create-price.js now, so each target's billing_rhythm below is computed by
+  // THE SAME functions the mint will call, with its source attached. A label
+  // that declares a week count the vocabulary cannot honour is stated as a
+  // FALLBACK to the calendar shape, because that is what cadenceFromLength
+  // returning null means at mint time - stated, never guessed.
   // MUTATE=previewlies.
   // DESTRUCTURED, NOT `const pair = ...row.source_offer_price_key...`, and that
   // is not a style choice. scripts/credential-header-scan.mjs treats any
@@ -2150,15 +2674,48 @@ async function phase3Preview(clientId, mod) {
     const pair = `${String(onOffer || "")}|${String(forKey || "")}`;
     if (!typedCadence.has(pair)) typedCadence.set(pair, String(rhythm));   // sort_order asc: the first is the one
   }
-  const CADENCE_UNKNOWABLE = "this preview cannot say which billing rhythm the mint will use: create-price.js resolves it from a cadence vocabulary that is not exported. Treat a rhythm below as something to check before the live mint, not as what will happen.";
+  // A live Stripe price matches a target when the AMOUNT and the RECURRING
+  // SHAPE both agree with what the mint would create - a one-time target
+  // matches only a price with no recurring block at all. Amount alone is not a
+  // match: a $2,186.41 price billed every 4 weeks is not the 12-month prepay,
+  // it is a different product at a coincidental number.
+  const sameRecurring = (price, want) => (want == null
+    ? price.recurring == null
+    : !!price.recurring
+      && String(price.recurring.interval) === String(want.interval)
+      && Number(price.recurring.interval_count) === Number(want.interval_count));
 
   const rows = targets.map((t) => {
     const shape = shapeFor(t.term);
     const hit = !canCompare || shape.interval == null ? null : (catalog.find(
       (r) => Number(r.amount_cents) === Number(t.allin_cents) && String(r.interval) === shape.interval
     ) || null);
-    const weeks = offersRead.state === "read" ? declaredWeeksFor(t) : null;
+    const lenLabel = offersRead.state === "read" ? declaredLengthFor(t) : null;
+    const weeksM = lenLabel ? String(lenLabel).toLowerCase().match(/(\d+)\s*week/) : null;
+    const weeks = weeksM ? +weeksM[1] : null;
     const typed = typedCadence.get(`${String(t.offer_id || "")}|${String(t.key || "")}`);
+    // THE MINT'S OWN RESOLUTION, called rather than copied: typed row first,
+    // then the label's week count, then the term's calendar shape - each step
+    // through the exported functions the mint itself uses.
+    const typedCad = typed === undefined ? null : mod.pricer.normCadence(typed);
+    const lenCad = typedCad ? null : mod.pricer.cadenceFromLength(lenLabel);
+    const cadence = typedCad || lenCad;
+    const mintRecurring = mod.pricer.recurringFor(t.term, cadence, null);
+    const source = typedCad ? "typed_row" : (lenCad ? "length_label" : "term_shape");
+    // Live-Stripe existence, only ever answered off a read that HAPPENED:
+    // null means "this run cannot say", and it must be impossible to read
+    // exists:false out of a failed read.
+    let stripeInfo = null;
+    if (stripeCheck === "read") {
+      const live = livePrices.find((p) => Number(p.unit_amount) === Number(t.allin_cents) && sameRecurring(p, mintRecurring)) || null;
+      stripeInfo = live ? {
+        exists: true,
+        price_id: live.id,
+        currency: live.currency || null,
+        interval: live.recurring ? `${live.recurring.interval_count} ${live.recurring.interval}` : "one_time",
+        product_name: (productNames && typeof live.product === "string" && productNames[live.product]) || null,
+      } : { exists: false };
+    }
     return {
       key: t.key,
       label: t.label,
@@ -2169,18 +2726,27 @@ async function phase3Preview(clientId, mod) {
       fee_label: t.fee_label || null,
       interval: shape.interval,
       recurring: shape.recurring,
-      ...(weeks == null ? {} : {
-        declared_weeks: weeks,
-        rhythm_note: `the commitment length declares a ${weeks}-week billing rhythm. ${CADENCE_UNKNOWABLE}`,
-      }),
-      ...(typed === undefined ? {} : {
-        typed_cadence: typed,
-        typed_cadence_note: `offer_prices already carries billing_cadence "${typed}" for this key, and a typed row OUTRANKS the length label at mint time, so this is the rhythm to check first. ${CADENCE_UNKNOWABLE}`,
-      }),
+      ...(weeks == null ? {} : { declared_weeks: weeks }),
+      ...(typed === undefined ? {} : { typed_cadence: typed }),
+      // THE REAL RHYTHM, with its source - computed by the mint's own exported
+      // functions, so the rehearsal and the mint cannot disagree about a clock.
+      billing_rhythm: {
+        recurring: mintRecurring,
+        source,
+        sentence: rhythmSentence(mintRecurring, source),
+      },
+      // A declared week count the vocabulary cannot honour is a FALLBACK the
+      // mint will really take - stated, not guessed at.
+      ...(weeks != null && !cadence ? {
+        rhythm_fallback: `the length label declares a ${weeks}-week rhythm that is not in the mint's cadence vocabulary, so the mint will FALL BACK to the term's calendar shape. Set billing_cadence on the offer_prices row if the weekly clock is the real one.`,
+      } : {}),
+      stripe: stripeInfo,
       matched: hit ? { stripe_price_id: hit.stripe_price_id, tier: hit.tier, amount_cents: hit.amount_cents, display_name: hit.display_name || null } : null,
       // A COMPARISON WE COULD NOT MAKE IS NULL, NOT "yes it needs minting".
       // With the catalog unread, `needs_mint: true` is a claim about a table
       // nobody opened - and acting on it mints a price that already exists.
+      // (Two different questions ride each row on purpose: `matched`/
+      // `needs_mint` ask the CATALOG snapshot, `stripe` asks the LIVE account.)
       needs_mint: canCompare ? !hit : null,
     };
   });
@@ -2245,11 +2811,25 @@ async function phase3Preview(clientId, mod) {
 
   return {
     targets: rows,
+    // THE FEES THE BUILD DELIBERATELY LEFT OUT, as data a reviewer reads.
+    // Empty array = nothing withheld; null = this deployment cannot say
+    // (report export missing, or the build refused). MUTATE=feewithheldsilently.
+    withheld_signup_fees: withheld,
+    ...(withheldNote ? { withheld_note: withheldNote } : {}),
     // COUNTS ARE NULL WHEN THE COMPARISON DID NOT HAPPEN. A zero here reads as
     // "we checked and nothing matched", which is the exact false confidence the
     // catalog's swallowed failure produced.
     matched: canCompare ? rows.filter((r) => r.needs_mint === false).length : null,
     would_mint: canCompare ? rows.filter((r) => r.needs_mint === true).length : null,
+    withheld_fees: withheld ? withheld.length : null,
+    tax_state: taxState,
+    // THE LIVE-STRIPE ANSWER. Counts are NULL, never zero, when the read did
+    // not happen: "nothing exists yet" and "we could not look" are different
+    // answers, and acting on the wrong one mints duplicates against real cards.
+    stripe_check: stripeCheck,
+    ...(stripeError ? { stripe_error: stripeError } : {}),
+    exists_in_stripe: stripeCheck === "read" ? rows.filter((r) => r.stripe && r.stripe.exists === true).length : null,
+    would_mint_new: stripeCheck === "read" ? rows.filter((r) => r.stripe && r.stripe.exists === false).length : null,
     catalog: catalogRead.state === "read" ? (catalog.length ? "read" : "empty") : catalogRead.state,
     ...(canCompare ? {} : {
       could_not_compare: "the price catalog could not be read, so nothing here says whether these prices already exist. Do NOT mint from this run: minting against an unread catalog is how duplicate Stripe prices get made.",
@@ -2259,7 +2839,6 @@ async function phase3Preview(clientId, mod) {
       could_not_scan_offers: "the offers could not be read, so this run cannot say whether any commitment length is unsellable, and no declared billing rhythm is shown.",
     }),
     typed_cadence_source: cadenceRead.state,
-    cadence_caveat: CADENCE_UNKNOWABLE,
   };
 }
 
@@ -2293,7 +2872,13 @@ async function doRollbackStaff(req, body) {
   await sb(`clients?id=eq.${enc(wb.client_id)}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ tax_config: restoredTax }),
+    body: JSON.stringify({
+      tax_config: restoredTax,
+      // Only restored when the photograph actually CARRIES the key: a snapshot
+      // taken before the registration number was photographed would otherwise
+      // null a column it never looked at, which is a restore inventing state.
+      ...("tax_registration_number" in snap ? { tax_registration_number: orNull(snap.tax_registration_number) } : {}),
+    }),
   });
 
   // The applied stamps come off so a future apply can land again; the snapshot

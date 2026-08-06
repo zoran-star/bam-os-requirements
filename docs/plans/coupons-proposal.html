@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coupons: where they live</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;color:#1E1E24;background:#F7F6F2;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased;padding:26px 18px 70px}
+  .wrap{max-width:860px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 4px;letter-spacing:-.6px;font-weight:800}
+  .sub{font-size:13px;color:#6E6E78;margin:0 0 22px}
+  h2{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#8A8A94;margin:26px 0 10px;font-weight:800;border-top:1px solid #E3E1DA;padding-top:14px}
+  .card{background:#FFFFFF;border:1px solid #E3E1DA;border-radius:13px;padding:15px 17px;margin-bottom:11px;box-shadow:0 1px 2px rgba(20,20,20,.04)}
+  .card p{margin:0;font-size:13px;color:#4A4A54}
+  .card p+p{margin-top:7px}
+  b{color:#1E1E24;font-weight:700}
+  .pill{font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2.5px 8px;border-radius:20px;vertical-align:1px}
+  .p-paper{background:#FBF3E1;color:#8A6D1F}
+  .p-live{background:#E4F5EA;color:#2E7D46}
+  .p-warn{background:#FDEAE4;color:#C0392B}
+  .p-off{background:#EEEDE8;color:#7C7C86}
+
+  /* mock portal panel */
+  .mock{background:#FFFFFF;border:1px solid #E3E1DA;border-radius:14px;padding:16px;margin:8px 0 4px;box-shadow:0 1px 3px rgba(20,20,20,.05)}
+  .mock .mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .mock .mh b{font-size:14px;letter-spacing:-.2px}
+  .addbtn{font-size:11.5px;color:#8A6D1F;border:1px dashed #D4B65C;border-radius:8px;padding:4px 10px;background:#FDFBF4}
+  .crow{background:#FAF9F5;border:1px solid #E7E5DE;border-radius:11px;padding:11px 13px;margin-bottom:9px}
+  .crow .l1{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+  .code{font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:13.5px;color:#8A6D1F;background:#FBF3E1;border:1px solid #EAD9A8;border-radius:6px;padding:1px 8px}
+  .crow .facts{font-size:12px;color:#6E6E78}
+  .crow .facts b{color:#2E2E36;font-weight:700}
+  .crow .act{font-size:11px;color:#2266AA;margin-top:5px}
+  .why{font-size:11.5px;color:#6E6E78;margin-top:7px}
+  .why b{color:#3A3A44}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #ECEAE3;color:#4A4A54;vertical-align:top}
+  th{color:#8A8A94;font-size:10px;text-transform:uppercase;letter-spacing:1.2px}
+  td b{color:#1E1E24}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Coupons: where they live</h1>
+  <p class="sub">One page, three decisions. Most of the machinery already exists from the July money-model build; nothing here is a new system.</p>
+
+  <h2>The one place they live</h2>
+  <div class="card">
+    <p><b>This is NOT the onboarding wizard, and Lij never sees it.</b> The workbook stays the only owner-facing surface, and it already collects his codes. This page is about the two things AFTER the workbook: where his answers are stored, and the staff-only screen where BAM pushes a code live in Stripe.</p>
+    <p><b>Storage:</b> the academy's offer record in the database already holds a discount-codes list, the workbook writes into it, and the July build can push a code to Stripe with its applies-to list enforced natively. The proposal keeps that as the ONLY home and gives each code a state, instead of codes being half-real.</p>
+  </div>
+
+  <h2>What the review skill prints (staff work in Claude, no new portal screen)</h2>
+  <div class="mock">
+    <div class="mh"><b>Discount codes &middot; By Any Means San Jose</b></div>
+    <div class="crow">
+      <div class="l1"><span class="code">club</span><span class="pill p-paper">on paper</span><span class="pill p-warn">forever</span><span class="pill p-off">never used</span></div>
+      <div class="facts"><b>$100 off every payment</b> &middot; applies to: <b>nothing ticked yet</b> &middot; imported from Lij's Stripe (his coupon, adopted by id, never re-minted)</div>
+      <div class="act">The skill asks: make it live? Refuses until targets and duration are confirmed</div>
+    </div>
+    <div class="crow">
+      <div class="l1"><span class="code">2SIBLING</span><span class="pill p-live">live in Stripe</span></div>
+      <div class="facts"><b>10% off every payment</b> &middot; applies to: <b>Steady monthly, Summer Unlimited monthly + 3mo</b> &middot; GTA (shown as the worked example)</div>
+      <div class="act">Editing targets re-issues the code to Stripe so enforcement matches the list</div>
+    </div>
+    <p class="why"><b>Two states, one deliberate step between them.</b> "On paper" = written down in the offer record, cannot be redeemed. "Live in Stripe" = a real coupon + promotion code, targets enforced by Stripe itself. The step between them is the July re-issue path that already works for 2SIBLING, run by the skill with a staff yes.</p>
+  </div>
+
+  <h2>The three decisions</h2>
+  <table>
+    <tr><th>#</th><th>Question</th><th>Proposed answer</th></tr>
+    <tr><td><b>1</b></td><td>An academy arrives with coupons already in their Stripe (club)</td><td><b>Adopt, never re-mint.</b> Store their coupon id, show it "on paper" until the owner asks for it live. His account keeps one coupon, not a duplicate with our name on it.</td></tr>
+    <tr><td><b>2</b></td><td>Can a code go live without saying what it applies to?</td><td><b>No.</b> Same ruling as the workbook today: targets always explicit, "everything including the joining fee" is a choice, not a default. A forever-duration code additionally shows a red chip because it compounds every billing cycle.</td></tr>
+    <tr><td><b>3</b></td><td>Person-level deals (Christopher $199, Keanu $100)</td><td><b>Not coupons.</b> Your Aug 4 ruling: arrangements with a person ride the member workbook and live on that member's subscription. The coupons list never shows them, so it stays the list of what the academy offers to everyone.</td></tr>
+  </table>
+
+  <div class="card" style="margin-top:14px">
+    <p><b>What this costs to build:</b> tiny. Adopt-by-id is the only new code. Everything else (storage, applies-to, Stripe issue and re-issue, checkout enforcement, agent transparency) shipped in July and is live for GTA, and the staff surface is the review skill itself, which is being written anyway.</p>
+  </div>
+</div>
+</body>
+</html>

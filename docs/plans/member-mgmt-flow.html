@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How member management works</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;color:#1E1E24;background:#F7F6F2;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    line-height:1.45;-webkit-font-smoothing:antialiased;padding:26px 16px 70px}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 4px;letter-spacing:-.6px;font-weight:800}
+  .sub{font-size:13px;color:#6E6E78;margin:0 0 24px}
+  h2{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#8A8A94;margin:30px 0 12px;font-weight:800;border-top:1px solid #E3E1DA;padding-top:16px}
+
+  .lane{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+  .box{background:#fff;border:1.5px solid #E3E1DA;border-radius:11px;padding:10px 12px;font-size:12.5px;
+    flex:1 1 150px;min-width:140px;box-shadow:0 1px 2px rgba(20,20,20,.04);position:relative}
+  .box b{display:block;font-size:12.5px;margin-bottom:2px}
+  .box .s{color:#6E6E78;font-size:11px}
+  .box.done{border-color:#7DC79A;background:#F4FBF6}
+  .box.now{border-color:#5B93C9;background:#F1F7FD;border-width:2px}
+  .box.next{border-color:#D9B75B;background:#FDF9EE}
+  .box.later{border-color:#D9D6CD}
+  .box.hero{border-color:#5B93C9;background:#EAF3FB;border-width:2px}
+  .arrow{display:flex;align-items:center;color:#B4B0A5;font-weight:800;font-size:15px;padding:0 1px}
+  .down{width:100%;text-align:center;color:#B4B0A5;font-weight:800;margin:2px 0;font-size:15px}
+  .tag{position:absolute;top:-9px;right:8px;font-size:8.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+    padding:2px 7px;border-radius:12px;background:#EEEDE8;color:#7C7C86}
+  .box.done .tag{background:#DDF2E4;color:#2E7D46}
+  .box.now .tag{background:#DCEBF8;color:#2266AA}
+  .box.next .tag{background:#F8EFD4;color:#8A6D1F}
+  .note{font-size:11.5px;color:#6E6E78;margin:8px 0 0}
+  .note b{color:#3A3A44}
+
+  .loopbox{background:#fff;border:1.5px dashed #C9C5B9;border-radius:13px;padding:14px 16px;margin-top:8px}
+  .loopbox .lane .box{min-width:110px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>How the member management build works</h1>
+  <p class="sub">Top: where it sits in onboarding an academy. Middle: the pipeline for San Jose. Bottom: the quality loop protecting the send.</p>
+
+  <h2>1 &middot; The big picture: onboarding any academy = four systems</h2>
+  <div class="lane">
+    <div class="box"><b>Branding deck</b><span class="s">wordmark, colors, voice</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box"><b>Core site</b><span class="s">their website, free trial page</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box"><b>Sales system</b><span class="s">funnel, agent, pipelines</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box hero"><b>Member management</b><span class="s">THIS BUILD: existing members + pricing move into the portal</span><span class="tag">here</span></div>
+  </div>
+  <p class="note"><b>Why it exists:</b> an academy like San Jose already has paying members in its own Stripe. Before the portal can bill, quote, or route anyone, what they pay and who they are has to come across correctly, confirmed by the owner, with nobody double-charged. San Jose is the proving run; the skills get written from what actually happens, so academy #4 is a repeat, not a rebuild.</p>
+
+  <h2>2 &middot; The pipeline for San Jose (9 steps)</h2>
+  <div class="lane">
+    <div class="box done"><b>1 &middot; Connect his Stripe</b><span class="s">direct key, proven in prod</span><span class="tag">done</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box done"><b>2 &middot; Work out his prices</b><span class="s">4 plans, every live price classified</span><span class="tag">done</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box now"><b>3 &middot; PRICE workbook</b><span class="s">one link, he confirms what he sells</span><span class="tag">final checks</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box next"><b>4 &middot; He confirms</b><span class="s">8 cards, all deliberate</span><span class="tag">after send</span></div>
+  </div>
+  <div class="down">&#8595;</div>
+  <div class="lane">
+    <div class="box done"><b>5 &middot; Staff review</b><span class="s">skill in Claude: every change shown, approved card by card</span><span class="tag">built</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box done"><b>6 &middot; Apply</b><span class="s">match his existing Stripe prices, never duplicate; 12 of 12 already exist</span><span class="tag">built, dry-run</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box next"><b>7 &middot; MEMBER workbook</b><span class="s">his 20 members, deals attach to people</span><span class="tag">designed</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box next"><b>8 &middot; Seed 20 members</b><span class="s">one by one, you confirm each</span><span class="tag">not started</span></div>
+  </div>
+  <div class="down">&#8595;</div>
+  <div class="lane">
+    <div class="box later"><b>9 &middot; Write the 3 skills</b><span class="s">from the real run logs: price match / member workbook / seeding. Staff run them in Claude for every next academy</span></div>
+  </div>
+  <p class="note"><b>The two-links rule:</b> Lij only ever gets two links from us (price workbook, member workbook), both forwarded personally by you. That is why step 3 gets rehearsed to death before anything is sent: asking him twice costs credibility.</p>
+
+  <h2>3 &middot; What happens inside the workbook round trip</h2>
+  <div class="lane">
+    <div class="box"><b>You send the link</b><span class="s">in your Lij thread</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box"><b>Lij answers 8 cards</b><span class="s">tax, 4 plans + ages, missing plans, codes, anything else. No login, saves as he types</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box"><b>Send unlocks at 8 of 8</b><span class="s">every card deliberately confirmed, even empty ones</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box"><b>Staff skill in Claude</b><span class="s">shows every change (renames, prices, tax), warns on traps, you approve</span></div>
+    <div class="arrow">&#8594;</div>
+    <div class="box"><b>Apply</b><span class="s">portal pricing goes live, matched to his real Stripe. Sales agent quotes the truth</span></div>
+  </div>
+
+  <h2>4 &middot; The quality loop (running right now)</h2>
+  <div class="loopbox">
+    <div class="lane">
+      <div class="box now"><b>Rehearsal</b><span class="s">an agent plays Lij on the real page, real database, Stripe in dry run</span></div>
+      <div class="arrow">&#8594;</div>
+      <div class="box"><b>Planner</b><span class="s">turns findings into an executable plan</span></div>
+      <div class="arrow">&#8594;</div>
+      <div class="box"><b>Builder</b><span class="s">builds it, commits per step</span></div>
+      <div class="arrow">&#8594;</div>
+      <div class="box"><b>Tester</b><span class="s">a DIFFERENT agent tries to break it</span></div>
+    </div>
+    <p class="note">Tester fails it &#8594; back to the planner. Tester passes &#8594; rehearsal runs again from the top. The link goes to Lij only when a full rehearsal comes back clean. So far: round 1 caught 9 bugs, round 2 confirmed all fixes and caught 1 blocker, round 3 is next.</p>
+  </div>
+</div>
+</body>
+</html>

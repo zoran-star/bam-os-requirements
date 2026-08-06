@@ -95,11 +95,11 @@
  * is imported and called as the real handler. The page's fetch and the handler's
  * Supabase fetch are the same router: page -> real handler -> in-memory PostgREST.
  *
- * ONE DELIBERATE ASYMMETRY IS EXPECTED AND ALLOWED, and it is asserted as such
- * rather than waved through: counted() counts a card holding an addition even
- * when the server says counts:false. That can only ever ask for MORE review, and
- * the page says so in a comment. It is asserted one-way (page >= server), so the
- * guard cannot be quietly widened into "the page counts whatever it likes".
+ * COUNTING IS SYMMETRIC SINCE THE D6 RULING: every card counts on both halves,
+ * from first render, and section E asserts the two sets are identical. The
+ * page keeps its addition guard (a card holding a request counts whatever a
+ * future wire value says) as a trivial pass - it can only ever ask for MORE
+ * review, and the guard's direction is still the safe one.
  *
  * NEGATIVE CONTROLS - one per real defect, and the part that proves this file has
  * teeth. Each reintroduces the disagreement exactly as it shipped. A control that
@@ -110,9 +110,11 @@
  *       STRING instead of the deliberate act, so a card the owner typed into and
  *       never confirmed counts as ready. The server's `remaining` drops below the
  *       page's, and the server accepts a submit the page is still holding back.
- *   MUTATE=pagecountsall       PAGE. counted() counts every card, including the
- *       empty add-a-plan card the server excludes. The page said 8, the server
- *       said 7, and the owner was told to confirm a card with nothing on it.
+ *   MUTATE=pagedenominatorgrows PAGE. counted() goes back to trusting the wire
+ *       flag, so the total can move mid-session. (Replaced MUTATE=pagecountsall,
+ *       retired when the D6 ruling made every-card-counts the correct rule.)
+ *   MUTATE=emptycardsdontcount API. cardCounts goes back to "has answers", so
+ *       the server's denominator grows on an add while the page's stays fixed.
  *   MUTATE=feecasing           PAGE. idxOf matches vocabulary case-sensitively,
  *       so a stored "waive" falls through to the default - which on the sign-up
  *       fee is CHARGE. This one silently told the owner we take his $40 joining
@@ -160,14 +162,98 @@
  *       amount the rehearsal prints is PRE-TAX while his own page told him what a
  *       parent pays with tax on. The defect the tax card exists to close, one
  *       write later.
+ *   MUTATE=onepagestripe            API. The live-Stripe price read stops
+ *       paginating, so it reads only the fixture's 100 page-one fillers and
+ *       never sends the starting_after cursor - in production, exists:false
+ *       past price #100 and the mint duplicates real prices.
+ *   MUTATE=monthsunbounded          API. CODE_T.duration_months goes back to
+ *       the unbounded tIntOrNull, so the 25 months section J types on the
+ *       real page reviews clean and applies with ok:true - a claim about
+ *       billing months this build can never sell.
+ *   MUTATE=blankkeysrestrict        API (via api/_coupon-guardrails.js). The
+ *       shared emptiness rule loses its trim, so a direct POST of
+ *       `applies_to: [" "]` confirms on the server while the page promised a
+ *       refusal - the coupon it scopes still applying to EVERYTHING. F7.
+ *   MUTATE=noncanonicalindex        API. classifyIndexed's one-spelling check
+ *       becomes `if (false)`, so a direct POST of `codes.00.applies_to` mints
+ *       a TWIN row for logical code 0. F5's direct-404 pin catches it; the
+ *       page-side positive pin proves the real page only ever emits canonical
+ *       spellings, so the refusal can never refuse the page.
  *
- * Measured 2026-08-06, unmutated ALL PASS (111 assertions).
- * typingisapproving -> 9 failures, pagecountsall -> 13, feecasing -> 5,
- * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 5,
- * staffcountsanswered -> 4, renameisnotachange -> 2, reviewdropscards -> 1,
- * reviewshowsuntranslated -> 1, staffgateoff -> 4, refusalnamescount -> 1,
+ * Measured 2026-08-06, after the full rehearsal-round-1 build (Steps 1-12:
+ * withheld fee report, Variant A codes guard, confirmed-no tax, registration
+ * number, duration scope sentence, every-card-counts, live-Stripe dry run,
+ * fee-line truth, Other-cadence follow-up, stale-note clear, approve-card
+ * vocabulary, per-plan age bands). Unmutated ALL PASS (184 assertions;
+ * was 148 before the Step 12 age sections D3/G/H4 joined, 161 before the
+ * R3 pagination pin, 167 before the 2026-08-06 D1-D4 fix pass - the header
+ * previously said 162 while the run printed 167; the recorded total had
+ * drifted and is trued up here. That pass took it 167 -> 174 (F5, D1) ->
+ * 176 (D3) -> 179 (F6, D2) -> 181 (D4); the 2026-08-06 whitespace pass took
+ * it 181 -> 184 (F7), and its Step 2 (canonical indexes + mint ceiling)
+ * 184 -> 186 (F5's direct-404 and page-canonical pins)).
+ * typingisapproving -> 18 failures, pagedenominatorgrows -> 7,
+ * emptycardsdontcount -> 7, feecasing -> 10, addkeepsconfirm -> 5,
+ * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
+ * renameisnotachange -> 2, reviewdropscards -> 2,
+ * reviewshowsuntranslated -> 1, staffgateoff -> 5, refusalnamescount -> 1,
  * applyreopensediting -> 3, rollbackleavesoffers -> 1,
- * rollbackclearsanswers -> 2, taxneverlands -> 2.
+ * rollbackclearsanswers -> 2, taxneverlands -> 5, feewithheldsilently -> 1,
+ * confirmuntargetedcode -> 3 (RE-MEASURED 2026-08-06, whitespace pass: was 1
+ * after the D3 fix pass - with the server guard in place a page whose own
+ * guard is deleted has its confirm REFUSED by the server in the same
+ * sentence, so F3's original two checks pass and the catch was F5's
+ * byte-identity assertion, the page relaying the server sentence prefixed
+ * with "We could not save that confirmation.", which is not the page's own
+ * promised alert; F7's before-any-network and byte-identity pins then
+ * joined the same door and catch 2 more),
+ * serverconfirmsuntargeted -> 4 (RE-MEASURED 2026-08-06, whitespace pass:
+ * was 2 - F5's direct-API refusal and byte-identity pins; F7's direct-API
+ * refusal and byte-identity pins joined the same guard; the same pin
+ * catches 7 in api/_workbook.test.mjs), noisnull -> 3, taxregnowhere -> 16,
+ * firstbillalways -> 1, feelineflat -> 4, othernofollowup -> 4 (was 3;
+ * gained one when section F6 joined - re-measured in the 2026-08-06 closeout
+ * sweep),
+ * agesunknownfield -> 19, agenotegone -> 1 (taxregnowhere and
+ * agesunknownfield each gained one catch on 2026-08-06 when the remediation
+ * sections joined; re-measured in the full sweep that date),
+ * onepagestripe -> 1 (measured
+ * 2026-08-06, R3: the H5 read-pattern assertion; the existence assertions it
+ * also breaks live in api/_workbook-apply.test.mjs, where the same pin
+ * catches 4), monthsunbounded -> 3 (measured 2026-08-06, R4: section J's
+ * review refusal, apply refusal and untouched-offer pins; the same pin
+ * catches 2 in api/_workbook-apply.test.mjs),
+ * codesunmintable -> 6 (RE-MEASURED 2026-08-06, Step 2 pass: was 5 - F5's
+ * save/mint/target/keys/confirm pins, the live defect reproduced end to
+ * end; the Step 2 one-row pin joined the same door; the same pin catches 18
+ * in api/_workbook.test.mjs),
+ * codesmintany -> 4 (RE-MEASURED 2026-08-06, Step 2 pass: was 1 until the D4
+ * banner pins joined F5 - with the allowlist gutted, codes.0.hacker MINTS,
+ * the page's flush succeeds, and both failure-banner assertions trip too -
+ * then 3, and F5's Step 2 direct-404 pin joined (codes.00 MINTS under it);
+ * the same pin catches 10 in api/_workbook.test.mjs),
+ * refusedaddwipes -> 6 (measured 2026-08-06, D2 fix pass: F6's survive and
+ * succeed-with-preserved-values pins plus F4's carry-across and its
+ * downstream follow-up pins - the wipe breaks the F4 flow too, which is why
+ * both probe cleanups are guarded so the banner still prints),
+ * bannerblamesadds -> 2 (measured 2026-08-06, D4 fix pass: section A's and
+ * F5's names-the-field banner pins),
+ * blankkeysrestrict -> 2 (measured 2026-08-06, whitespace pass: F7's
+ * direct-API refusal and byte-identity pins - the page's own inline guard
+ * still refuses, so the catch is the server accepting what the page
+ * promised it would refuse; the same pin catches 4 in
+ * api/_coupon-guardrails.test.mjs, 2 in api/_workbook.test.mjs and 4 in
+ * api/_workbook-apply.test.mjs),
+ * noncanonicalindex -> 1 (measured 2026-08-06, Step 2 pass: F5's direct-404
+ * pin - the page-canonical positive pin stays green because the real page
+ * cannot emit the spelling; the same pin catches 6 in
+ * api/_workbook.test.mjs. MUTATE=mintuncapped, the mint ceiling's control,
+ * lives ONLY in api/_workbook.test.mjs, where it catches 1 - this flow has
+ * no 90-row card).
+ * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
+ * flow never submits an inverted band because the page guard refuses it in
+ * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
+ * both files and catch 4 and 1 there.)
  *
  * EVERY MULTI-LINE PIN IN THIS FILE WAS SPLIT AND EACH HALF RUN ON ITS OWN
  * (2026-08-06), because a control that patches two lines otherwise reports one
@@ -225,11 +311,17 @@ const die = (msg) => { console.log("\n" + msg); process.exit(1); };
 // caught on this project before.
 // ═════════════════════════════════════════════════════════════════════════════
 const PAGE_CONTROLS = {
-  // The page counts every card, so the empty add-a-plan card holds Send hostage
-  // and the owner is told to confirm a card with nothing on it.
-  pagecountsall: [[
-    `  return c.counts!==false;`,
-    `  return true; // (control pagecountsall) every card counts, empty or not`]],
+  // The page's denominator grows again: counted() goes back to deriving the
+  // total from what the card HOLDS, so an add moves the total under the
+  // owner's cursor - the 0-of-7 -> 5-of-8 defect. (The plan's suggested pin,
+  // `c.counts !== false`, is DECORATIVE now that the server sends counts:true
+  // for every card - a wire-trusting page cannot diverge from a wire that
+  // agrees - so the control reintroduces the page's real old rule instead.
+  // The old MUTATE=pagecountsall was retired by the same D6 ruling: every
+  // card counting is the correct behaviour on both halves.)
+  pagedenominatorgrows: [[
+    `  return true;                       // every card counts, empty or not`,
+    `  return (c.answers||[]).length>0;   // (control pagedenominatorgrows) the denominator moves with the rows`]],
   // Vocabulary matched case-sensitively. Stored "waive" no longer finds "Waive",
   // falls to the default, and the default on the sign-up fee is CHARGE.
   feecasing: [[
@@ -244,6 +336,45 @@ const PAGE_CONTROLS = {
     `  // (control numericprice) a number is sent where the offer stores a string`]],
   // The parser as it was: first number in the string, then convert if the string
   // mentions weeks ANYWHERE. "3 Months (12 Weeks)" -> 3 -> /4.345 -> 1.
+  // The codes-card confirm guard is gone, so a named code with nothing ticked
+  // confirms straight through - and the everything-scope goes back to being a
+  // default the owner inherited rather than a choice he made.
+  confirmuntargetedcode: [[
+    `    if(untargeted){alert('Say what '+untargeted.code+' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');return}`,
+    `    // (control confirmuntargetedcode) the guard is gone`]],
+  // The scope sentence goes back to the hardcoded first-bill claim, so a code
+  // whose duration chips say Every payment is described as first-bill-only - a
+  // wrong claim about money on the page whose job is checking the money.
+  firstbillalways: [[
+    `      const scope=c.dur===2?'on every bill':c.dur===1?('on the first '+(c.durMonths||'?')+' months of bills'):'on the first bill';`,
+    `      const scope='on the first bill';   // (control firstbillalways)`]],
+  // The fee line goes back to the flat sentence: "Plus a one-time $40 joining
+  // fee." whenever the base charges, with the per-rung waivers - San Jose's
+  // real state - omitted from the one fee sentence a parent would read.
+  feelineflat: [[
+    `    const FR=liveRungs(p);
+    const charged=FR.filter(r=>r.fee===0),waivedR=FR.filter(r=>r.fee===1);
+    const lens=a=>a.map(r=>r.len).join(' and ');
+    if(p.feeOnBase===0&&FR.length&&charged.length===0)
+      bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee on the \${CYCLES[p.cad]} option. Pay up front and the joining fee is waived.\`);
+    else if(p.feeOnBase===0)
+      bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee.\`+(waivedR.length?\` Waived on \${lens(waivedR)}.\`:''));
+    else if(charged.length)
+      bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee when you pay up front for \${lens(charged)}.\`);`,
+    `    if(p.feeOnBase===0)bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee.\`);   // (control feelineflat)`]],
+  // The save-failure banner goes back to its guessed cause: "this page cannot
+  // add brand new items yet" - a wrong claim now that the mint whitelist
+  // accepts most null-id saves - instead of naming the fields it failed on.
+  bannerblamesadds: [[
+    `        ? 'We could not save your answer for '+fields.join(', ')+'. That change is not stored yet. Try again, or tell BAM directly.'`,
+    `        ? 'This page cannot add brand new items yet, so the one you just added is not stored. Everything you changed on the questions we asked you is saved. Tell BAM what you wanted to add and we will add it for you.'   // (control bannerblamesadds)`]],
+  // The restore half of redrawAddsKeep is a no-op again, so every refusal
+  // redraw wipes the owner's typed name and price - the D2 defect back.
+  refusedaddwipes: [[
+    `  Object.entries(keep).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v});
+}`,
+    `  // (control refusedaddwipes) the typing is not restored
+}`]],
   monthsmisparse: [[
     `  const t=String(s==null?'':s);
   const mo=t.match(/(\\d+(?:\\.\\d+)?)\\s*(?:mo|mos|month|months)\\b/i);
@@ -297,12 +428,21 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   renameisnotachange: [[
     `    is_change: !jsonEqual(eff, a.current_value),`,
     `    is_change: !!(a.answered != null && !jsonEqual(a.answered, a.proposed)),   // (control renameisnotachange)`]],
-  // A card with nothing to SHOW is dropped from review even when the gate counts
-  // it, so the tax card, the add-a-plan card and the notes card vanish from the
-  // surface staff read while apply still demands their approval.
+  // A card with nothing to SHOW is dropped from review even though the gate
+  // counts it, so the empty add-a-plan card vanishes from the surface staff
+  // read while apply still demands its approval - an approval nobody can give
+  // for a card nobody can see.
   reviewdropscards: [[
-    `    if (!items.length && !cardCounts(mine)) continue;   // nothing to show for an empty card`,
-    `    if (!items.length) continue;   // (control reviewdropscards)`]],
+    `    cardGroups.push({`,
+    `    if (!items.length) continue;   // (control reviewdropscards) the empty card vanishes
+    cardGroups.push({`]],
+  // The API's counting rule goes back to "has answers": the server's total
+  // grows when an addition lands and drops when one is removed, while the
+  // page's denominator stays fixed - the two halves telling the owner two
+  // different numbers about the same workbook.
+  emptycardsdontcount: [[
+    `const cardCounts = (answers) => true;`,
+    `const cardCounts = (answers) => (answers || []).length > 0;   // (control emptycardsdontcount)`]],
   // will_write stops being the TRANSLATED value and becomes the raw answer, so
   // the preview shows staff the page's own "Charge" while the apply one call
   // later writes the offer's "charge". The anchor line above it is reproduced
@@ -346,6 +486,98 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   taxneverlands: [[
     `      body: JSON.stringify({ tax_config: value }),`,
     `      body: JSON.stringify({ tax_config: null }),   // (control taxneverlands)`]],
+  // The withheld-fee report is dropped from the apply response, so a joining
+  // fee the RISK 4 gate leaves out of the mint targets goes back to being a
+  // console.warn in a server log - invisible to the reviewer whose rehearsal
+  // just lost a target the page still promises.
+  feewithheldsilently: [[
+    `    withheld_signup_fees: withheld,`,
+    `    // (control feewithheldsilently) the withhold is dropped from the response`]],
+  // The deliberate No collapses back into never-asked: canonicalTax stores
+  // null again for { charges_tax: false }, so a future workbook renders the
+  // tax card as unanswered over a question the owner already answered.
+  noisnull: [[
+    `  if (v.charges_tax === false) return tOk({ charges_tax: false });`,
+    `  if (v.charges_tax === false) return tOk(null);   // (control noisnull)`]],
+  // The registration number loses its classifyField home, so the row the page
+  // really produced must REFUSE the apply (fail closed) rather than land on a
+  // guessed column.
+  taxregnowhere: [[
+    `  if (f === "tax_registration_number") return { kind: "taxreg" };`,
+    `  // (control taxregnowhere) the field has no home`]],
+  // age_min loses its home in the plan whitelist, so the age row the page
+  // really produced must REFUSE the whole apply (fail closed) - and every
+  // downstream check on the offer jsonb trips because nothing landed.
+  agesunknownfield: [[
+    `  age_min: tAgeStrOrEmpty, age_max: tAgeStrOrEmpty,`,
+    `  age_max: tAgeStrOrEmpty,   // (control agesunknownfield) age_min has no home`]],
+  // (MUTATE=agebandunchecked - the deleted min>max refusal - lives in
+  // api/_workbook-apply.test.mjs: this flow never submits an inverted band,
+  // because the page's own confirm guard refuses it in section D3.)
+  // The stored-for-later note is dropped from the apply response, so an apply
+  // that wrote plan ages stops saying that nothing consumes them yet.
+  agenotegone: [[
+    `    ...(wroteAges ? { age_note: "Plan ages were stored on the offer for later use. Nothing reads plan ages yet: class age routing still reads the class list, so no routing changed." } : {}),`,
+    `    // (control agenotegone) the note is gone`]],
+  // CODE_T.duration_months goes back to the unbounded tIntOrNull, so the 25
+  // months section J types on the real page reviews clean and applies with
+  // ok:true - a claim about billing months this build can never sell.
+  monthsunbounded: [[
+    `  duration: tChip(V_DUR, "duration"), duration_months: tMonths1to24,`,
+    `  duration: tChip(V_DUR, "duration"), duration_months: tIntOrNull,   // (control monthsunbounded)`]],
+  // The live-Stripe price read stops paginating, so it reads only the fixture's
+  // 100 fillers and never sends the starting_after cursor - which H5's
+  // read-pattern assertion has to catch (the existence assertions live in
+  // api/_workbook-apply.test.mjs, whose fixture keeps its real hits on page two).
+  onepagestripe: [[
+    `      for (let page = 0; page < 10; page++) {   // cap ~1000 prices; an academy past that is a conversation`,
+    `      for (let page = 0; page < 1; page++) {    // (control onepagestripe) the first page is the whole truth`]],
+  // The codes branch of canMint returns false - the D1 fix reverted, which IS
+  // the live defect: the Everything chip's null-id save of codes.0.applies_to
+  // 404s and the codes card can never confirm. F5 must reproduce it.
+  codesunmintable: [[
+    `    return cls.kind === "code" && !!cls.t;`,
+    `    return false; // (control codesunmintable) the codes branch is gone - the live SJ defect`]],
+  // The codes branch stops consulting classifyField and mints ANY field name on
+  // the codes card. F5's byte-for-byte refusal of codes.0.hacker has to catch it.
+  codesmintany: [[
+    `    return cls.kind === "code" && !!cls.t;`,
+    `    return true; // (control codesmintany) the allowlist is gutted`]],
+  // The server-side codes confirm guard is gone, so a direct POST confirms a
+  // named code with no applies-to list - exactly what the dress rehearsal
+  // found succeeding while the page promised a refusal. F5's direct-confirm
+  // refusal and the byte-identity assertion have to catch it.
+  serverconfirmsuntargeted: [[
+    `      if (loose.length) throw bad('Say what ' + loose[0].code + ' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');`,
+    `      if (false && loose.length) throw bad("unreachable");   // (control serverconfirmsuntargeted) the server confirms it anyway`]],
+  // The server drops the Other-cycle follow-up requirement, so the two halves
+  // stop refusing in the same sentence - the page refuses, the API stores the
+  // riddle.
+  othernofollowup: [[
+    `    : String(v.billing_cycle || "") === "Other" && !str(v.billing_cycle_other) ? "Please say how often this plan bills before adding it." : ""),`,
+    `    : ""),   // (control othernofollowup) the follow-up requirement is gone`]],
+  // The ONE emptiness rule (cleanAppliesTo, api/_coupon-guardrails.js) loses
+  // its trim, so a direct POST of `applies_to: [" "]` confirms on the server
+  // while the page promised a refusal - the adversarial finding exactly as it
+  // shipped. The pinned line lives in the guardrails module: this entry
+  // repoints the workbook copy's import at a mutant guardrails copy the
+  // harness writes below. Section F7's direct-refusal and byte-identity pins
+  // are what have to catch it. The SAME pin is carried by
+  // api/_coupon-guardrails.test.mjs, api/_workbook.test.mjs and
+  // api/_workbook-apply.test.mjs.
+  blankkeysrestrict: [[
+    `import { cleanAppliesTo } from "./_coupon-guardrails.js";`,
+    `import { cleanAppliesTo } from "./.mutant-contract-guardrails.js";   // (control blankkeysrestrict)`]],
+  // classifyIndexed's one-spelling check becomes `if (false)`, so a direct
+  // POST of `codes.00.applies_to` mints a TWIN row for logical code 0 again.
+  // F5's direct-404 pin has to catch it; the page-side positive pin proves
+  // the real page never emits a non-canonical spelling, so the refusal can
+  // never refuse the page. (MUTATE=mintuncapped, the mint ceiling's control,
+  // lives ONLY in api/_workbook.test.mjs - this flow has no 90-row card, and
+  // building one would prove nothing the direct gate does not already pin.)
+  noncanonicalindex: [[
+    `  if (String(index) !== m[1]) {`,
+    `  if (false) {   // (control noncanonicalindex) every spelling is an address`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -471,7 +703,13 @@ function registerMarkup(containerId, markup) {
   const next = new Set([...markup.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
   for (const old of OWNED.get(containerId) || []) if (!next.has(old) && old !== containerId) DOMBOX.delete(old);
   OWNED.set(containerId, next);
-  for (const id of next) mint(id);
+  // A RE-RENDERED INPUT COMES BACK EMPTY, exactly as innerHTML re-creation
+  // does in a browser: a fresh input carries only its markup value, and the
+  // add box's inputs carry none. Object identity is kept (held references
+  // stay valid); only .value resets. Without this the double quietly preserved
+  // typing across a redraw a real browser wipes, which is how the D2 defect -
+  // a refused add eating the owner's typing - was invisible from in here.
+  for (const id of next) { const e = DOMBOX.get(id); if (e && id !== containerId) e.value = ""; mint(id); }
 }
 // The static shell, read out of the real file rather than transcribed.
 for (const m of html.slice(0, SCRIPT_OPEN).matchAll(/\bid="([^"]+)"/g)) mint(m[1]);
@@ -522,6 +760,10 @@ process.env.SUPABASE_URL = SB_BASE;
 process.env.VITE_SUPABASE_URL = SB_BASE;
 process.env.SUPABASE_SERVICE_ROLE_KEY = "stub-service-key";
 delete process.env.SUPABASE_SERVICE_KEY;
+// The rehearsal's live-Stripe read routes through the transport seam; with no
+// client_stripe_direct row in the stub it takes the Connect path, which needs
+// a platform key in env.
+process.env.STRIPE_CONNECT_SECRET_KEY = "sk_stub_platform_key";
 
 const TOKEN = "wbk_tok_contract";
 // The STAFF credential. Nothing the owner's page ever sends carries it, which is
@@ -529,7 +771,8 @@ const TOKEN = "wbk_tok_contract";
 const STAFF_BEARER = "staff-session-" + "contract-Kp3";
 const OFFER_ID = "off1";
 const COLUMNS = {
-  clients: ["id", "public_name", "business_name", "tax_config"],
+  clients: ["id", "public_name", "business_name", "tax_config", "tax_registration_number", "stripe_connect_account_id"],
+  client_stripe_direct: ["client_id", "status", "secret_key_enc", "secret_key_last4", "publishable_key", "stripe_account_id", "capabilities", "key_last_verified_at"],
   staff: ["id", "user_id", "name", "email"],
   offers: ["id", "client_id", "status", "title", "type", "data"],
   workbooks: ["id", "client_id", "kind", "token", "status", "submitted_at", "reviewed_at", "snapshot", "created_at", "updated_at"],
@@ -588,6 +831,12 @@ function planAnswers(cardId, o) {
   a(cardId, "expires_after", null);
   a(cardId, "other_description", null);
   a(cardId, "description", null);
+  // Per-plan age bands (Step 12). PREFILL IS A CLAIM: only the Elementary card
+  // carries proposed values (from its class twin in schedule.classes on the
+  // live workbook); every other plan proposes NOTHING, because a prefill the
+  // owner confirms without editing lands in configuration.
+  a(cardId, "age_min", null, o.ageMin === undefined ? null : o.ageMin);
+  a(cardId, "age_max", null, o.ageMax === undefined ? null : o.ageMax);
   // ARCHIVING IS A PROPOSAL LIKE ANY OTHER. currentArchived is what the offer
   // holds today; archived is what BAM proposed. Keeping them apart matters: a
   // card whose offering is ALREADY archived cannot be resolved at all, so a
@@ -633,12 +882,17 @@ planAnswers("c-p1", {
 // A SECOND RENAME, and it is a WORD rather than a letter case, so the two shapes
 // of "confirmed without editing is still a change" are both on the table.
 planAnswers("c-p2", { currentTitle: "Academy Unlimited Pass", title: "Academy Unlimited", included: "Every session we run.", price: "425", fee: "40", feeOnBase: "charge", rungs: [] });
-planAnswers("c-p3", { currentTitle: "Elementary 1x/Week", title: "Elementary 1x/week", included: "One session a week.", price: "180", fee: "40", feeOnBase: "waive", rungs: [] });
+planAnswers("c-p3", { currentTitle: "Elementary 1x/Week", title: "Elementary 1x/week", included: "One session a week.", price: "180", fee: "40", feeOnBase: "waive", ageMin: "9", ageMax: "12", rungs: [] });
 planAnswers("c-p4", { currentTitle: "Legacy Elite", title: "Legacy Elite", included: "Not sold to new families.", price: "500", fee: "0", feeOnBase: "charge", archived: true, rungs: [] });
 // The tax card: one column, one answer, keys in a DIFFERENT order in `proposed`
 // because jsonb does not preserve order and a stringifying comparison would
 // report a change nobody made.
 a("c-tax", "tax_config", { charges_tax: true, pct: 9.375, label: "CA sales tax" }, { label: "CA sales tax", pct: 9.375, charges_tax: true }, { target_kind: "academy_setting", target_table: "clients", target_id: "sj" });
+// The optional registration number (G2): seeded with nothing stored and
+// nothing proposed, the shape a freshly minted workbook carries. Older
+// workbooks grow this row through doSave's mint whitelist instead;
+// api/_workbook.test.mjs covers that door.
+a("c-tax", "tax_registration_number", null, null, { target_kind: "academy_setting", target_table: "clients", target_id: "sj" });
 // The discount code. applies_to is the API's OWN statement of which rung is the
 // three-month one, which is what section D holds the page's parser against.
 a("c-codes", "codes.0.code", "SIBLING10");
@@ -707,7 +961,7 @@ const OFFER_DATA = () => ({
 function reset() {
   seq = 0;
   DB = {
-    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null }],
+    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null, stripe_connect_account_id: "acct_1RDtSMK6ZS1cqefu" }],
     staff: [{ id: "staff-1", user_id: "user-1", name: "Zoran", email: "zoran@byanymeansbball.com" }],
     offers: [{ id: OFFER_ID, client_id: "sj", status: "active", title: "Training", type: "training", data: OFFER_DATA() }],
     pricing_catalog: [],
@@ -789,6 +1043,16 @@ function project(table, rows, params) {
 // ═════════════════════════════════════════════════════════════════════════════
 let HANDLER = null;
 const API_CALLS = [];
+// The Stripe fixture (R3): page one of the price list is 100 fillers whose
+// amounts (1-100 cents) can match no target, page two - reachable only through
+// the starting_after cursor - is the empty end of the list. STRIPE_GETS records
+// every Stripe GET so H5 can assert the cursor request really happened.
+const STRIPE_FILLERS = Array.from({ length: 100 }, (_, i) => ({
+  id: `price_filler_${i + 1}`, object: "price", unit_amount: i + 1, currency: "usd",
+  product: "prod_filler", recurring: { interval: "week", interval_count: 4 },
+}));
+const STRIPE_CURSOR = STRIPE_FILLERS[STRIPE_FILLERS.length - 1].id;
+const STRIPE_GETS = [];
 async function router(url, init = {}) {
   const u = String(url);
   const method = String(init.method || "GET").toUpperCase();
@@ -815,7 +1079,26 @@ async function router(url, init = {}) {
       ? json({ id: "user-1", email: "zoran@byanymeansbball.com" })
       : json({ msg: "invalid" }, 401);
   }
-  if (u.startsWith("https://api.stripe.com/")) throw new Error(`STRIPE WAS CALLED: ${method} ${u} - nothing in this pass may talk to Stripe`);
+  // The rehearsal may READ Stripe (D7); anything else still throws, so the
+  // no-writes gate survives, sharper. This harness serves NO real hits -
+  // existence assertions live in api/_workbook-apply.test.mjs, whose fixture
+  // carries live prices; here the claim is that the read happens, is a GET,
+  // fails loud when it cannot - and PAGINATES (R3): page one is 100 fillers
+  // whose 1-100 cent amounts match no target, has_more:true, and page two
+  // (behind the starting_after cursor) is the empty end of the list. Every
+  // GET is recorded so H5 can assert the cursor request really arrived.
+  // MUTATE=onepagestripe.
+  if (u.startsWith("https://api.stripe.com/")) {
+    if (method !== "GET") throw new Error(`STRIPE WAS WRITTEN TO: ${method} ${u} - the rehearsal may READ Stripe, never write it`);
+    STRIPE_GETS.push(u);
+    if (u.includes("/v1/prices")) {
+      const after = new URL(u).searchParams.get("starting_after");
+      if (!after) return json({ object: "list", data: STRIPE_FILLERS, has_more: true });
+      if (after === STRIPE_CURSOR) return json({ object: "list", data: [], has_more: false });
+      return json({ object: "list", data: [], has_more: false });
+    }
+    return json({ object: "list", data: [], has_more: false });
+  }
   if (!u.startsWith(`${SB_BASE}/rest/v1/`)) throw new Error(`UNSTUBBED CALL: ${method} ${u}`);
   // The runtime builds a Headers object out of init.headers and its validator
   // throws quoting the whole value; keeping that here means the credential guard
@@ -871,6 +1154,21 @@ const SENTRY_STUB = 'const withSentryApiRoute = (h) => h; // (contract suite) @s
 if (!sentryOk) console.log("  (note) @sentry/node is not installed here, so the copy under test has its _sentry import replaced by an identity wrapper. Nothing else about api/workbook.js is changed.\n");
 
 let modulePath = API;
+// The guardrails half of blankkeysrestrict: the pinned line IS the emptiness
+// rule and lives in api/_coupon-guardrails.js, so a mutant copy is written for
+// the (also-pinned) workbook import above to point at.
+if (MUTATE === "blankkeysrestrict") {
+  const G_PATH = path.join(ROOT, "api", "_coupon-guardrails.js");
+  const gMutant = applyPins(fs.readFileSync(G_PATH, "utf8"), [[
+    `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.map((k) => String(k == null ? "" : k).trim()).filter(Boolean) : []);`,
+    `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.filter(Boolean) : []);   // (control blankkeysrestrict) raw values, no trim`]],
+  "api/_coupon-guardrails.js");
+  const gCopy = path.join(ROOT, "api", ".mutant-contract-guardrails.js");
+  fs.writeFileSync(gCopy, gMutant);
+  tmp.push(gCopy);
+}
 if (!sentryOk || API_CONTROLS[MUTATE]) {
   let src = fs.readFileSync(API, "utf8");
   if (API_CONTROLS[MUTATE]) {
@@ -916,9 +1214,9 @@ const RETURNS = [
   "submitAdd", "removeAddition", "flushAll", "idxOf", "monthsOf", "sameShape", "val", "ansOf",
   "planModel", "taxModel", "codeModel", "priceKeys", "addSummary", "readAdd", "addProblem",
   "capReason", "pillOf", "additionsOf", "hasAdditionFields", "sendBlocked", "drawPlan",
-  "openAdd",
+  "openAdd", "applyEverything", "appliesEverything", "setTax", "drawCodes", "pickCyc",
   "drawLadder", "prevOpts", "TYPES", "TYPES_W", "CYCLES", "CYCLES_W", "AFTER", "AFTER_W",
-  "YESNO_W", "CHARGE_W", "DUR", "KIND", "ADDOPEN", "MAX_ADD_PER_CARD",
+  "YESNO_W", "CHARGE_W", "DUR", "KIND", "ADDOPEN", "ADDERR", "MAX_ADD_PER_CARD",
 ].join(", ");
 const pageBody = pageSrc + `\nreturn { ${RETURNS}, get CARDS(){return CARDS}, get MODEL(){return MODEL}, get WB(){return WB}, get RO(){return RO}, get SAVE(){return SAVE} };\n`;
 const pageGlobals = {
@@ -1022,7 +1320,13 @@ check(page.CARDS.map((c) => c.card_key).join(",") === wire.cards.map((c) => c.ca
   await page.flushAll();
   await settle();
   check(DB.workbook_answers.length === before, "a save that would CREATE a row writes nothing (creation is the add action, on both sides)");
-  check(page.SAVE.state === "error" && /cannot add brand new items yet/.test(page.SAVE.msg), "and the page says so in its own words instead of showing him a validation string");
+  // D4: the banner claims only what the code has in hand - the failed fields -
+  // never a guessed cause. The old sentence ("cannot add brand new items yet")
+  // became a wrong claim the moment the mint whitelist started accepting most
+  // null-id saves. MUTATE=bannerblamesadds.
+  console.log(`  NOTE  the banner reads: "${page.SAVE.msg}"`);
+  check(page.SAVE.state === "error" && /commitments\.9\.length/.test(page.SAVE.msg) && !/cannot add brand new items/.test(page.SAVE.msg),
+    `and the banner names the field it could not save, claiming no cause ("${page.SAVE.msg}")`);
 }
 await page.boot();          // back to a clean page; nothing was written
 await settle();
@@ -1129,28 +1433,125 @@ console.log("\n── D. \"3 Months (12 Weeks)\": what the page reads it as ─�
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// D2. THE PARENT PREVIEW TELLS THE TRUTH ABOUT THE JOINING FEE
+// The old line said only "Plus a one-time $40 joining fee." whenever the base
+// charged, while San Jose's real state is base charges, EVERY prepay waives -
+// so the one fee sentence a parent would read omitted that paying up front
+// skips the fee. Driven through the real chips, read off the real preview.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── D2. the fee line carries the per-rung truth ──");
+{
+  const lid = lidOf("plan:p1");
+  const feeLine = () => { page.prevOpts(lid); return txt("pv_fee_" + lid); };
+
+  // San Jose's real state: base charges, every prepay waives.
+  await type("plan:p1", "signup_fee_on_base", page.CHARGE_W[0]);
+  let said = feeLine();
+  check(/joining fee on the every month option/.test(said) && /waived/i.test(said),
+    `base charges + every rung waives: the line names the charged option AND says prepay waives it ("${said}")`);
+  check(!/joining fee\.$/.test(said.trim()),
+    "and it is not the old bare sentence that stopped at the fee and omitted the waiver");
+
+  // One rung flips to Charge: the line names what still waives.
+  await type("plan:p1", "commitments.0.signup_fee_charge", page.CHARGE_W[0]);
+  said = feeLine();
+  check(/Waived on .*6 Months \(24 Weeks\)/.test(said),
+    `some rungs charge too: the waived lengths are named ("${said}")`);
+
+  // Base waives while a rung charges: the fee is a prepay-only fact.
+  await type("plan:p1", "signup_fee_on_base", page.CHARGE_W[1]);
+  said = feeLine();
+  check(/joining fee when you pay up front for 3 Months \(12 Weeks\)/.test(said),
+    `base waives + a rung charges: the line names the charged length ("${said}")`);
+
+  // Nothing charges: no line at all.
+  await type("plan:p1", "commitments.0.signup_fee_charge", page.CHARGE_W[1]);
+  said = feeLine();
+  check(!/joining fee/.test(said), `nothing charges: no fee line at all ("${said}")`);
+
+  // Put the probes back to unanswered so the rest of the flow reads the
+  // fixture's own state.
+  await type("plan:p1", "signup_fee_on_base", null);
+  await type("plan:p1", "commitments.0.signup_fee_charge", null);
+}
+
+console.log("\n── D3. the age band: the preview claims only the bound that exists ──");
+{
+  // PREFILL IS A CLAIM. Only the Elementary card carries one (its class twin
+  // in schedule.classes is the one thing to point at); every other plan
+  // renders the age boxes EMPTY, because a prefill the owner confirms without
+  // editing lands in configuration.
+  const pre = Object.fromEntries(["plan:p1", "plan:p2", "plan:p3", "plan:p4"].map((k) => {
+    const m = page.MODEL[lidOf(k)] || {};
+    return [k, `${m.ageMin}|${m.ageMax}`];
+  }));
+  check(pre["plan:p3"] === "9|12" && pre["plan:p1"] === "|" && pre["plan:p2"] === "|" && pre["plan:p4"] === "|",
+    `the proposed prefill exists ONLY on the Elementary card (${JSON.stringify(pre)})`);
+
+  const lid = lidOf("plan:p1");
+  const ages = () => { page.prevOpts(lid); return txt("pv_fee_" + lid); };
+  await type("plan:p1", "age_min", "9");
+  let said = ages();
+  check(/Ages 9 and up\./.test(said), `min only: the parent preview says "Ages 9 and up." ("${said}")`);
+  await type("plan:p1", "age_max", "12");
+  said = ages();
+  check(/Ages 9 to 12\./.test(said), `both bounds: "Ages 9 to 12." ("${said}")`);
+  await type("plan:p1", "age_min", "");
+  said = ages();
+  check(/Ages 12 and under\./.test(said) && !/Ages 9/.test(said), `max only: "Ages 12 and under." ("${said}")`);
+  await type("plan:p1", "age_max", "");
+  said = ages();
+  check(!/Ages /.test(said), `neither: no age line at all ("${said}")`);
+
+  // The ONE page-side guard, same direction as the apply's refusal: an
+  // inverted band cannot be confirmed. Blank never blocks - blank means the
+  // plan is for everyone, and the empty-age confirms in section G prove it.
+  await type("plan:p1", "age_min", "14");
+  await type("plan:p1", "age_max", "9");
+  ALERTS = [];
+  await confirm("plan:p1");
+  check(ALERTS.length === 1 && /youngest age is above the oldest/.test(ALERTS[0]) && !dbCard("c-p1").confirmed_at,
+    `an inverted band cannot be confirmed ("${ALERTS[0]}")`);
+  ALERTS = [];
+  // Back to unanswered so the rest of the flow reads the fixture's own state.
+  await type("plan:p1", "age_min", null);
+  await type("plan:p1", "age_max", null);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // E. COUNTING - which cards hold Send
 // ═════════════════════════════════════════════════════════════════════════════
-console.log("\n── E. which cards the gate counts ──");
+console.log("\n── E. which cards the gate counts: every card, from first render ──");
 {
+  // D6: one definition, both halves - every card counts, empty or not, and the
+  // denominator is fixed the moment the page paints. The empty add-a-plan card
+  // is no longer the exception; "confirm it empty" is a real answer.
   const fresh = await getApi();
   const serverCounts = new Map(fresh.cards.map((c) => [c.card_key, c.counts]));
-  check(serverCounts.get("plans") === false, "the server does not count the empty add-a-plan card");
-  check([...serverCounts.values()].filter(Boolean).length === 7, "so 7 of the 8 cards count");
+  check(serverCounts.get("plans") === true, "the server counts the EMPTY add-a-plan card");
+  check([...serverCounts.values()].every(Boolean) && serverCounts.size === 8, "so all 8 of 8 cards count");
   let wrong = [];
   for (const c of page.CARDS) {
     const mine = page.counted(c), theirs = serverCounts.get(c.card_key);
-    if (mine === theirs) continue;
-    // The ONE allowed asymmetry, and it is one-way on purpose: a card holding a
-    // request always counts on the page whatever the server says, which can only
-    // ever ask for MORE review. The page says so in a comment; this asserts it
-    // stays that narrow rather than becoming "the page counts what it likes".
-    if (mine === true && theirs === false && page.hasAdditionFields(c)) continue;
-    wrong.push(`${c.card_key}: page ${mine}, server ${theirs}`);
+    if (mine !== theirs) wrong.push(`${c.card_key}: page ${mine}, server ${theirs}`);
   }
   check(wrong.length === 0, `every card is counted the same way by both${wrong.length ? " - " + wrong.join("; ") : ""}`);
-  check(page.countedCards().length === 7, `the page counts 7 too (it counts ${page.countedCards().length})`);
-  check(txt("ntot") === "7", `and prints 7 as the total on his screen ("${txt("ncf")} of ${txt("ntot")} confirmed")`);
+  check(page.countedCards().length === 8, `the page counts 8 too (it counts ${page.countedCards().length})`);
+  check(txt("ntot") === "8", `and prints 8 as the total on his screen ("${txt("ncf")} of ${txt("ntot")} confirmed")`);
+
+  // THE GATE HOLDS ON THE EMPTY CARDS TOO, and both halves refuse with the
+  // same number before a single confirm has happened.
+  const refused0 = await callApi({ action: "submit" });
+  page.updProg();
+  check(refused0.ok === false && refused0.remaining === page.remainingCount(),
+    `with nothing confirmed, submit refuses and remaining agrees (server ${refused0.remaining}, page ${page.remainingCount()})`);
+  // "Confirm it empty" takes the deliberate act with nothing on the card, so
+  // "he was asked and had nothing to add" finally has a record.
+  ALERTS = [];
+  await confirm("plans");
+  check(!!dbCard("c-plans").confirmed_at && ALERTS.length === 0,
+    "the EMPTY add-a-plan card can be confirmed - he was asked, nothing to add");
+  agree("after confirming an empty card", await serverRemaining());
 }
 
 // The server's own number, read without the page in the middle: an empty save is
@@ -1206,6 +1607,8 @@ await confirm("plan:p1");
 console.log("\n── F2. an addition: a request, never a write ──");
 {
   const plansLid = lidOf("plans");
+  page.updProg();
+  const denomBefore = { tot: txt("ntot"), set: (await getApi()).cards.filter((c) => c.counts).map((c) => c.card_key).join(",") };
   page.openAdd(plansLid);                       // the real "+ Add a plan" button
   byId("af_title_" + plansLid).value = "Summer 1x/week";
   byId("af_price_" + plansLid).value = "150";
@@ -1217,8 +1620,12 @@ console.log("\n── F2. an addition: a request, never a write ──");
   check(created[0].answered && created[0].answered.title === "Summer 1x/week" && created[0].answered.price === 150, "add: carrying what he typed, with the price as a NUMBER the validator accepts");
   check(page.additionsOf(cardOf("plans")).length === 1, "add: and the page lists it back");
   const fresh = await getApi();
-  check(fresh.cards.find((c) => c.card_key === "plans").counts === true, "add: the empty card now COUNTS on the server");
-  check(page.counted(cardOf("plans")) === true, "add: and on the page - it holds Send now, with an unreviewed request in it");
+  page.updProg();
+  const denomAfter = { tot: txt("ntot"), set: fresh.cards.filter((c) => c.counts).map((c) => c.card_key).join(",") };
+  check(denomBefore.tot === "8" && denomAfter.tot === "8" && denomBefore.set === denomAfter.set,
+    `add: the card counted all along and the add did not move the denominator (page ${denomBefore.tot} -> ${denomAfter.tot}) - the 0-of-7 -> 5-of-8 defect, pinned`);
+  check(page.counted(cardOf("plans")) === true && fresh.cards.find((c) => c.card_key === "plans").counts === true,
+    "add: it holds Send through the confirm it retired, not through a denominator change");
   agree("after an addition", await serverRemaining());
 
   // AN ADDITION AFTER A CONFIRM RETIRES THAT CONFIRM. He approved a card that did
@@ -1252,13 +1659,333 @@ console.log("\n── F2. an addition: a request, never a write ──");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// F4. THE "SOMETHING ELSE" CADENCE GETS ITS FOLLOW-UP (G1)
+// A plan added with billing_cycle Other and no follow-up is a request staff
+// cannot act on - '$85 other' is a riddle. Both halves must refuse it in the
+// SAME sentence, and the summary must render the typed cadence, never 'other'.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F4. 'something else' asks how often, on both halves ──");
+{
+  const plansLid = lidOf("plans");
+  page.openAdd(plansLid);
+  byId("af_title_" + plansLid).value = "Skills clinic";
+  byId("af_price_" + plansLid).value = "85";
+  page.pickCyc(plansLid, 6);                      // the real "something else" chip
+  check(!!byId("af_cycother_" + plansLid), "picking 'something else' makes the follow-up box exist");
+  check(byId("af_title_" + plansLid).value === "Skills clinic" && byId("af_price_" + plansLid).value === "85",
+    "and the redraw carried his typed name and price across");
+
+  const attempt = page.readAdd(plansLid, "plan");
+  const pageSentence = page.addProblem("plan", attempt);
+  const direct = await callApi({ action: "add", card_key: "plans", what: "plan", answered: attempt });
+  check(pageSentence === "Please say how often this plan bills before adding it."
+    && direct.ok === false && direct.error === pageSentence,
+    `both halves refuse with the SAME sentence ("${pageSentence}" / "${direct.error}")`);
+
+  byId("af_cycother_" + plansLid).value = "every 6 weeks";
+  await page.submitAdd(plansLid, "plan");
+  await settle();
+  const stored = DB.workbook_answers.filter((r) => r.card_id === "c-plans").map((r) => r.answered)
+    .find((v) => v && v.title === "Skills clinic");
+  check(!!stored && stored.billing_cycle === "Other" && stored.billing_cycle_other === "every 6 weeks",
+    `the stored request carries the follow-up (${JSON.stringify(stored)})`);
+  const summary = page.addSummary(stored || {});
+  check(/every 6 weeks/.test(summary.d) && !/\bother\b/i.test(summary.d),
+    `and the rendered summary says the cadence, never 'other' ("${summary.d}")`);
+  check(/every 6 weeks/.test(byId("card_" + plansLid).outerHTML),
+    "the addition list on his screen renders the follow-up text");
+
+  // Take the probe back so the flow's counts stay the fixture's own. Guarded,
+  // because under MUTATE=refusedaddwipes the add above never succeeds and a
+  // crash here would end the run without its NEGATIVE CONTROL banner.
+  const probe = page.additionsOf(cardOf("plans")).find((a) => a.answered && a.answered.title === "Skills clinic");
+  if (probe) { await page.removeAddition(plansLid, probe.id); await settle(); }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F6. A REFUSED ADD KEEPS THE OWNER'S TYPING (D2)
+// Every refusal path in submitAdd redraws the add box (the error line lives
+// inside it), and a redrawn input is EMPTY in a real browser - so the refusal
+// wiped the plan name and price he had just typed, and correcting one missing
+// answer meant retyping everything. redrawAddsKeep carries the typing across,
+// the same pattern pickCyc already used for its own redraw.
+// MUTATE=refusedaddwipes.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F6. a refused add keeps the owner's typing ──");
+{
+  const plansLid = lidOf("plans");
+  page.openAdd(plansLid);
+  byId("af_title_" + plansLid).value = "Skills clinic";
+  byId("af_price_" + plansLid).value = "85";
+  page.pickCyc(plansLid, 6);                      // "something else", follow-up left empty
+  await page.submitAdd(plansLid, "plan");
+  await settle();
+  const survivedTitle = byId("af_title_" + plansLid) ? byId("af_title_" + plansLid).value : "(no such element)";
+  const survivedPrice = byId("af_price_" + plansLid) ? byId("af_price_" + plansLid).value : "(no such element)";
+  console.log(`  NOTE  after the refusal the box still holds title ${JSON.stringify(survivedTitle)} and price ${JSON.stringify(survivedPrice)}`);
+  check(page.ADDERR[plansLid] === "Please say how often this plan bills before adding it.",
+    `the refusal is on the box ("${page.ADDERR[plansLid]}")`);
+  check(survivedTitle === "Skills clinic" && survivedPrice === "85",
+    "and his typed name and price SURVIVED the refusal redraw");
+
+  // Fill in only what was missing: the add must succeed with the preserved
+  // values, proving nothing restored was silently stale.
+  byId("af_cycother_" + plansLid).value = "every 6 weeks";
+  await page.submitAdd(plansLid, "plan");
+  await settle();
+  const stored = DB.workbook_answers.filter((r) => r.card_id === "c-plans").map((r) => r.answered)
+    .find((v) => v && v.title === "Skills clinic");
+  check(!!stored && stored.price === 85 && stored.billing_cycle === "Other" && stored.billing_cycle_other === "every 6 weeks",
+    `the add then succeeds carrying the preserved values (${JSON.stringify(stored)})`);
+
+  // Take the probe back so the flow's counts stay the fixture's own. Guarded
+  // for the same reason as F4's cleanup: under MUTATE=refusedaddwipes the add
+  // never succeeds, and the banner must still print.
+  const probe = page.additionsOf(cardOf("plans")).find((a) => a.answered && a.answered.title === "Skills clinic");
+  if (probe) { await page.removeAddition(plansLid, probe.id); await settle(); }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F5. THE SJ-SHAPED CODES CARD: the missing rows grow back through the page
+// (D1, the deployment blocker). The live San Jose workbook was seeded with 5
+// rows per code and NONE for applies_to / duration_months / expires_at /
+// max_redemptions, so the page's null-id save of the MANDATORY applies-to
+// answer 404'd and confirm blocked forever. Here the fixture is cut down to
+// exactly that shape, a fresh page is booted against it, and the REAL page
+// call that failed in production - the Everything chip's save - must mint the
+// row (aimed by the card's own sibling, never the payload) and confirm must
+// unblock. MUTATE=codesunmintable / MUTATE=codesmintany.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F5. the SJ-shaped codes card grows its missing rows through the page ──");
+{
+  const SPLICED = ["codes.0.applies_to", "codes.0.duration_months", "codes.0.expires_at", "codes.0.max_redemptions"];
+  const snapAnswers = structuredClone(DB.workbook_answers);
+  const snapCards = structuredClone(DB.workbook_cards);
+  DB.workbook_answers = DB.workbook_answers.filter((r) => !(r.card_id === "c-codes" && SPLICED.includes(r.target_field)));
+  check(DB.workbook_answers.length === snapAnswers.length - 4,
+    "the fixture is cut to the live SJ shape: 5 rows for code 0, the 4 late-question rows gone");
+
+  // A fresh page, booted against the SJ-shaped database - the same script, the
+  // same fake DOM, the same router.
+  const sjPage = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await sjPage.boot();
+  await settle();
+  const codesLid = (sjPage.CARDS.find((c) => c.card_key === "codes") || {}).lid;
+
+  // ── D3 first, on the untargeted state: the server refuses the confirm ─────
+  // A direct POST - no page in the middle - is exactly what the dress
+  // rehearsal found SUCCEEDING while the page promised a refusal.
+  // MUTATE=serverconfirmsuntargeted.
+  const refusedConfirm = await callApi({ action: "confirm", card_key: "codes" });
+  check(refusedConfirm.ok === false && !dbCard("c-codes").confirmed_at,
+    `a direct API confirm of the untargeted code is refused ("${refusedConfirm.error}")`);
+  // And the sentence is the PAGE's OWN, byte for byte: the page promises the
+  // API's sentences, so the two refusals must be one wording.
+  ALERTS = [];
+  await sjPage.confirmCard(codesLid);
+  await settle();
+  check(ALERTS.length === 1 && ALERTS[0] === refusedConfirm.error,
+    `and the page's alert is BYTE-IDENTICAL to the server's refusal ("${ALERTS[0]}")`);
+
+  // The exact call that 404'd in production: the owner ticks the Everything
+  // chip, the page saves codes.0.applies_to with a null id.
+  sjPage.applyEverything(codesLid, 0);
+  TIMERS.clear();
+  const saved = await sjPage.flushAll();
+  await settle();
+  check(saved === true && sjPage.SAVE.state !== "error",
+    "the Everything chip's save goes through (this exact save 404'd on the live workbook)");
+  const mintedRow = dbAnswer("c-codes", "codes.0.applies_to");
+  const sibRow = dbAnswer("c-codes", "codes.0.code");
+  check(!!mintedRow && DB.workbook_answers.filter((r) => r.card_id === "c-codes" && r.target_field === "codes.0.applies_to").length === 1,
+    `the row was MINTED, exactly once (id ${mintedRow && mintedRow.id})`);
+  check(!!mintedRow && mintedRow.target_kind === sibRow.target_kind && mintedRow.target_table === sibRow.target_table && mintedRow.target_id === sibRow.target_id,
+    `aimed by the card's own codes.0.code sibling (${sibRow.target_kind}/${sibRow.target_table}/${sibRow.target_id}), never by the page's payload`);
+  const savedKeys = Array.isArray(mintedRow && mintedRow.answered) ? mintedRow.answered.length : 0;
+  check(savedKeys > 0 && savedKeys === sjPage.priceKeys().length,
+    `carrying the page's whole materialized key list (${savedKeys} keys saved)`);
+
+  // And the deliberate act the blocker was blocking: confirm succeeds end to end.
+  ALERTS = [];
+  await sjPage.confirmCard(codesLid);
+  await settle();
+  check(!!dbCard("c-codes").confirmed_at && ALERTS.length === 0,
+    "and the codes card CONFIRMS - the mandatory applies-to answer finally has a row to live in");
+
+  // FAIL-CLOSED DID NOT WEAKEN: a field CODE_T does not know keeps the refusal,
+  // byte for byte, on the same door.
+  const foreign = await callApi({ action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.hacker", answered: "x" }] });
+  check(foreign.ok === false && foreign.error === "that answer does not belong to this card",
+    `a null-id save of codes.0.hacker still refuses byte-for-byte ("${foreign.error}")`);
+
+  // ── Step 2 (2026-08-06): one spelling per address, same direct-POST door ──
+  // `+m[1]` collapses "00" and "0" into one number but the mint dedupes rows
+  // by the exact target_field string, so `codes.00.applies_to` used to mint a
+  // TWIN row for logical code 0. MUTATE=noncanonicalindex.
+  // The save-payload log is SNAPSHOTTED first: everything in it so far came
+  // from the real page or from canonical harness probes, and the deliberately
+  // non-canonical direct POST below must not end up inside its own tripwire.
+  const savedCodeFields = [...new Set(API_CALLS
+    .filter((c) => c.body && c.body.action === "save" && Array.isArray(c.body.answers))
+    .flatMap((c) => c.body.answers.map((a) => String((a || {}).target_field || "")))
+    .filter((f) => f.startsWith("codes.")))];
+  const twinSave = await callApi({ action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.00.applies_to", answered: ["x"] }] });
+  check(twinSave.ok === false && twinSave.error === "that answer does not belong to this card"
+    && DB.workbook_answers.filter((r) => r.card_id === "c-codes" && /^codes\.0+\.applies_to$/.test(r.target_field)).length === 1,
+    `a direct POST of codes.00.applies_to refuses 404 and logical code 0 keeps ONE row ("${twinSave.error}")`);
+
+  // ── D4, through the REAL page: the failure banner claims only what it knows.
+  // After D1 a genuinely foreign field is still the reachable 404, and the
+  // banner must name the field rather than guess a cause. This doubles as the
+  // contract-side pin that D1's fail-closed refusal still fires through the
+  // page. Driven on the throwaway SJ page, so the stuck-dirty field it leaves
+  // behind is discarded with it. MUTATE=bannerblamesadds.
+  sjPage.setA(codesLid, "codes.0.hacker", "x");
+  TIMERS.clear();
+  const failedFlush = await sjPage.flushAll();
+  await settle();
+  console.log(`  NOTE  the banner reads: "${sjPage.SAVE.msg}"`);
+  check(failedFlush === false && sjPage.SAVE.state === "error",
+    "a save the server refuses fails loud through the real page");
+  check(/codes\.0\.hacker/.test(sjPage.SAVE.msg) && !/cannot add brand new items/.test(sjPage.SAVE.msg),
+    `and the banner names the field it could not save, claiming no cause ("${sjPage.SAVE.msg}")`);
+
+  // ── Step 2's regression tripwire against the PAGE: every codes.* field the
+  // real page ever put in a save payload (snapshotted above, before the
+  // deliberately non-canonical harness probe) is canonically spelled, so
+  // refusing non-canonical spellings can never refuse the page. codeIndices
+  // does `s.add(+m[1])` on rows the API itself sent and setA builds
+  // 'codes.'+i+'.'+f from those numbers - this asserts that stays true.
+  check(savedCodeFields.length > 0 && savedCodeFields.every((f) => /^codes\.(?:0|[1-9]\d*)\./.test(f)),
+    `every codes.* field the REAL page ever saved is canonically spelled (${savedCodeFields.join(", ")})`);
+
+  // Put the fixture back and reboot the main page off it, so every later
+  // section reads the state it always did.
+  DB.workbook_answers = snapAnswers;
+  DB.workbook_cards = snapCards;
+  await page.boot();
+  await settle();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F3. THE CODES CARD REFUSES CONFIRM UNTIL EVERY CODE STATES ITS TARGETS
+// (D1 Variant A). An empty applies_to means Stripe discounts every line of the
+// first invoice by default - and the mint withholds the fee target in response
+// - so the page refuses the deliberate act until the scope is a choice. The
+// explicit choice is the "Everything, including the joining fee" chip, which
+// MATERIALIZES the full key list rather than storing a sentinel.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F3. a code with no stated targets cannot be confirmed ──");
+{
+  const codesLid = lidOf("codes");
+  // Take the fixture code's list away through the page's own write path.
+  await type("codes", "codes.0.applies_to", []);
+  ALERTS = [];
+  await confirm("codes");
+  check(!dbCard("c-codes").confirmed_at && !cardOf("codes").confirmed_at,
+    "confirm on a named code with nothing ticked is refused - the card stays unconfirmed on both halves");
+  check(ALERTS.length === 1 && /applies to first/.test(ALERTS[0]) && /Everything, including the joining fee/.test(ALERTS[0]),
+    `and the refusal offers the explicit choice ("${ALERTS[0]}")`);
+
+  // The Everything chip: the saved list is the page's whole materialized key
+  // vocabulary, the joining-fee keys included - real keys, not a sentinel.
+  page.applyEverything(codesLid, 0);
+  TIMERS.clear(); await page.flushAll(); await settle();
+  ALERTS = [];
+  await confirm("codes");
+  check(!!dbCard("c-codes").confirmed_at && ALERTS.length === 0,
+    "choosing Everything and confirming succeeds");
+  const savedList = dbAnswer("c-codes", "codes.0.applies_to").answered;
+  const want = page.priceKeys();
+  const sameSet = Array.isArray(savedList) && savedList.length === want.length && want.every((k) => savedList.includes(k));
+  check(sameSet && savedList.some((k) => /\|signup_fee$/.test(k)),
+    `and the saved applies_to equals the page's own key list, fee keys included (${Array.isArray(savedList) ? savedList.length : "?"} keys)`);
+  check(page.appliesEverything((page.MODEL[codesLid] || [])[0] || {}) === true,
+    "which the page reads back as the Everything state, so the chip stays lit");
+
+  // ── D3: the scope sentence tracks the DURATION the owner picked ───────────
+  // Driven through the same write path the duration chips use, then the card
+  // is redrawn and its rendered copy read - the sentence is the claim.
+  const cardMarkup = () => byId("card_" + codesLid).outerHTML;
+  page.setA(codesLid, "codes.0.duration", page.DUR[0]);   // First payment only
+  page.drawCodes();
+  let said = cardMarkup();
+  check(/on the first bill/.test(said) && !/on every bill/.test(said),
+    "a first-payment code says its discount rides the first bill only");
+  check(/including the joining fee(?! on the first one)/.test(said),
+    "and the fee clause claims the fee plainly - the fee rides that same first invoice");
+  page.setA(codesLid, "codes.0.duration", page.DUR[2]);   // Every payment
+  page.drawCodes();
+  said = cardMarkup();
+  check(/on every bill/.test(said) && !/on the first bill/.test(said),
+    "an every-payment code says every bill, not the hardcoded first-bill claim");
+  check(/including the joining fee on the first one/.test(said),
+    "while the fee clause still claims only the first invoice - the fee never recurs");
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F7. THE WHITESPACE KEY: applies-to emptiness is ONE rule on both halves
+// (Step 1, 2026-08-06 whitespace remediation). `[" "]` is byte-reachable by a
+// direct POST, and it used to read TARGETED to the guards' raw length checks
+// while couponAppliesToKeys trimmed it to "everything" for the Stripe coupon.
+// Both halves now read it through the same emptiness rule (the page inline,
+// the server via cleanAppliesTo), refusing in ONE sentence.
+// MUTATE=blankkeysrestrict.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F7. a whitespace-only applies_to reads untargeted on both halves ──");
+{
+  const codesLid = lidOf("codes");
+  await type("codes", "codes.0.applies_to", [" "]);
+  // The page refuses at the deliberate act, BEFORE any network: no confirm
+  // call may leave the page.
+  const confirmsBefore = API_CALLS.filter((c) => c.body && c.body.action === "confirm").length;
+  ALERTS = [];
+  await page.confirmCard(codesLid);
+  await settle();
+  const confirmsAfter = API_CALLS.filter((c) => c.body && c.body.action === "confirm").length;
+  check(ALERTS.length === 1 && confirmsAfter === confirmsBefore && !cardOf("codes").confirmed_at,
+    `the page reads [" "] as untargeted and refuses before any network ("${ALERTS[0]}")`);
+  // And the server, POSTed directly the way the tester did, refuses the same
+  // confirm - in the byte-identical sentence the page just promised.
+  const refusedWs = await callApi({ action: "confirm", card_key: "codes" });
+  check(refusedWs.ok === false && !dbCard("c-codes").confirmed_at,
+    `a direct API confirm of the whitespace-keyed code is refused, card unconfirmed ("${refusedWs.error}")`);
+  check(ALERTS[0] === refusedWs.error,
+    "and the two refusals are BYTE-IDENTICAL - one sentence, two doors");
+  // Put the card back the way F3 left it, so the gate below reads the state
+  // it always did.
+  page.applyEverything(codesLid, 0);
+  TIMERS.clear(); await page.flushAll(); await settle();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // G. THE GATE - the number on his screen against the number that is enforced
 // ═════════════════════════════════════════════════════════════════════════════
 console.log("\n── G. the submit gate ──");
 {
+  // G2 first: the optional tax registration number, typed through the real
+  // input path before the tax card is confirmed. The stub's clients row is
+  // checked after the staff apply in H4.
+  await type("tax", "tax_registration_number", "77-880 CA");
+  check(dbAnswer("c-tax", "tax_registration_number").answered === "77-880 CA",
+    "the tax registration number saves through the ordinary answer path");
+
+  // Step 12: the age band, typed through the real inputs. The stub's offer
+  // jsonb is checked after the staff apply in H4.
+  await type("plan:p1", "age_min", "9");
+  await type("plan:p1", "age_max", "12");
+  check(dbAnswer("c-p1", "age_min").answered === "9" && dbAnswer("c-p1", "age_max").answered === "12",
+    "the ages save through the ordinary answer path, as strings");
+
   // Confirm everything except one card, so the refusal has a number in it that
-  // both halves have to agree about.
-  for (const key of ["tax", "plan:p2", "plan:p3", "plan:p4", "codes", "plans"]) await confirm(key);
+  // both halves have to agree about. plan:p1 is re-confirmed here because the
+  // age edit above rightly RETIRED its earlier confirm - an approval does not
+  // survive the answer changing underneath it.
+  for (const key of ["tax", "plan:p1", "plan:p2", "plan:p3", "plan:p4", "codes", "plans"]) await confirm(key);
+  // Blank never blocks: p2 and p4 carry NO ages and confirmed anyway - being
+  // for everyone is an answer, not an omission.
+  check(!!dbCard("c-p2").confirmed_at && !!dbCard("c-p4").confirmed_at,
+    "a card with blank ages confirms - blank means the plan is for everyone");
   const left = page.remainingCount();
   check(left === 1, `one card is left unconfirmed (page says ${left})`);
   check(page.sendBlocked() === true, "the page holds the Send button off");
@@ -1362,8 +2089,10 @@ check(firstReview.body.gate.approved === 0, `and nothing is approved yet, so una
     "a card holding ONLY an addition is counted by both - the request needs an owner confirm and a staff approval");
 }
 {
-  // THE EMPTY ADD-A-PLAN CARD, which is the whole reason the gate is not simply
-  // "every card". Its addition is lifted out and both halves are asked again.
+  // THE EMPTY ADD-A-PLAN CARD counts on BOTH halves now (D6). Its addition is
+  // lifted out and both halves are asked again: the denominator must not move,
+  // review must still SHOW the card, and staff must be able to approve the
+  // owner's "nothing to add".
   const stash = DB.workbook_answers.filter((r) => r.card_id === "c-plans");
   DB.workbook_answers = DB.workbook_answers.filter((r) => r.card_id !== "c-plans");
   await page.boot(); await settle();
@@ -1371,8 +2100,14 @@ check(firstReview.body.gate.approved === 0, `and nothing is approved yet, so una
   const serverSet = setOf(r.body.gate.unapproved_card_keys);
   const pageSet = setOf(page.countedCards().map((c) => c.card_key));
   check(serverSet === pageSet, `with the request taken back off it, still the same cards: page [${pageSet}] / staff gate [${serverSet}]`);
-  check(!r.body.gate.unapproved_card_keys.includes("plans") && page.counted(cardOf("plans")) === false,
-    "and NEITHER half counts the empty add-a-plan card - it holds neither Send nor apply");
+  check(r.body.gate.unapproved_card_keys.includes("plans") && page.counted(cardOf("plans")) === true,
+    "and BOTH halves still count the empty card - the denominator does not move when a card empties");
+  const shownEmpty = r.body.review.cards.find((c) => c.card_key === "plans");
+  check(!!shownEmpty && Array.isArray(shownEmpty.items) && shownEmpty.items.length === 0,
+    "review SHOWS the empty card with items: [], so staff can see he was asked and had nothing to add");
+  const approvedEmpty = await staffApi({ action: "approve-card", workbook_id: "wb1", card_key: "plans" });
+  check(approvedEmpty.status === 200 && approvedEmpty.body.ok === true,
+    `an empty confirmed card can be approve-carded - no 409 (status ${approvedEmpty.status})`);
   DB.workbook_answers.push(...stash);
   await page.boot(); await settle();
 }
@@ -1549,6 +2284,36 @@ check(applied.status === 200 && applied.body.ok === true && applied.body.dry_run
   const taxItem = beforeApply.body.review.academy_settings.find((i) => i.target_field === "tax_config");
   check(!!taxItem && jsonEq(DB.clients[0].tax_config, taxItem.will_write),
     `and the academy setting too: review previewed ${JSON.stringify(taxItem && taxItem.will_write)}, clients.tax_config now holds ${JSON.stringify(DB.clients[0].tax_config)}`);
+
+  // G2: the number he typed on the tax card is now on the academy row, exactly
+  // as review previewed it. MUTATE=taxregnowhere takes away its classifyField
+  // home, and the whole apply must then refuse rather than write it anywhere.
+  const regItem = beforeApply.body.review.academy_settings.find((i) => i.target_field === "tax_registration_number");
+  check(!!regItem && regItem.will_write === "77-880 CA",
+    `review previews the registration number as the text he typed (${JSON.stringify(regItem && regItem.will_write)})`);
+  check(DB.clients[0].tax_registration_number === "77-880 CA",
+    `and apply landed it on clients.tax_registration_number (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
+
+  // Step 12: the age band. Review previews the STRING the translator will
+  // write - MUTATE=agesunknownfield takes away its PLAN_T home, and the whole
+  // apply must then refuse rather than land it on a guessed key.
+  const ageItem = (beforeApply.body.review.cards.find((c) => c.card_key === "plan:p1") || { items: [] })
+    .items.find((i) => i.target_field === "age_min");
+  check(!!ageItem && ageItem.will_write === "9",
+    `review previews age_min as the STRING "9" (${JSON.stringify(ageItem && ageItem.will_write)})`);
+  const offP1 = offerRow().data.pricing.pricing_offerings[OFFERING_IX.get("plan:p1")] || {};
+  check(offP1.age_min === "9" && offP1.age_max === "12" && typeof offP1.age_min === "string",
+    `and the ages he typed landed on the offering as strings (age_min ${JSON.stringify(offP1.age_min)}, age_max ${JSON.stringify(offP1.age_max)})`);
+  const offP3 = offerRow().data.pricing.pricing_offerings[OFFERING_IX.get("plan:p3")] || {};
+  check(offP3.age_min === "9" && offP3.age_max === "12",
+    `the Elementary prefill he confirmed landed too (age_min ${JSON.stringify(offP3.age_min)}, age_max ${JSON.stringify(offP3.age_max)})`);
+  const offP2 = offerRow().data.pricing.pricing_offerings[OFFERING_IX.get("plan:p2")] || {};
+  check(!("age_min" in offP2) && !("age_max" in offP2),
+    "while the blank-age plan grew NO age keys at all");
+  // Stored-for-later is said OUT LOUD: nothing consumes plan ages yet, and an
+  // apply that wrote them must say no routing changed. MUTATE=agenotegone.
+  check(typeof applied.body.age_note === "string" && /Nothing reads plan ages yet/.test(applied.body.age_note),
+    `the apply response says plan ages are stored for later and no routing changed ("${applied.body.age_note}")`);
 }
 {
   // THE OWNER'S HALF DID NOT REOPEN. Staff reviewing, approving and applying must
@@ -1590,7 +2355,11 @@ console.log("\n── H5. the rehearsal describes work in the page's own key voc
   // two sides parse the commitment length with two different parsers. A key phase
   // 3 would mint that the page cannot name is a price nobody can ever attach a
   // coupon to.
-  const p3keys = (applied.body.phase3.targets || []).map((t) => t.key);
+  // Read defensively: under an API control that makes apply REFUSE, phase3 is
+  // absent, and a harness that crashes exits without its banner - the H4
+  // assertions above are the ones that report the refusal.
+  const PH3 = (applied.body && applied.body.phase3) || {};
+  const p3keys = (PH3.targets || []).map((t) => t.key);
   const offered = new Set(page.priceKeys());
   const orphan = p3keys.filter((k) => !offered.has(k));
   check(p3keys.length > 0 && orphan.length === 0,
@@ -1600,7 +2369,7 @@ console.log("\n── H5. the rehearsal describes work in the page's own key voc
   // price by the tax he entered and prints a sentence; the rehearsal takes the
   // tax it just wrote to clients and mints cents through _fees.applyFee. Nothing
   // is shared between those two paths except the workbook.
-  const byKey = new Map((applied.body.phase3.targets || []).map((t) => [t.key, t]));
+  const byKey = new Map((PH3.targets || []).map((t) => [t.key, t]));
   const money = [];
   let priced = 0;
   for (const c of page.CARDS.filter((x) => x.type === "plan")) {
@@ -1616,6 +2385,36 @@ console.log("\n── H5. the rehearsal describes work in the page's own key voc
     if (his !== mint) money.push(`${c.card_key}: his page says a parent pays ${his} for ${JSON.stringify(m.title)} and the mint would charge ${mint} ("${said}")`);
   }
   check(priced > 0 && money.length === 0, `the parent price on his screen is the amount the mint would charge, tax and all (${priced} plans${money.length ? " - " + money[0] : ""})`);
+
+  // THE WITHHELD-FEE REPORT AGREES WITH THE PAGE'S OWN CODES MODEL. The page
+  // computes "loose" (a named code with nothing ticked, while some plan charges
+  // a joining fee) to warn the owner; the apply response computes the same state
+  // off the offer as it really landed and WITHHOLDS the fee target when it
+  // holds. The two halves must agree on WHEN that state exists, or the owner is
+  // warned about a withhold that never happens - or worse, not warned about one
+  // that does. MUTATE=feewithheldsilently.
+  const whs = PH3.withheld_signup_fees;
+  const codesModel = page.MODEL[lidOf("codes")] || [];
+  const anyFee = page.CARDS.filter((c) => c.type === "plan")
+    .some((c) => page.MODEL[c.lid] && !page.MODEL[c.lid].archived && page.MODEL[c.lid].fee === 1);
+  const pageLoose = codesModel.some((c) => String(c.code).trim() && !(c.applies && c.applies.length)) && anyFee;
+  check(Array.isArray(whs), `the apply response carries withheld_signup_fees as DATA (saw ${JSON.stringify(whs)})`);
+  check((Array.isArray(whs) && whs.length > 0) === pageLoose,
+    `and its presence matches the page's own loose-code state (page loose ${pageLoose}, withheld ${Array.isArray(whs) ? whs.length : "MISSING"})`);
+
+  // D7: the live-Stripe read happened, read-only, and with this harness's
+  // empty account every target honestly reads as would-mint.
+  check(PH3.stripe_check === "read" && PH3.exists_in_stripe === 0 && PH3.would_mint_new === (PH3.targets || []).length,
+    `the rehearsal read LIVE Stripe (stripe_check ${JSON.stringify(PH3.stripe_check)}, ${PH3.exists_in_stripe} exist, ${PH3.would_mint_new} to mint of ${(PH3.targets || []).length})`);
+  // R3: and the read PAGINATED. The fixture's first page is 100 fillers with
+  // has_more:true, so a read that never sends the starting_after cursor never
+  // saw the whole account - in production that reports exists:false past
+  // price #100 and the mint duplicates real prices. MUTATE=onepagestripe.
+  const cursorReq = STRIPE_GETS.find((g) => g.includes("/v1/prices") && g.includes(`starting_after=${STRIPE_CURSOR}`));
+  check(!!cursorReq,
+    `the price read paginated: a request carried starting_after=${STRIPE_CURSOR} (${STRIPE_GETS.filter((g) => g.includes("/v1/prices")).length} price GETs recorded)`);
+  check((PH3.targets || []).length > 0 && (PH3.targets || []).every((t) => t.billing_rhythm && typeof t.billing_rhythm.sentence === "string" && t.billing_rhythm.recurring !== undefined),
+    "and every target states its real billing rhythm with a source, no hedge");
 }
 
 console.log("\n── H6. rollback puts back exactly what he was looking at ──");
@@ -1634,6 +2433,83 @@ console.log("\n── H6. rollback puts back exactly what he was looking at ─�
   const surface = pageSurface();
   check(surface === SURFACE_BEFORE,
     `his read-only page renders byte-identically to before the apply${surface === SURFACE_BEFORE ? "" : " - first difference at char " + [...surface].findIndex((ch, i) => ch !== SURFACE_BEFORE[i])}`);
+}
+
+console.log("\n── I. a confirmed No to tax survives as a value the next workbook reads ──");
+{
+  // A FRESH RUN in the same harness: the stub world is reset wholesale and a
+  // NEW page instance is built, because the real page never un-submits (RO is
+  // one-way by design) and this section needs an editable workbook. Everything
+  // else - the router, the handler, the DOM double - is the same machinery.
+  reset();
+  page = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await page.boot(); await settle();
+  page.setTax(0);                                   // the real "No, my prices are the full amount" chip
+  TIMERS.clear(); await page.flushAll(); await settle();
+  for (const key of ["tax", "plan:p1", "plan:p2", "plan:p3", "plan:p4", "codes", "plans", "notes"]) await confirm(key);
+  ALERTS = [];
+  await page.doSubmit(); await settle();
+  check(DB.workbooks[0].status === "submitted", `the No workbook sends${ALERTS.length ? " (alerts: " + ALERTS.join(" | ") + ")" : ""}`);
+  const rvI = await staffApi({ action: "review", workbook_id: "wb1" });
+  for (const k of rvI.body.gate.unapproved_card_keys) await staffApi({ action: "approve-card", workbook_id: "wb1", card_key: k });
+  const apI = await staffApi({ action: "apply", workbook_id: "wb1" });
+  check(apI.body.ok === true && JSON.stringify(DB.clients[0].tax_config) === JSON.stringify({ charges_tax: false }),
+    `apply stores the No as { charges_tax: false }, never null (saw ${JSON.stringify(DB.clients[0].tax_config)})`);
+  // Read defensively: under an API control that makes apply REFUSE, phase3 is
+  // absent, and a harness that crashes exits without its banner.
+  check((apI.body.phase3 || {}).tax_state === "confirmed_no",
+    `and the rehearsal reports it (tax_state ${JSON.stringify((apI.body.phase3 || {}).tax_state)})`);
+
+  // THE DISTINGUISHABILITY THE PAGE COPY PROMISES ("Answering No is a real
+  // answer, not a skip"): a future workbook minted over this academy carries
+  // the stored config as current_value, and the page must render the card as
+  // ANSWERED No - not as never asked. MUTATE=noisnull collapses exactly this.
+  const taxRowI = dbAnswer("c-tax", "tax_config");
+  taxRowI.current_value = DB.clients[0].tax_config;
+  taxRowI.proposed = null;
+  taxRowI.answered = null;
+  DB.workbooks[0].status = "sent";                  // a fresh link over the same rows
+  page = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await page.boot(); await settle();
+  const TI = page.MODEL[lidOf("tax")];
+  check(TI.on === 0,
+    `the next workbook renders the tax card as ANSWERED No (on ${JSON.stringify(TI.on)}), not as never asked (null)`);
+}
+
+console.log("\n── J. 25 months on the real page is refused where staff read, and cannot apply ──");
+{
+  // R4: duration_months is bounded 1-24 (the term vocabulary's own ceiling).
+  // A fresh run, section I's pattern: the owner picks "a set number of
+  // months" and types 25 through the page's real input path - there is no
+  // confirm-gate block, the translator refusal IS the enforcement, so it must
+  // print in review AND refuse the apply. MUTATE=monthsunbounded.
+  reset();
+  page = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await page.boot(); await settle();
+  await type("codes", "codes.0.duration", page.DUR[1]);        // For a set number of months
+  await type("codes", "codes.0.duration_months", 25);          // the page's number input sends a NUMBER
+  check(dbAnswer("c-codes", "codes.0.duration_months").answered === 25,
+    "typing 25 months saves through the ordinary answer path");
+  for (const key of ["tax", "plan:p1", "plan:p2", "plan:p3", "plan:p4", "codes", "plans", "notes"]) await confirm(key);
+  ALERTS = [];
+  await page.doSubmit(); await settle();
+  check(DB.workbooks[0].status === "submitted", `the workbook sends${ALERTS.length ? " (alerts: " + ALERTS.join(" | ") + ")" : ""}`);
+
+  const rvJ = await staffApi({ action: "review", workbook_id: "wb1" });
+  const monthsItem = REVIEW_ITEMS(rvJ.body).find((i) => i.target_field === "codes.0.duration_months") || {};
+  check(/a set number of months must be a whole number from 1 to 24/.test(String(monthsItem.translation_error))
+    && monthsItem.will_write === undefined,
+    `review carries the refusal where staff read ("${monthsItem.translation_error}")`);
+
+  for (const k of rvJ.body.gate.unapproved_card_keys) await staffApi({ action: "approve-card", workbook_id: "wb1", card_key: k });
+  const offersBeforeJ = JSON.stringify(DB.offers.map((o) => ({ id: o.id, data: o.data })));
+  const apJ = await staffApi({ action: "apply", workbook_id: "wb1" });
+  const fJ = (Array.isArray((apJ.body || {}).failures) ? apJ.body.failures : [])
+    .find((f) => f.target_field === "codes.0.duration_months") || {};
+  check(apJ.body.ok === false && /a set number of months must be a whole number from 1 to 24/.test(String(fJ.error)),
+    `and apply refuses the workbook with the same sentence ("${fJ.error}")`);
+  check(JSON.stringify(DB.offers.map((o) => ({ id: o.id, data: o.data }))) === offersBeforeJ,
+    "so the 25-month claim never reached the offer jsonb");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

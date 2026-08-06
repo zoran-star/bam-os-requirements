@@ -529,7 +529,8 @@ function addProblem(kind,v){
   const s=x=>typeof x==='string'?x.trim():'';
   const n=x=>typeof x==='number'&&isFinite(x)?x:null;
   if(kind==='plan')return !s(v.title)?'Please give the plan a name before adding it.'
-    :(n(v.price)===null||n(v.price)<0)?'Please add a price for this plan before adding it.':'';
+    :(n(v.price)===null||n(v.price)<0)?'Please add a price for this plan before adding it.'
+    :(String(v.billing_cycle||'')==='Other'&&!s(v.billing_cycle_other))?'Please say how often this plan bills before adding it.':'';
   if(kind==='length')return (n(v.months)===null||!Number.isInteger(v.months)||v.months<1||v.months>120)
     ?'Please say how many months this length runs for.'
     :(n(v.price)===null||n(v.price)<0)?'Please add a price for this length before adding it.':'';
@@ -652,6 +653,11 @@ function planModel(c){
     feeOnBase:idxOf(CHARGE_W,val(c,'signup_fee_on_base','Charge'),0),
     sessions:val(c,'sessions_included',''),
     expires:val(c,'expires_after',''),
+    /* STRINGS, never coerced with + here: "" is the no-bound encoding the
+       server stores (same as schedule.classes), and +"" is 0, which is an
+       age. Comparison happens only at the confirm guard, on both present. */
+    ageMin:val(c,'age_min',''),
+    ageMax:val(c,'age_max',''),
     otherDesc:val(c,'other_description',''),
     notes:val(c,'description',''),
     archived:val(c,'archived',false)?1:0,
@@ -680,7 +686,8 @@ function planModel(c){
 function taxModel(c){
   const t=val(c,'tax_config',null)||{};
   return {on:t.charges_tax===true?1:(t.charges_tax===false?0:null),
-          pct:has(t.pct)?String(t.pct):'', label:t.label||'Sales tax'};
+          pct:has(t.pct)?String(t.pct):'', label:t.label||'Sales tax',
+          reg:val(c,'tax_registration_number','')};
 }
 function codeModel(c){
   const out=[];
@@ -764,10 +771,13 @@ async function flush(lid){
   const c=card(lid); if(!c||!c.dirty||!c.dirty.size)return true;
   const fields=[...c.dirty];
   const payload=fields.map(f=>{const a=ansOf(c,f);return {id:a?a.id:null,target_field:f,answered:a?a.answered:null}});
-  // Whether this batch tries to CREATE something (a rung, a code, a whole plan the
-  // owner added) rather than answer a question we asked. The API does not accept
-  // creates yet, so a failure here has a known cause worth saying plainly instead
-  // of echoing a validation string at an academy owner.
+  // Whether this batch carries a null id - a field the seed never made a row
+  // for. Most of those MINT server-side now (the canMint whitelist grew the
+  // tax, plan-age and codes fields), so "no id" no longer means "the API
+  // cannot store this" and the old banner's guessed cause ("this page cannot
+  // add brand new items yet") became a wrong claim. When one of these fails,
+  // the banner below says only what this code actually knows: WHICH fields,
+  // and that the change is not stored.
   const creating=payload.some(p=>!p.id);
   inflight++; setSave('saving');
   try{
@@ -786,7 +796,7 @@ async function flush(lid){
     setSave('error', e.message==='offline'
       ? 'You look offline. Your typing is still on screen, nothing is lost.'
       : creating
-        ? 'This page cannot add brand new items yet, so the one you just added is not stored. Everything you changed on the questions we asked you is saved. Tell BAM what you wanted to add and we will add it for you.'
+        ? 'We could not save your answer for '+fields.join(', ')+'. That change is not stored yet. Try again, or tell BAM directly.'
         : e.message);
     return false;
   }
@@ -867,11 +877,34 @@ async function confirmCard(lid){
     if(!String(p.title).trim()){alert('Give this plan a name first.');return}
     if(p.type===null||p.type===undefined){alert('Pick what kind of pricing this is first.');return}
     if(!(p.price>0)){alert('Set a price first.');return}
+    /* Ages: blank does NOT block - blank means the plan is for everyone. The
+       one guard is an inverted band, which no athlete could ever fit, refused
+       here in the same direction the apply refuses it. */
+    const mn=String(p.ageMin==null?'':p.ageMin).trim(),mx=String(p.ageMax==null?'':p.ageMax).trim();
+    if(mn&&mx&&+mn>+mx){alert('The youngest age is above the oldest. Fix the ages first.');return}
   }
   if(c.type==='tax'){
     const t=MODEL[lid];
     if(t.on===null){alert('Pick Yes or No first.');return}
     if(t.on===1&&!(parseFloat(t.pct)>0)){alert('Type the tax rate first.');return}
+  }
+  if(c.type==='codes'){
+    /* Variant A (Zoran's ruling, 2026-08-06): a named code with nothing ticked
+       cannot be confirmed. Under an empty applies_to, Stripe discounts every
+       line of the first invoice - the joining fee included - as a DEFAULT, and
+       the mint then withholds the fee target in self-defence. The refusal
+       lives here, at the moment of the deliberate act, so the everything-scope
+       is something the owner CHOSE (the explicit chip) rather than inherited.
+       The server refuses the same confirm too (doConfirm, D3), in THIS EXACT
+       SENTENCE - the sentence below is byte-identical to the API's, and the
+       contract harness asserts it - so a direct POST cannot walk past the
+       rule this page promises. The Step 1 withhold report stays as the
+       backstop for a code that somehow arrives untargeted anyway. */
+    /* Emptiness here is the SERVER's rule (cleanAppliesTo): a list of
+       whitespace-only keys restricts nothing, so it must read untargeted on
+       this side too or the server's refusal arrives as a surprise alert. */
+    const untargeted=(MODEL[lid]||[]).find(x=>String(x.code).trim()&&!(x.applies||[]).some(k=>String(k).trim()));
+    if(untargeted){alert('Say what '+untargeted.code+' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');return}
   }
   // Confirm after the edits it is confirming, never before, or the server would
   // record an approval of a value it has not been told about yet.
@@ -887,26 +920,20 @@ async function confirmCard(lid){
     alert('We could not save that confirmation. '+(e.message==='offline'?'You look offline. Try again when you have signal.':e.message));
   }
 }
-/* A card the SERVER does not count cannot be counted here either, or the owner
-   reads "Confirm the remaining 8 cards" while the server will happily accept at
-   7 - two different numbers about the same workbook, one of them on his screen.
-   The gate has ONE definition and it lives on the server; `counts` is that
-   definition arriving over the wire. Only a card carrying nothing to review is
-   ever excluded, which is why an empty add-a-plan card does not hold Send.
-   The `!==false` shape is deliberate: an older API that sends no `counts` key at
-   all must keep counting every card, never silently stop counting them. */
+/* EVERY CARD COUNTS, FROM FIRST RENDER (D6, one definition on both halves).
+   The denominator is CARDS.length the moment the page paints and it cannot
+   grow mid-session: under the old rule an addition landing on the empty
+   add-a-plan card turned "0 of 7" into "5 of 8" under the owner's cursor, and
+   the empty card could ship unseen while its own hint promised "confirm it
+   empty and we will know you were asked". The server's cardCounts says the
+   same thing; `counts` still arrives on the wire and the two must agree
+   (MUTATE=pagedenominatorgrows / MUTATE=emptycardsdontcount). */
 function counted(c){
-  // A CARD HOLDING A REQUEST ALWAYS COUNTS, whatever `counts` says. Verified on
-  // the live handler 2026-08-06: adding "Summer 1x/week" to the empty add-a-plan
-  // card returned counts:false on the ADD response while the very next GET
-  // returned counts:true. The page therefore stayed at "7 cards, 5 still to
-  // review" while the server meant 8 and 6, and Send would have gone with an
-  // unreviewed request for a plan we do not sell riding inside it.
-  // Reported rather than worked around, but the guard stays regardless: it can
-  // only ever ask for MORE review, and it does not depend on the API getting the
-  // ordering right on every future action.
+  // The addition guard stays as a trivial pass: a card holding a request must
+  // count whatever any future wire value says, because that direction can only
+  // ever ask for MORE review.
   if(hasAdditionFields(c))return true;
-  return c.counts!==false;
+  return true;                       // every card counts, empty or not
 }
 function countedCards(){return CARDS.filter(counted)}
 function remainingCount(){return countedCards().filter(c=>!isReady(c)).length}
@@ -1009,6 +1036,9 @@ function taxCardHTML(lid){
         <input class="bb-input" placeholder="Sales tax" value="${esc(T.label)}" style="max-width:180px" oninput="setTaxField('label',this.value)">
       </div>
       <div class="qhint" id="taxecho" style="margin-top:8px"></div>
+      <div class="q">Do you have a tax registration number?</div>
+      <div class="qhint">Optional. If you have one it goes on parent receipts. You can send it to us later.</div>
+      <input class="bb-input" placeholder="e.g. 123-456-789" value="${esc(T.reg)}" style="max-width:220px" oninput="setA('${lid}','tax_registration_number',this.value)">
     </div>
     <div class="confirmbar"><button class="cbtn" onclick="confirmCard('${lid}')">&#10003; That's right</button>
      <span class="chint">Nothing is taxed until you answer this. Answering No is a real answer, not a skip.</span></div>
@@ -1133,6 +1163,15 @@ function planCardHTML(lid){
      <div class="ladder" id="ladder_${lid}"></div>
      <div class="laddernote">Savings are compared against paying <b id="basecmp_${lid}">${money(p.price)}</b> ${CYCLES[p.cad]}.</div>
      ${addSectionHTML(lid,'length')}`:''}
+
+     <div class="q">Who is this plan for?</div>
+     <div class="qhint">Ages. Leave it blank if the plan is for everyone.</div>
+     <div class="chiprow">
+       <span class="ml">Ages</span>
+       <input class="bb-input" type="number" inputmode="numeric" style="max-width:80px" value="${esc(p.ageMin)}" oninput="setA('${lid}','age_min',this.value)">
+       <span class="ml">to</span>
+       <input class="bb-input" type="number" inputmode="numeric" style="max-width:80px" value="${esc(p.ageMax)}" oninput="setA('${lid}','age_max',this.value)">
+     </div>
 
      <div class="q">Anything else about this price?</div>
      <textarea class="bb-input" placeholder="optional, just for you and BAM" oninput="${s('description','this.value')}">${esc(p.notes)}</textarea>
@@ -1271,8 +1310,30 @@ function prevOpts(lid){
   if(cc)cc.textContent=p.type===0?' / '+CYCLES[p.cad].replace('every ',''):(p.type===1?` / ${p.sessions||'?'} sessions`:' once');
   const bits=[];
   if(taxedPlan(p))bits.push(`With ${esc(T.pct)}% ${esc(T.label)}, a parent pays ${money(base*(1+pctNum()/100))}.`);
-  if(p.type===0&&p.fee===1&&p.feeOnBase===0)bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee.`);
+  /* THE FEE LINE TELLS THE WHOLE TRUTH (D2). The old line said only "Plus a
+     one-time $40 joining fee." whenever the base charged - while San Jose's
+     real state is base charges, EVERY prepay waives, so the one sentence a
+     parent-facing preview showed omitted the fact that paying up front skips
+     the fee entirely. Computed from the per-rung values the model already
+     carries; a fee nobody charges prints nothing at all. Plain text into
+     textContent, so no esc() here - entities would render literally. */
+  if(p.type===0&&p.fee===1&&p.feeAmt>0){
+    const FR=liveRungs(p);
+    const charged=FR.filter(r=>r.fee===0),waivedR=FR.filter(r=>r.fee===1);
+    const lens=a=>a.map(r=>r.len).join(' and ');
+    if(p.feeOnBase===0&&FR.length&&charged.length===0)
+      bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee on the ${CYCLES[p.cad]} option. Pay up front and the joining fee is waived.`);
+    else if(p.feeOnBase===0)
+      bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee.`+(waivedR.length?` Waived on ${lens(waivedR)}.`:''));
+    else if(charged.length)
+      bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee when you pay up front for ${lens(charged)}.`);
+  }
   if(p.type===1&&p.expires)bits.push(`Expires after ${p.expires}.`);
+  /* The age band a parent reads, only ever claiming the bound that exists. */
+  {const mn=String(p.ageMin==null?'':p.ageMin).trim(),mx=String(p.ageMax==null?'':p.ageMax).trim();
+   if(mn&&mx)bits.push(`Ages ${mn} to ${mx}.`);
+   else if(mn)bits.push(`Ages ${mn} and up.`);
+   else if(mx)bits.push(`Ages ${mx} and under.`);}
   document.getElementById('pv_fee_'+lid).textContent=bits.join(' ');
   const back=R.filter(r=>r.after===0).length, ren=R.filter(r=>r.after===1).length;
   let line='';
@@ -1331,6 +1392,15 @@ function codeCardHTML(lid){
     <div class="qhint">Leave this empty if you do not use codes. Waiving a setup fee for some families is exactly what a code does.</div>
     ${C.map(c=>{const i=c.i;const F=`'codes.${i}.`;
       const wasNamed=codeWasNamed(card(lid),i);
+      /* The scope sentence tracks the DURATION the owner picked, because "on
+         the first bill" was hardcoded while the duration chips said otherwise:
+         a code set to Every payment was described as first-bill-only, a wrong
+         claim about money on the page whose job is checking the money. The fee
+         clause never claims more than the code does either - the joining fee
+         only ever rides the FIRST invoice, so a many-bill duration says "on
+         the first one" rather than implying the fee recurs. */
+      const scope=c.dur===2?'on every bill':c.dur===1?('on the first '+(c.durMonths||'?')+' months of bills'):'on the first bill';
+      const feeClause=anyJoiningFee()?(c.dur===0?', including the joining fee':', including the joining fee on the first one'):'';
       // A code he cleared shows as removed with a way back, rather than as an
       // empty box he cannot tell apart from one he never filled in.
       if(!String(c.code).trim()&&wasNamed)return `<div class="subrow">
@@ -1347,10 +1417,10 @@ function codeCardHTML(lid){
       </div>
       <div class="q" style="margin:12px 0 6px;font-size:12.5px">How long does it apply?</div>
       <div class="chiprow">${DUR.map((d,j)=>`<button class="bchip sm ${c.dur===j?'sel':''}" onclick="setA('${lid}',${F}duration',DUR[${j}]);drawCodes()">${d}</button>`).join('')}
-      ${c.dur===1?`<input class="bb-input" type="number" inputmode="numeric" style="max-width:80px" placeholder="3" value="${c.durMonths||''}" oninput="setA('${lid}',${F}duration_months',+this.value||0)"><span class="ml">months</span>`:''}</div>
+      ${c.dur===1?`<input class="bb-input" type="number" inputmode="numeric" min="1" max="24" style="max-width:80px" placeholder="3" value="${c.durMonths||''}" oninput="setA('${lid}',${F}duration_months',+this.value||0)"><span class="ml">1 to 24 months</span>`:''}</div>
       <div class="q" style="margin:12px 0 6px;font-size:12.5px">What does it apply to?</div>
-      <div class="chiprow">${keys.length?keys.map(k=>`<button class="bchip sm ${(c.applies||[]).includes(k)?'sel':''}" onclick="toggleApplies('${lid}',${i},${JSON.stringify(k).replace(/"/g,'&quot;')})">${esc(keyLabel(k))}</button>`).join(''):'<span class="ml">Add your prices above first.</span>'}</div>
-      ${!(c.applies&&c.applies.length)&&String(c.code).trim()?`<div class="warnbox">Nothing ticked means this code comes off <b>everything</b> on the first bill${anyJoiningFee()?', including the joining fee':''}. Tick the prices it should apply to if that is not what you want.</div>`:''}
+      <div class="chiprow">${keys.length?`<button class="bchip sm ${appliesEverything(c)?'sel':''}" onclick="applyEverything('${lid}',${i})">Everything, including the joining fee</button>`+keys.map(k=>`<button class="bchip sm ${(c.applies||[]).includes(k)?'sel':''}" onclick="toggleApplies('${lid}',${i},${JSON.stringify(k).replace(/"/g,'&quot;')})">${esc(keyLabel(k))}</button>`).join(''):'<span class="ml">Add your prices above first.</span>'}</div>
+      ${String(c.code).trim()?`<div class="qhint" style="margin-top:8px">Tick the prices this code covers. It comes off them ${esc(scope)}${esc(feeClause)}. Choosing "Everything, including the joining fee" is a real choice, not a default.</div>`:''}
       <div class="subgrid" style="margin-top:10px">
         <span class="ml">Expires</span><input class="bb-input" type="date" style="max-width:160px" value="${esc(c.expires)}" oninput="setA('${lid}',${F}expires_at',this.value)">
         <span class="ml">Max total uses</span><input class="bb-input" type="number" inputmode="numeric" style="max-width:130px" placeholder="unlimited" value="${c.max||''}" oninput="setA('${lid}',${F}max_redemptions',+this.value||0)">
@@ -1385,8 +1455,30 @@ function codeWasNamed(c,i){
   const a=ansOf(c,'codes.'+i+'.code'); if(!a)return '';
   return (has(a.proposed)?a.proposed:a.current_value)||'';
 }
+/* THE EXPLICIT "everything" CHOICE (Variant A, Zoran's ruling 2026-08-06).
+   Clicking it MATERIALIZES the full key list - real keys, the joining fee's
+   included - rather than storing a sentinel, because an empty applies_to is
+   exactly the state the confirm guard below refuses: under it Stripe discounts
+   every line of the first invoice BY DEFAULT, and the mint withholds the fee
+   target in response. With every key ticked, unrestrictedCodes() on the server
+   sees a populated list, the fee target MINTS, and the coupon covers it
+   because the owner said so - a decision, not an inheritance. */
+function appliesEverything(c){
+  const keys=priceKeys();
+  if(!keys.length)return false;
+  const list=(c.applies||[]).slice().sort();
+  const want=keys.slice().sort();
+  return list.length===want.length&&want.every((k,j)=>k===list[j]);
+}
+function applyEverything(lid,i){
+  setA(lid,'codes.'+i+'.applies_to',priceKeys());drawCodes();
+}
 function toggleApplies(lid,i,k){
   const C=MODEL[lid]||[];const c=C.find(x=>x.i===i);if(!c)return;
+  /* Ticking ONE key out of the materialized everything-list means "just this
+     one", not "everything minus this one": the chip he pressed is the scope he
+     chose. Normal toggle behaviour takes over from there. */
+  if(appliesEverything(c)){setA(lid,'codes.'+i+'.applies_to',[k]);drawCodes();return}
   const list=(c.applies||[]).slice();
   const j=list.indexOf(k);if(j<0)list.push(k);else list.splice(j,1);
   setA(lid,'codes.'+i+'.applies_to',list);drawCodes();
@@ -1412,15 +1504,26 @@ const ADD_COPY={
         hint:'We will set this code up for you and check it with you first. It does not start working by adding it here.'}
 };
 function addFieldsHTML(lid,kind){
-  if(kind==='plan')return `
+  if(kind==='plan'){
+    /* The selected cycle is whatever pickCyc stored, defaulting to "every 4
+       weeks" as before - it has to be read here rather than hardcoded on chip
+       3, because picking "something else" redraws this box and the redraw must
+       not lose the selection. */
+    const sel=has(ADDOPEN[lid+'_cyc'])?ADDOPEN[lid+'_cyc']:3;
+    return `
     <div class="addgrid">
       <input class="bb-input" id="af_title_${lid}" placeholder="Summer 1x/week" style="max-width:220px">
       <span style="font-weight:800;color:var(--gold-ink)">$</span>
       <input class="bb-input" id="af_price_${lid}" type="number" inputmode="decimal" placeholder="150" style="max-width:110px;font-weight:800">
     </div>
     <div class="addgrid" style="margin-top:8px">
-      ${CYCLES.map((c,j)=>`<button class="bchip sm" data-cyc="${j}" onclick="pickCyc('${lid}',${j})" ${j===3?'style="background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700"':''}>${c}</button>`).join('')}
-    </div>`;
+      ${CYCLES.map((c,j)=>`<button class="bchip sm" data-cyc="${j}" onclick="pickCyc('${lid}',${j})" ${j===sel?'style="background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700"':''}>${c}</button>`).join('')}
+    </div>
+    ${sel===6?`<div class="addgrid" style="margin-top:8px">
+      <span class="ml">How often exactly?</span>
+      <input class="bb-input" id="af_cycother_${lid}" placeholder="e.g. every 6 weeks, per term" style="max-width:240px">
+    </div>`:''}`;
+  }
   if(kind==='length')return `
     <div class="addgrid">
       <input class="bb-input" id="af_months_${lid}" type="number" inputmode="numeric" placeholder="3" style="max-width:90px;font-weight:800">
@@ -1434,7 +1537,13 @@ function addFieldsHTML(lid,kind){
     </div>`;
 }
 function pickCyc(lid,j){
+  const was=has(ADDOPEN[lid+'_cyc'])?ADDOPEN[lid+'_cyc']:3;
   ADDOPEN[lid+'_cyc']=j;
+  /* Crossing the "something else" boundary changes WHICH inputs exist, so the
+     box is redrawn - carrying his typed name and price across, because a
+     redraw that eats the plan name he just typed reads as the page losing his
+     work. Inside either regime the chips just restyle, exactly as before. */
+  if((was===6)!==(j===6)){redrawAddsKeep(lid);return}
   document.querySelectorAll('#addbox_'+lid+' [data-cyc]').forEach(b=>{
     const on=+b.dataset.cyc===j;
     b.style.cssText=on?'background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700':'';
@@ -1444,16 +1553,28 @@ function pickCyc(lid,j){
    no coercion, so "150" and 150 are different answers to it. */
 function readAdd(lid,kind){
   const g=id=>{const e=document.getElementById(id);return e?e.value:''};
-  if(kind==='plan')return {kind:'plan',title:g('af_title_'+lid).trim(),
-    price:g('af_price_'+lid)===''?null:+g('af_price_'+lid),
-    billing_cycle:CYCLES_W[has(ADDOPEN[lid+'_cyc'])?ADDOPEN[lid+'_cyc']:3]};
+  if(kind==='plan'){
+    const cyc=has(ADDOPEN[lid+'_cyc'])?ADDOPEN[lid+'_cyc']:3;
+    return {kind:'plan',title:g('af_title_'+lid).trim(),
+      price:g('af_price_'+lid)===''?null:+g('af_price_'+lid),
+      billing_cycle:CYCLES_W[cyc],
+      /* Only when the cycle IS Other: a follow-up on a cycle he did not pick
+         would be a passenger key staff have to puzzle over. Field name per the
+         FIELD MAP (docs/plans/sj-price-match-log.md, sections 1-3). */
+      ...(cyc===6?{billing_cycle_other:g('af_cycother_'+lid).trim()}:{})};
+  }
   if(kind==='length')return {kind:'length',
     months:g('af_months_'+lid)===''?null:+g('af_months_'+lid),
     price:g('af_price_'+lid)===''?null:+g('af_price_'+lid)};
   return {kind:'code',code:g('af_code_'+lid).trim()};
 }
 function addSummary(v){
-  if(v.kind==='plan')return {n:v.title||'(no name)',d:money(v.price)+' '+String(v.billing_cycle||'').toLowerCase()};
+  /* "Other" is a chip, not a cadence: with the follow-up captured, the summary
+     renders what he actually typed. '$85 other' must be impossible. */
+  if(v.kind==='plan')return {n:v.title||'(no name)',
+    d:money(v.price)+' '+(String(v.billing_cycle||'')==='Other'&&String(v.billing_cycle_other||'').trim()
+      ?String(v.billing_cycle_other).trim()
+      :String(v.billing_cycle||'').toLowerCase())};
   if(v.kind==='length')return {n:v.months+(v.months===1?' month':' months'),d:money(v.price)+' paid up front'};
   return {n:v.code||'(no code)',d:'discount code'};
 }
@@ -1486,6 +1607,22 @@ function addSectionHTML(lid,kind){
 function redrawAdds(lid){
   const c=card(lid);
   if(c.type==='plan')drawPlan(lid); else if(c.type==='codes')drawCodes(); else drawPlansAdd();
+}
+/* Redraw the add box WITHOUT eating what the owner typed. Redrawing rebuilds
+   the inputs from markup, and a rebuilt input is EMPTY - so every refusal
+   path that redraws (the error line lives inside the box) was wiping the plan
+   name and price he had just typed, and the refusal read as the page losing
+   his work. pickCyc solved this exact problem for its own redraw; the pattern
+   lives here once now, for every add-box redraw while the box is still open.
+   Harmless after a successful add: ADDOPEN is 0, the inputs are gone, and
+   there is nothing to restore. MUTATE=refusedaddwipes. */
+function redrawAddsKeep(lid){
+  const keep={};
+  ['af_title_','af_price_','af_cycother_','af_months_','af_code_'].forEach(p=>{
+    const e=document.getElementById(p+lid); if(e)keep[p+lid]=e.value;
+  });
+  redrawAdds(lid);
+  Object.entries(keep).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v});
 }
 function openAdd(lid){ADDOPEN[lid]=1;ADDERR[lid]='';redrawAdds(lid)}
 function cancelAdd(lid){ADDOPEN[lid]=0;ADDERR[lid]='';redrawAdds(lid)}
@@ -1522,15 +1659,15 @@ let addBusy=false;
 async function submitAdd(lid,kind){
   if(addBusy)return;
   const c=card(lid);
-  const cap=capReason(c); if(cap){ADDERR[lid]=cap;redrawAdds(lid);return}
+  const cap=capReason(c); if(cap){ADDERR[lid]=cap;redrawAddsKeep(lid);return}
   const v=readAdd(lid,kind);
   // Checked here only so he gets the answer instantly. The server runs the same
   // rules and its refusal is the one that counts.
   const problem=addProblem(kind,v);
-  if(problem){ADDERR[lid]=problem;redrawAdds(lid);return}
+  if(problem){ADDERR[lid]=problem;redrawAddsKeep(lid);return}
   if(JSON.stringify(v).length>MAX_ADD_CHARS){
     ADDERR[lid]='That is too long to add here. Please shorten it, or tell us the details directly.';
-    redrawAdds(lid);return;
+    redrawAddsKeep(lid);return;
   }
   addBusy=true; setSave('saving');
   try{
@@ -1559,7 +1696,7 @@ async function submitAdd(lid,kind){
       : e.message;
     setSave('idle');
   }finally{ addBusy=false; }
-  rebuild(lid);paintPill(lid);updProg();redrawAdds(lid);
+  rebuild(lid);paintPill(lid);updProg();redrawAddsKeep(lid);
 }
 /* A HARD DELETE on the server: no tombstone and no emptied row left behind on a
    "needs creating" list for a human to puzzle over. Nothing leaves the page until
@@ -1580,7 +1717,7 @@ async function removeAddition(lid,id){
       ? 'You look offline, so we could not take that off the list yet. It is still on it.'
       : e.message);
   }finally{ addBusy=false; }
-  rebuild(lid);paintPill(lid);updProg();redrawAdds(lid);
+  rebuild(lid);paintPill(lid);updProg();redrawAddsKeep(lid);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

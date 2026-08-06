@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
 import { applyFee, feeLabel, resolveFee } from "../_fees.js";
+import { cleanAppliesTo } from "../_coupon-guardrails.js";
 import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 // Reads ALL live Stripe subs/products/charges (paginated) + an AI call — the
 // default ~10s function timeout is not enough, which surfaces as "Failed to
@@ -95,7 +96,9 @@ async function fetchLiveSubs(stripeAccount) {
 
 // Product names can't be expanded inline (depth limit), so fetch them once and
 // map id → name. One or two list calls for a typical academy.
-async function fetchProductNames(stripeAccount) {
+// Exported (2026-08-06) for the workbook rehearsal's live-Stripe read: reusing
+// this one pass is the non-fork answer to naming the prices it finds.
+export async function fetchProductNames(stripeAccount) {
   const map = {};
   let startingAfter = null;
   for (let page = 0; page < 10; page++) {
@@ -292,10 +295,25 @@ function _termFromLength(s) {
 // safe: it either lists the fee key (deliberate) or it does not (excluded).
 // Only an UNRESTRICTED code is still dangerous, because Stripe applies it to
 // every line on the first invoice, the fee included.
-function hasUnrestrictedDiscountCodes(offer) {
+//
+// Answers the ARRAY of offending code strings rather than a boolean, because
+// the withhold this gate produces used to live only in a console.warn - a
+// server log nobody reviewing the workbook ever reads - and the report that
+// replaced it (buildOfferTargetsReport) has to NAME the codes so a human can go
+// fix the right one instead of hunting.
+function unrestrictedCodes(offer) {
   const codes = (offer.data && offer.data.pricing && offer.data.pricing.discount_codes) || [];
-  return codes.some(c => c && String(c.code || "").trim() && !c.archived
-    && !(Array.isArray(c.applies_to) && c.applies_to.filter(Boolean).length));
+  // cleanAppliesTo (api/_coupon-guardrails.js) is the ONE emptiness rule: a
+  // whitespace-only key must read as unrestricted HERE exactly the way the
+  // Stripe coupon builder reads it, or the fee withhold and the coupon scope
+  // disagree about the same code.
+  return codes
+    .filter(c => c && String(c.code || "").trim() && !c.archived
+      && !cleanAppliesTo(c.applies_to).length)
+    .map(c => String(c.code).trim());
+}
+function hasUnrestrictedDiscountCodes(offer) {
+  return unrestrictedCodes(offer).length > 0;
 }
 
 function signupFeeChargedAnywhere(off) {
@@ -317,13 +335,22 @@ function signupFeeChargedAnywhere(off) {
 // Target shape: { key, offer_id, offering, term, base_cents, allin_cents,
 // fee_label, label } - unchanged by the term-vocabulary opening (new lengths
 // just produce new `<n>_months` term values inside the same shape).
-export async function buildOfferTargets(clientId) {
+//
+// buildOfferTargetsReport is the same build, answering { targets,
+// withheld_signup_fees } instead of the bare array. It exists because the
+// RISK 4 gate below used to withhold a plan's joining fee from the targets
+// with nothing but a console.warn: the rehearsal then showed one fewer target
+// than the page promised and NOTHING anywhere said why. A withhold is a
+// decision about money, so it travels as DATA, named per plan and per code.
+// buildOfferTargets stays as the thin wrapper so nothing downstream re-keys.
+export async function buildOfferTargetsReport(clientId) {
   const [offers, taxRows] = await Promise.all([
     sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,type,data`).then(r => r || []),
     sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=tax_config&limit=1`).catch(() => []),
   ]);
   const taxConfig = (Array.isArray(taxRows) && taxRows[0] && taxRows[0].tax_config) || null;
   const targets = [];
+  const withheld_signup_fees = [];
   const cents = n => Math.round(n * 100);
   for (const o of offers) {
     const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
@@ -366,7 +393,18 @@ export async function buildOfferTargets(clientId) {
       // declares its applies_to list is safe and does not block the fee.
       const feeAmt = parseFloat(off.signup_fee);
       if (!isNaN(feeAmt) && feeAmt > 0 && signupFeeChargedAnywhere(off) && hasUnrestrictedDiscountCodes(o)) {
+        // The warn stays for the server log; the ENTRY below is what a human
+        // actually sees, because it rides the apply response into staff review.
         console.warn(`[signup-fee] skipped for offer ${o.id} (${title}): this academy has a discount code with no "applies to" list, which would also discount the fee. Set what each code applies to first.`);
+        const because = unrestrictedCodes(o);
+        withheld_signup_fees.push({
+          key: `${title}|signup_fee`,
+          offer_id: o.id,
+          offering: title,
+          amount_cents: cents(feeAmt),
+          because_codes: because,
+          reason: `The ${title} joining fee was left out of the mint targets: discount code "${because[0]}" has no applies-to list, and an unrestricted code discounts every line on the first invoice, the fee included. Set what the code applies to, then rerun.`,
+        });
       } else if (!isNaN(feeAmt) && feeAmt > 0 && signupFeeChargedAnywhere(off)) {
         const feeTax = resolveFee({ taxConfig, taxable: off.signup_fee_taxable, legacyText: null });
         targets.push({ key: `${title}|signup_fee`, offer_id: o.id, offering: title, term: "signup_fee",
@@ -375,7 +413,11 @@ export async function buildOfferTargets(clientId) {
       }
     }
   }
-  return targets;
+  return { targets, withheld_signup_fees };
+}
+
+export async function buildOfferTargets(clientId) {
+  return (await buildOfferTargetsReport(clientId)).targets;
 }
 
 async function handler(req, res) {

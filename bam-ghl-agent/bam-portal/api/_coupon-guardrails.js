@@ -22,6 +22,17 @@ const COUPON_CURRENCY = "cad";
 const isPercent = (kind) => /percent|%/i.test(String(kind || ""));
 const normCode = (s) => String(s || "").trim().toUpperCase();
 
+// The ONE definition of applies-to emptiness. `[" "]` and `["\t"]` are not a
+// smaller discount: a key nobody can type into a chip restricts nothing. Every
+// reader of applies_to (couponAppliesToKeys here, looseCodesIn in
+// api/workbook.js, unrestrictedCodes in api/offers/match-prices.js) and the
+// apply-side write translator (tStrArray in api/workbook.js) go through this
+// function, so "empty" cannot mean different things to the guard that refuses
+// a confirm and the builder that scopes the Stripe coupon.
+// MUTATE=blankkeysrestrict (in the gates that pin those readers).
+const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.map((k) => String(k == null ? "" : k).trim()).filter(Boolean) : []);
+
 // Map a duration value that may be a machine token ("once"/"repeating"/"forever")
 // OR a friendly offer-builder label ("First payment only" / "A set number of
 // months" / "Every payment") to the machine token.
@@ -156,10 +167,8 @@ function stripeCouponBody(raw, productIds) {
 // so every code written before Build C keeps its current behaviour untouched.
 // A non-empty list means only those keys, and nothing else, ever.
 function couponAppliesToKeys(raw = {}) {
-  const v = raw.applies_to;
-  if (!Array.isArray(v)) return null;              // null = applies to everything
-  const keys = v.map(k => String(k || "").trim()).filter(Boolean);
-  return keys.length ? keys : null;
+  const keys = cleanAppliesTo(raw.applies_to);     // the ONE emptiness rule, above
+  return keys.length ? keys : null;                // null = applies to everything
 }
 
 // Does this code cover a given offer_price_key? Used by checkout to decide
@@ -212,6 +221,7 @@ export {
   isExpired,
   stripeCouponBody,
   stripePromoBody,
+  cleanAppliesTo,
   couponAppliesToKeys,
   couponCoversKey,
   couponFromPromo,
