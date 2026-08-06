@@ -169,8 +169,11 @@
 // proof in CI, which runs every name and greps for the banner):
 //   seeduntrimmed -> 4 failures (the padded, whitespace-only and newline/tab
 //                    mapper pins, and the tAgeStrOrEmpty round trip)
-//   codesunmintable -> 6 failures (measured 2026-08-06, D1 fix pass: the codes
-//                    mint section's accept/mint/target/twin/new-index pins)
+//   codesunmintable -> 7 failures (measured 2026-08-06, D1 fix pass: the codes
+//                    mint section's accept/mint/target/twin/new-index pins;
+//                    was 6 until the D3 confirm-guard section's fill-then-
+//                    confirm joined the same door - re-measured in the full
+//                    closeout sweep, same date)
 //   codesmintany  -> 4 failures (measured 2026-08-06, D1 fix pass: the five
 //                    byte-for-byte refusals minus the plan-card one, which
 //                    mintableOn still refuses on its own)

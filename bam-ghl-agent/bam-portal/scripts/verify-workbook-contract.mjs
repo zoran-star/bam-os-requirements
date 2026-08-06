@@ -175,11 +175,12 @@
  * withheld fee report, Variant A codes guard, confirmed-no tax, registration
  * number, duration scope sentence, every-card-counts, live-Stripe dry run,
  * fee-line truth, Other-cadence follow-up, stale-note clear, approve-card
- * vocabulary, per-plan age bands). Unmutated ALL PASS (174 assertions;
+ * vocabulary, per-plan age bands). Unmutated ALL PASS (181 assertions;
  * was 148 before the Step 12 age sections D3/G/H4 joined, 161 before the
- * R3 pagination pin, 167 before the 2026-08-06 D1 fix pass added section F5 -
- * the header previously said 162 while the run printed 167; the recorded
- * total had drifted and is trued up here).
+ * R3 pagination pin, 167 before the 2026-08-06 D1-D4 fix pass - the header
+ * previously said 162 while the run printed 167; the recorded total had
+ * drifted and is trued up here. That pass took it 167 -> 174 (F5, D1) ->
+ * 176 (D3) -> 179 (F6, D2) -> 181 (D4)).
  * typingisapproving -> 18 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 10, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -196,7 +197,9 @@
  * serverconfirmsuntargeted -> 2 (measured 2026-08-06, D3 fix pass: F5's
  * direct-API refusal and byte-identity pins; the same pin catches 2 in
  * api/_workbook.test.mjs), noisnull -> 3, taxregnowhere -> 16,
- * firstbillalways -> 1, feelineflat -> 4, othernofollowup -> 3,
+ * firstbillalways -> 1, feelineflat -> 4, othernofollowup -> 4 (was 3;
+ * gained one when section F6 joined - re-measured in the 2026-08-06 closeout
+ * sweep),
  * agesunknownfield -> 19, agenotegone -> 1 (taxregnowhere and
  * agesunknownfield each gained one catch on 2026-08-06 when the remediation
  * sections joined; re-measured in the full sweep that date),
@@ -209,8 +212,11 @@
  * codesunmintable -> 5 (measured 2026-08-06, D1 fix pass: section F5's
  * save/mint/target/keys/confirm pins - the live defect reproduced end to
  * end; the same pin catches 6 in api/_workbook.test.mjs),
- * codesmintany -> 1 (measured 2026-08-06, D1 fix pass: F5's byte-for-byte
- * codes.0.hacker refusal; the same pin catches 4 in api/_workbook.test.mjs),
+ * codesmintany -> 3 (measured 2026-08-06, D1 fix pass; was 1 until the D4
+ * banner pins joined F5 - with the allowlist gutted, codes.0.hacker MINTS,
+ * the page's flush succeeds, and both failure-banner assertions trip too;
+ * re-measured in the full closeout sweep, same date; the same pin catches 4
+ * in api/_workbook.test.mjs),
  * refusedaddwipes -> 6 (measured 2026-08-06, D2 fix pass: F6's survive and
  * succeed-with-preserved-values pins plus F4's carry-across and its
  * downstream follow-up pins - the wipe breaks the F4 flow too, which is why
