@@ -468,6 +468,16 @@ function sameShape(a,v){
   const ref=has(a.current_value)?a.current_value:a.proposed;
   if(typeof ref==='string'&&typeof v==='number')return String(v);
   if(typeof ref==='number'&&typeof v==='string'&&v.trim()!==''&&isFinite(+v))return +v;
+  /* CASE, for the same reason as type. The offer stores vocabulary lowercase
+     ("waive"); this page's chip lists are capitalised ("Waive"); idxOf matches
+     case-insensitively so the right chip is already lit. Pressing the chip that
+     is ALREADY SELECTED then wrote "Waive" over "waive", and the API compares
+     with === - so a click that changed nothing was recorded as a money change
+     for staff to adjudicate, and on an approved card it retired the confirm.
+     Found by scripts/verify-workbook-contract.mjs, which is the only thing that
+     can see it: each half is self-consistent and they disagree with each other.
+     Choosing a DIFFERENT chip still differs after this and is still recorded. */
+  if(typeof ref==='string'&&typeof v==='string'&&v!==ref&&v.trim().toLowerCase()===ref.trim().toLowerCase())return ref;
   return v;
 }
 function ansOf(c,field){return (c.answers||[]).find(a=>a.target_field===field)}
