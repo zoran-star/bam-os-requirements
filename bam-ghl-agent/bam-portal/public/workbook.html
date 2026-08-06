@@ -900,7 +900,10 @@ async function confirmCard(lid){
        contract harness asserts it - so a direct POST cannot walk past the
        rule this page promises. The Step 1 withhold report stays as the
        backstop for a code that somehow arrives untargeted anyway. */
-    const untargeted=(MODEL[lid]||[]).find(x=>String(x.code).trim()&&!(x.applies&&x.applies.length));
+    /* Emptiness here is the SERVER's rule (cleanAppliesTo): a list of
+       whitespace-only keys restricts nothing, so it must read untargeted on
+       this side too or the server's refusal arrives as a surprise alert. */
+    const untargeted=(MODEL[lid]||[]).find(x=>String(x.code).trim()&&!(x.applies||[]).some(k=>String(k).trim()));
     if(untargeted){alert('Say what '+untargeted.code+' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');return}
   }
   // Confirm after the edits it is confirming, never before, or the server would

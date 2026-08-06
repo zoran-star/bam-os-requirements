@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "./_sentry.js";
 import { assertHeaderSafeCredential, safeFetch } from "./_header-safe-credential.js";
+import { cleanAppliesTo } from "./_coupon-guardrails.js";
 import { randomBytes } from "node:crypto";
 
 // Vercel Serverless Function - THE OWNER-FACING WORKBOOK, and the only surface
@@ -183,7 +184,10 @@ function looseCodesIn(mine) {
   const out = [];
   for (const [i, c] of byIdx) {
     const code = String(c.code == null ? "" : c.code).trim();
-    const applies = Array.isArray(c.applies_to) ? c.applies_to.filter(Boolean) : [];
+    // cleanAppliesTo is the ONE emptiness rule (api/_coupon-guardrails.js):
+    // `[" "]` reads as targeted to a raw filter but as EVERYTHING to the Stripe
+    // coupon builder, and the two reading differently is the hole this closes.
+    const applies = cleanAppliesTo(c.applies_to);
     if (code && !applies.length) out.push({ index: +i, code });
   }
   return out;
@@ -1455,8 +1459,15 @@ const tYesNoBool = (v) => {
   if (s === "no" || s === "false") return tOk(false);
   return tErr(`expected yes or no: ${JSON.stringify(v)}`);
 };
+// The stored list is CANONICALIZED through the shared emptiness rule: a
+// whitespace-only key would read "restricted" to a raw length check while the
+// Stripe coupon builder (couponAppliesToKeys) trims it away and scopes the
+// coupon to EVERYTHING - so no whitespace key may ever reach the offer jsonb.
+// This is depth behind the readers, not the wall: the confirm guard runs on
+// `answered` values that were never translated, so the readers share
+// cleanAppliesTo regardless. Non-string entries keep the existing refusal.
 const tStrArray = (v) =>
-  (Array.isArray(v) && v.every((x) => typeof x === "string") ? tOk(v) : tErr("expected a list of price keys"));
+  (Array.isArray(v) && v.every((x) => typeof x === "string") ? tOk(cleanAppliesTo(v)) : tErr("expected a list of price keys"));
 // Plan ages are STRINGS ("9", "12", "" = no bound) - the byte-identical
 // encoding offers.data.schedule.classes already uses (api/_offer-class-ages
 // .test.mjs pins it), so nothing downstream ever has to ask which shape a

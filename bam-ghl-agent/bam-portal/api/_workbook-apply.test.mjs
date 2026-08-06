@@ -166,6 +166,16 @@
 //       CODE_T.duration_months goes back to the unbounded tIntOrNull, so a
 //       discount code claiming 0 or 25 billing months - months this build can
 //       never sell - lands in the offer jsonb with ok:true.
+//   MUTATE=blankkeysrestrict  node api/_workbook-apply.test.mjs
+//       cleanAppliesTo (api/_coupon-guardrails.js) stops trimming, so
+//       `applies_to: [" "]` reads as a RESTRICTION to unrestrictedCodes - the
+//       joining-fee withhold never fires - while couponAppliesToKeys still
+//       trims it to "everything" for the Stripe coupon, and tStrArray lets
+//       the whitespace key land in the offer jsonb. Section 15b is what has
+//       to catch it. Pins the guardrails module (two mutant copies, wired
+//       above the module import); the SAME pin is carried by
+//       api/_coupon-guardrails.test.mjs, api/_workbook.test.mjs and
+//       scripts/verify-workbook-contract.mjs.
 //
 // A pin that no longer matches api/workbook.js reports NEGATIVE CONTROL FAILED
 // rather than passing quietly. A control run exits ZERO when the mutation IS
@@ -193,6 +203,13 @@
 //                       refusals; also pinned in
 //                       scripts/verify-workbook-contract.mjs, where section J's
 //                       real-page 25 catches 3)
+//   blankkeysrestrict -> 4 failures (measured 2026-08-06, whitespace pass:
+//                       section 15b's withhold-fires and no-fee-target pins on
+//                       the poisoned offer, plus the cleaned-list-lands and
+//                       withholds-out-loud pins on the answered [" "]. Catches
+//                       elsewhere: 4 in api/_coupon-guardrails.test.mjs, 2 in
+//                       api/_workbook.test.mjs, 2 in
+//                       scripts/verify-workbook-contract.mjs)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -506,9 +523,26 @@ const AGENOTEGONE = [[
   `    ...(wroteAges ? { age_note: "Plan ages were stored on the offer for later use. Nothing reads plan ages yet: class age routing still reads the class list, so no routing changed." } : {}),`,
   `    // (control agenotegone) the note is gone`]];
 
+// The ONE emptiness rule (cleanAppliesTo, api/_coupon-guardrails.js) loses its
+// trim, so `applies_to: [" "]` reads as a RESTRICTION to unrestrictedCodes and
+// the joining-fee withhold never fires - while couponAppliesToKeys still trims
+// it to "everything" for the Stripe coupon. The pinned line lives in the
+// guardrails module, so this control writes a mutant guardrails copy plus a
+// mutant match-prices copy that imports it, and repoints the workbook copy's
+// two imports at them (below). The SAME pin is carried by
+// api/_coupon-guardrails.test.mjs, api/_workbook.test.mjs and
+// scripts/verify-workbook-contract.mjs.
+const BLANKKEYSRESTRICT = [
+  [`import { cleanAppliesTo } from "./_coupon-guardrails.js";`,
+   `import { cleanAppliesTo } from "./.mutant-coupon-guardrails.js";   // (control blankkeysrestrict)`],
+  [`await import("./offers/match-prices.js")`,
+   `await import("./offers/.mutant-match-prices.js")`],
+];
+
 const EDITS = {
   applybeforereview: APPLYBEFOREREVIEW,
   feewithheldsilently: FEEWITHHELDSILENTLY,
+  blankkeysrestrict: BLANKKEYSRESTRICT,
   noisnull: NOISNULL,
   taxregnowhere: TAXREGNOWHERE,
   stripequietfail: STRIPEQUIETFAIL,
@@ -543,6 +577,39 @@ const EDITS = {
 const edits = MUTATE
   ? (EDITS[MUTATE] || (() => { controlBroken = `unknown control MUTATE=${MUTATE}`; throw new Error(controlBroken); })())
   : [];
+
+// ── the guardrails half of blankkeysrestrict, BEFORE any module import ───────
+// The pin is the one line that IS the emptiness rule. Two mutant copies are
+// written: the guardrails module with the trim reverted, and a match-prices
+// copy whose guardrails import points at it (so unrestrictedCodes on the
+// apply path really runs the mutant, not the real rule).
+if (MUTATE === "blankkeysrestrict") {
+  const G_PIN = [
+    `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.map((k) => String(k == null ? "" : k).trim()).filter(Boolean) : []);`,
+    `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.filter(Boolean) : []);   // (control blankkeysrestrict) raw values, no trim`];
+  let gSrc = fs.readFileSync(path.join(HERE, "_coupon-guardrails.js"), "utf8");
+  if (!gSrc.includes(G_PIN[0])) {
+    controlBroken = `MUTATE=blankkeysrestrict is pinned to text that is no longer in api/_coupon-guardrails.js:\n\n${G_PIN[0]}\n\nRe-point it or delete it - a pin that fails to apply looks exactly like a check that passed.`;
+    throw new Error(controlBroken);
+  }
+  const gCopy = path.join(HERE, ".mutant-coupon-guardrails.js");
+  fs.writeFileSync(gCopy, gSrc.split(G_PIN[0]).join(G_PIN[1]));
+  tmpFiles.push(gCopy);
+
+  const MP_PIN = [
+    `import { cleanAppliesTo } from "../_coupon-guardrails.js";`,
+    `import { cleanAppliesTo } from "../.mutant-coupon-guardrails.js";   // (control blankkeysrestrict)`];
+  let mpSrc = fs.readFileSync(path.join(HERE, "offers", "match-prices.js"), "utf8");
+  if (!mpSrc.includes(MP_PIN[0])) {
+    controlBroken = `MUTATE=blankkeysrestrict is pinned to an import that is no longer in api/offers/match-prices.js:\n\n${MP_PIN[0]}\n\nRe-point it or delete it.`;
+    throw new Error(controlBroken);
+  }
+  const mpCopy = path.join(HERE, "offers", ".mutant-match-prices.js");
+  fs.writeFileSync(mpCopy, mpSrc.split(MP_PIN[0]).join(MP_PIN[1]));
+  tmpFiles.push(mpCopy);
+}
 if (!sentryOk) console.log("  (note) @sentry/node is not installed here, so the copy under test has its _sentry import replaced by an identity wrapper. Nothing else is changed. NOTE: apply's phase-3 preview imports match-prices.js, whose chain also needs node_modules - expect it to refuse here.");
 const modulePath = (!MUTATE && sentryOk)
   ? path.join(HERE, "workbook.js")
@@ -837,9 +904,13 @@ const WB = await import(pathToFileURL(modulePath).href);
 // fails", and you cannot answer it against an import that works. MUTATE=lateload
 // moves the load back to where it used to be, and this copy is where that shows
 // up as tax and offer writes that landed before the refusal.
+// Any control pin that already repoints the match-prices import (only
+// blankkeysrestrict today) is dropped for THIS copy: the whole point of the
+// noload copy is that the price machinery cannot load, and which mutant fails
+// to load is not part of any claim.
 const noloadEdits = [
   ...(sentryOk ? [] : [[SENTRY_IMPORT, SENTRY_STUB]]),
-  ...edits,
+  ...edits.filter(([find]) => !find.includes(`import("./offers/match-prices.js")`)),
   [`await import("./offers/match-prices.js")`, `await import("./offers/no-such-price-machinery.js")`],
 ];
 const WB_NOLOAD = await import(pathToFileURL(copyWith(noloadEdits, ".mutant-workbook-noload.js")).href);
@@ -1487,6 +1558,73 @@ console.log("\n── 15. a withheld joining fee is DATA in the response, not a 
     `and withholds nothing - the EMPTY ARRAY, never null, because "nothing withheld" is a claim this run actually checked (saw ${JSON.stringify(wh2)})`);
   ok(r2.body.phase3.targets.some((t) => t.key === "Elementary Academy|signup_fee"),
     "while the fee target is present in the targets");
+  reset();
+}
+
+console.log("\n── 15b. a whitespace-only applies_to is UNRESTRICTED, everywhere it is read ──");
+{
+  // The adversarial finding (2026-08-06): `[" "]` read as a restriction to raw
+  // length checks while couponAppliesToKeys trimmed it to null = EVERYTHING,
+  // so the fee withhold stayed quiet about a coupon Stripe would apply to the
+  // joining fee. cleanAppliesTo (api/_coupon-guardrails.js) is now the ONE
+  // emptiness rule. MUTATE=blankkeysrestrict.
+  //
+  // ── the reader: an offer already holding the poisoned list ────────────────
+  // The shape a direct POST could have left before the write-side
+  // canonicalization existed; the workbook's own applies answer is removed so
+  // apply cannot repair it on the way through.
+  reset();
+  approveAll();
+  row("offers", "off1").data.pricing.discount_codes = [{ code: "club", kind: "Dollar off", value: "100", applies_to: [" "] }];
+  DB.workbook_answers = DB.workbook_answers.filter((a) => a.id !== "a-code-applies");
+  addAnswer("c-ele", "signup_fee", "40", { current_value: "40" });
+  addAnswer("c-ele", "signup_fee_on_base", "charge", { current_value: "charge" });
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const wh = r.body.phase3 && r.body.phase3.withheld_signup_fees;
+  const wh0 = (Array.isArray(wh) && wh[0]) || {};
+  ok(r.body.ok === true && Array.isArray(wh) && wh.length === 1
+    && Array.isArray(wh0.because_codes) && wh0.because_codes.includes("club"),
+    `hasUnrestrictedDiscountCodes reads applies_to [" "] as UNRESTRICTED - the withhold fires, because_codes ${JSON.stringify(wh0.because_codes)}`);
+  ok(Array.isArray(r.body.phase3 && r.body.phase3.targets) && !r.body.phase3.targets.some((t) => String(t.key).endsWith("|signup_fee")),
+    "and no |signup_fee key reaches the targets - a key nobody can type into a chip restricts nothing");
+  reset();
+
+  // ── the writer: an answered [" "] can no longer LAND in the offer ─────────
+  // tStrArray canonicalizes through the same shared rule, so the stored list
+  // is the cleaned list and the three readers plus the stored value agree.
+  reset();
+  approveAll();
+  row("workbook_answers", "a-code-applies").answered = [" "];
+  addAnswer("c-ele", "signup_fee", "40", { current_value: "40" });
+  addAnswer("c-ele", "signup_fee_on_base", "charge", { current_value: "charge" });
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const stored = ((row("offers", "off1").data.pricing.discount_codes || [])[0]) || {};
+  const wh2 = r2.body.phase3 && r2.body.phase3.withheld_signup_fees;
+  ok(r2.body.ok === true && JSON.stringify(stored.applies_to) === JSON.stringify([]),
+    `an answered [" "] lands in the offer as the CLEANED empty list (saw ${JSON.stringify(stored.applies_to)}), never as a whitespace key`);
+  ok(Array.isArray(wh2) && wh2.length === 1,
+    "so the same apply withholds the fee out loud rather than shipping a scope nobody chose");
+  reset();
+
+  // ── the whitespace-only code NAME is no code, all the way down ────────────
+  // Review's loose-code warning does not name it, nothing is withheld for it,
+  // and the fee target mints - the same reading looseCodesIn, the page and the
+  // coupon-mint path share (the mint skip is pinned in
+  // api/_coupon-guardrails.test.mjs).
+  reset();
+  approveAll();
+  row("workbook_answers", "a-code-code").answered = "   ";
+  DB.workbook_answers = DB.workbook_answers.filter((a) => a.id !== "a-code-applies");
+  addAnswer("c-ele", "signup_fee", "40", { current_value: "40" });
+  addAnswer("c-ele", "signup_fee_on_base", "charge", { current_value: "charge" });
+  const rev3 = await staffPost({ action: "review", workbook_id: "wb1" });
+  ok(Array.isArray(rev3.body.warnings) && rev3.body.warnings.length === 0,
+    "review's loose-code warning does not name a code whose name trims blank - it is no code");
+  const r3 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const wh3 = r3.body.phase3 && r3.body.phase3.withheld_signup_fees;
+  ok(r3.body.ok === true && Array.isArray(wh3) && wh3.length === 0
+    && r3.body.phase3.targets.some((t) => t.key === "Elementary Academy|signup_fee"),
+    "and apply withholds nothing for it - the fee target mints, because a nameless code can never reach Stripe");
   reset();
 }
 

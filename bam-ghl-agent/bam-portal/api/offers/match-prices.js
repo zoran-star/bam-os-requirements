@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
 import { applyFee, feeLabel, resolveFee } from "../_fees.js";
+import { cleanAppliesTo } from "../_coupon-guardrails.js";
 import { stripeFetch as transportStripeFetch } from "../_stripe-transport.js";
 // Reads ALL live Stripe subs/products/charges (paginated) + an AI call — the
 // default ~10s function timeout is not enough, which surfaces as "Failed to
@@ -302,9 +303,13 @@ function _termFromLength(s) {
 // fix the right one instead of hunting.
 function unrestrictedCodes(offer) {
   const codes = (offer.data && offer.data.pricing && offer.data.pricing.discount_codes) || [];
+  // cleanAppliesTo (api/_coupon-guardrails.js) is the ONE emptiness rule: a
+  // whitespace-only key must read as unrestricted HERE exactly the way the
+  // Stripe coupon builder reads it, or the fee withhold and the coupon scope
+  // disagree about the same code.
   return codes
     .filter(c => c && String(c.code || "").trim() && !c.archived
-      && !(Array.isArray(c.applies_to) && c.applies_to.filter(Boolean).length))
+      && !cleanAppliesTo(c.applies_to).length)
     .map(c => String(c.code).trim());
 }
 function hasUnrestrictedDiscountCodes(offer) {

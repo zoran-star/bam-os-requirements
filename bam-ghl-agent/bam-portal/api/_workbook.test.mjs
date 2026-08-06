@@ -146,9 +146,18 @@
 //       materialises it as `answered`, and the apply-side translator then
 //       rightly refuses " 9" - a refusal manufactured by our own seed. This
 //       control pins scripts/seed-sj-age-rows.mjs, not api/workbook.js.
+//   MUTATE=blankkeysrestrict   node api/_workbook.test.mjs
+//       cleanAppliesTo (api/_coupon-guardrails.js) stops trimming - raw
+//       `.filter(Boolean)` - so `[" "]` reads as a restriction to the confirm
+//       guard while the Stripe coupon builder still trims it to "everything":
+//       the direct-POST hole exactly as the adversarial tester found it. This
+//       control pins api/_coupon-guardrails.js (the workbook copy under test
+//       imports a mutant guardrails copy); the SAME pin is carried by
+//       api/_coupon-guardrails.test.mjs, api/_workbook-apply.test.mjs and
+//       scripts/verify-workbook-contract.mjs.
 //
-// TWENTY-FIVE controls: twenty-four over the route in three families, plus the
-// seed-side seeduntrimmed above. The route's: PRODUCT rules (partialsubmit,
+// TWENTY-SIX controls: twenty-four over the route in three families, plus the
+// seed-side seeduntrimmed and the guardrails-side blankkeysrestrict above. The route's: PRODUCT rules (partialsubmit,
 // confirmblind, confirmnomaterialize, submittededitable, echoacts, orphanmint,
 // metawritable, dropnulls, addconfirmed, ghostremove, blankadd,
 // serverconfirmsuntargeted), DISCLOSURE AND
@@ -169,16 +178,24 @@
 // proof in CI, which runs every name and greps for the banner):
 //   seeduntrimmed -> 4 failures (the padded, whitespace-only and newline/tab
 //                    mapper pins, and the tAgeStrOrEmpty round trip)
-//   codesunmintable -> 7 failures (measured 2026-08-06, D1 fix pass: the codes
-//                    mint section's accept/mint/target/twin/new-index pins;
-//                    was 6 until the D3 confirm-guard section's fill-then-
-//                    confirm joined the same door - re-measured in the full
-//                    closeout sweep, same date)
+//   codesunmintable -> 13 failures (re-measured 2026-08-06, whitespace pass:
+//                    was 7 after the D1/D3 sections; the confirm-guard part-2
+//                    battery's six null-id saves go through the same mint
+//                    door, so its five shape pins and the padded-key pin all
+//                    trip too)
 //   codesmintany  -> 4 failures (measured 2026-08-06, D1 fix pass: the five
 //                    byte-for-byte refusals minus the plan-card one, which
 //                    mintableOn still refuses on its own)
-//   serverconfirmsuntargeted -> 2 failures (measured 2026-08-06, D3 fix pass:
-//                    the verbatim 400 refusal and the no-half-stamped-card pin)
+//   serverconfirmsuntargeted -> 7 failures (re-measured 2026-08-06, whitespace
+//                    pass: was 2; the confirm-guard part-2 battery's five
+//                    verbatim refusals run through the same D3 guard)
+//   blankkeysrestrict -> 2 failures (measured 2026-08-06, whitespace pass: the
+//                    [" "] and ["\t"] battery iterations - the raw filter
+//                    reads them as targeted, so the confirm goes through and
+//                    both verbatim-refusal pins trip. Catches elsewhere: 4 in
+//                    api/_coupon-guardrails.test.mjs, 4 in
+//                    api/_workbook-apply.test.mjs, 2 in
+//                    scripts/verify-workbook-contract.mjs)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -515,6 +532,14 @@ const OTHERNOFOLLOWUP = [[
   `    : String(v.billing_cycle || "") === "Other" && !str(v.billing_cycle_other) ? "Please say how often this plan bills before adding it." : ""),`,
   `    : ""),   // (control othernofollowup) the follow-up requirement is gone`]];
 
+// MUTATE=blankkeysrestrict  the ONE emptiness rule loses its trim. The pinned
+// line lives in api/_coupon-guardrails.js, so the control writes a mutant
+// guardrails copy (below) and the workbook copy under test imports THAT - the
+// same two-file shape seeduntrimmed uses for the seed mapper.
+const BLANKKEYSRESTRICT = [[
+  `import { cleanAppliesTo } from "./_coupon-guardrails.js";`,
+  `import { cleanAppliesTo } from "./.mutant-coupon-guardrails.js";   // (control blankkeysrestrict)`]];
+
 const EDITS = {
   partialsubmit: PARTIALSUBMIT, confirmblind: CONFIRMBLIND,
   confirmnomaterialize: CONFIRMNOMATERIALIZE, submittededitable: SUBMITTEDEDITABLE,
@@ -529,8 +554,32 @@ const EDITS = {
   serverconfirmsuntargeted: SERVERCONFIRMSUNTARGETED,
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
+  blankkeysrestrict: BLANKKEYSRESTRICT,   // + a mutant _coupon-guardrails.js copy, written below
   seeduntrimmed: [],   // pins scripts/seed-sj-age-rows.mjs, not workbook.js - see below
 };
+
+// ── the guardrails half of blankkeysrestrict, BEFORE the module import ───────
+// The pin is the one line that IS the emptiness rule; a copy of the module
+// with that line reverted is what the workbook copy above imports.
+const GUARDRAILS_PATH = path.join(HERE, "_coupon-guardrails.js");
+const GUARDRAILS_PIN = [[
+  `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.map((k) => String(k == null ? "" : k).trim()).filter(Boolean) : []);`,
+  `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.filter(Boolean) : []);   // (control blankkeysrestrict) raw values, no trim`]];
+if (MUTATE === "blankkeysrestrict") {
+  let gSrc = fs.readFileSync(GUARDRAILS_PATH, "utf8");
+  for (const [find, repl] of GUARDRAILS_PIN) {
+    if (!gSrc.includes(find)) {
+      controlBroken = `MUTATE=blankkeysrestrict is pinned to text that is no longer in api/_coupon-guardrails.js:\n\n${find}\n\nRe-point it or delete it - a pin that fails to apply looks exactly like a check that passed.`;
+      throw new Error(controlBroken);
+    }
+    gSrc = gSrc.split(find).join(repl);
+  }
+  const gCopy = path.join(HERE, ".mutant-coupon-guardrails.js");
+  fs.writeFileSync(gCopy, gSrc);
+  tmpFiles.push(gCopy);
+}
 
 const edits = MUTATE
   ? (EDITS[MUTATE] || (() => { controlBroken = `unknown control MUTATE=${MUTATE}`; throw new Error(controlBroken); })())
@@ -1739,6 +1788,61 @@ console.log("\n── the codes confirm guard: a named code must say what it app
   const r3 = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
   ok(r3.status === 200 && r3.body.ok === true && !!row("workbook_cards", "c-codes").confirmed_at,
     "a codes card with no named code still confirms - 'no codes' is an answer");
+  reset();
+}
+
+console.log("\n── the codes confirm guard, part 2: a whitespace key restricts nothing ──");
+{
+  // The adversarial finding (2026-08-06): `applies_to: [" "]` read as targeted
+  // to the guards' raw length checks while couponAppliesToKeys trimmed it to
+  // null = EVERYTHING - so a direct POST could confirm a code the Stripe
+  // builder would scope to every line of the first invoice, the joining fee
+  // included. cleanAppliesTo (api/_coupon-guardrails.js) is now the ONE
+  // emptiness rule for every reader. MUTATE=blankkeysrestrict.
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  let seedAt = 0;
+  const codeRow = (field, proposed) => DB.workbook_answers.push({
+    id: "a-code-" + (++seedAt), workbook_id: "wb1", card_id: "c-codes", client_id: "sj",
+    target_kind: "price_row", target_table: "offers", target_id: "off1",
+    target_field: field, current_value: null, proposed: proposed === undefined ? null : proposed,
+    answered: null, applied_at: null, created_at: `2026-08-04T00:01:0${seedAt}Z`,
+  });
+  codeRow("codes.0.code", "SIBLING10");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  codeRow("codes.0.duration", "Every payment");
+  codeRow("codes.0.once_per_customer", "yes");
+
+  // The tester's exact battery, as a loop: every shape that is EMPTY once the
+  // shared rule reads it must refuse the confirm 400, sentence verbatim.
+  const WANT = 'Say what SIBLING10 applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".';
+  for (const shape of [[], [""], [" "], ["\t"], ""]) {
+    const s = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: shape }] });
+    const r = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+    ok(s.body.ok === true && r.status === 400 && r.body.ok === false && r.body.error === WANT && !row("workbook_cards", "c-codes").confirmed_at,
+      `applies_to ${JSON.stringify(shape)} saves but the confirm refuses 400, sentence verbatim ("${r.body.error}")`);
+  }
+
+  // Trim must never over-refuse: a PADDED REAL KEY is a real key.
+  const padded = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: ["  Academy 2x/week|monthly  "] }] });
+  const okPadded = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(padded.body.ok === true && okPadded.status === 200 && okPadded.body.ok === true && !!row("workbook_cards", "c-codes").confirmed_at,
+    'a padded real key ["  Academy 2x/week|monthly  "] confirms - the trim refuses whitespace, never keys');
+
+  // And the whitespace-only code NAME resolves as NO CODE: nothing is loose,
+  // so the confirm goes through - the same reading looseCodesIn, the page and
+  // unrestrictedCodes all share (the coupon-mint path skips it too, pinned in
+  // api/_coupon-guardrails.test.mjs).
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  seedAt = 0;
+  codeRow("codes.0.code", "   ");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  const rName = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(rName.status === 200 && rName.body.ok === true && !!row("workbook_cards", "c-codes").confirmed_at,
+    'a code NAMED "   " with an answered value and no applies_to still confirms - a name that trims blank IS no code, so nothing is loose and no warning would name it');
   reset();
 }
 

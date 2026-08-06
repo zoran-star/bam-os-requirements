@@ -170,17 +170,22 @@
  *       the unbounded tIntOrNull, so the 25 months section J types on the
  *       real page reviews clean and applies with ok:true - a claim about
  *       billing months this build can never sell.
+ *   MUTATE=blankkeysrestrict        API (via api/_coupon-guardrails.js). The
+ *       shared emptiness rule loses its trim, so a direct POST of
+ *       `applies_to: [" "]` confirms on the server while the page promised a
+ *       refusal - the coupon it scopes still applying to EVERYTHING. F7.
  *
  * Measured 2026-08-06, after the full rehearsal-round-1 build (Steps 1-12:
  * withheld fee report, Variant A codes guard, confirmed-no tax, registration
  * number, duration scope sentence, every-card-counts, live-Stripe dry run,
  * fee-line truth, Other-cadence follow-up, stale-note clear, approve-card
- * vocabulary, per-plan age bands). Unmutated ALL PASS (181 assertions;
+ * vocabulary, per-plan age bands). Unmutated ALL PASS (184 assertions;
  * was 148 before the Step 12 age sections D3/G/H4 joined, 161 before the
  * R3 pagination pin, 167 before the 2026-08-06 D1-D4 fix pass - the header
  * previously said 162 while the run printed 167; the recorded total had
  * drifted and is trued up here. That pass took it 167 -> 174 (F5, D1) ->
- * 176 (D3) -> 179 (F6, D2) -> 181 (D4)).
+ * 176 (D3) -> 179 (F6, D2) -> 181 (D4); the 2026-08-06 whitespace pass took
+ * it 181 -> 184 (F7)).
  * typingisapproving -> 18 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 10, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -188,15 +193,18 @@
  * reviewshowsuntranslated -> 1, staffgateoff -> 5, refusalnamescount -> 1,
  * applyreopensediting -> 3, rollbackleavesoffers -> 1,
  * rollbackclearsanswers -> 2, taxneverlands -> 5, feewithheldsilently -> 1,
- * confirmuntargetedcode -> 1 (RE-MEASURED 2026-08-06, D3 fix pass: was 2;
- * with the server guard in place a page whose own guard is deleted now has
- * its confirm REFUSED by the server in the same sentence, so F3's original
- * two checks pass and the catch is F5's byte-identity assertion - the page
- * relays the server sentence prefixed with "We could not save that
- * confirmation.", which is not the page's own promised alert),
- * serverconfirmsuntargeted -> 2 (measured 2026-08-06, D3 fix pass: F5's
- * direct-API refusal and byte-identity pins; the same pin catches 2 in
- * api/_workbook.test.mjs), noisnull -> 3, taxregnowhere -> 16,
+ * confirmuntargetedcode -> 3 (RE-MEASURED 2026-08-06, whitespace pass: was 1
+ * after the D3 fix pass - with the server guard in place a page whose own
+ * guard is deleted has its confirm REFUSED by the server in the same
+ * sentence, so F3's original two checks pass and the catch was F5's
+ * byte-identity assertion, the page relaying the server sentence prefixed
+ * with "We could not save that confirmation.", which is not the page's own
+ * promised alert; F7's before-any-network and byte-identity pins then
+ * joined the same door and catch 2 more),
+ * serverconfirmsuntargeted -> 4 (RE-MEASURED 2026-08-06, whitespace pass:
+ * was 2 - F5's direct-API refusal and byte-identity pins; F7's direct-API
+ * refusal and byte-identity pins joined the same guard; the same pin
+ * catches 7 in api/_workbook.test.mjs), noisnull -> 3, taxregnowhere -> 16,
  * firstbillalways -> 1, feelineflat -> 4, othernofollowup -> 4 (was 3;
  * gained one when section F6 joined - re-measured in the 2026-08-06 closeout
  * sweep),
@@ -222,7 +230,13 @@
  * downstream follow-up pins - the wipe breaks the F4 flow too, which is why
  * both probe cleanups are guarded so the banner still prints),
  * bannerblamesadds -> 2 (measured 2026-08-06, D4 fix pass: section A's and
- * F5's names-the-field banner pins).
+ * F5's names-the-field banner pins),
+ * blankkeysrestrict -> 2 (measured 2026-08-06, whitespace pass: F7's
+ * direct-API refusal and byte-identity pins - the page's own inline guard
+ * still refuses, so the catch is the server accepting what the page
+ * promised it would refuse; the same pin catches 4 in
+ * api/_coupon-guardrails.test.mjs, 2 in api/_workbook.test.mjs and 4 in
+ * api/_workbook-apply.test.mjs).
  * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
  * flow never submits an inverted band because the page guard refuses it in
  * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
@@ -529,6 +543,18 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   othernofollowup: [[
     `    : String(v.billing_cycle || "") === "Other" && !str(v.billing_cycle_other) ? "Please say how often this plan bills before adding it." : ""),`,
     `    : ""),   // (control othernofollowup) the follow-up requirement is gone`]],
+  // The ONE emptiness rule (cleanAppliesTo, api/_coupon-guardrails.js) loses
+  // its trim, so a direct POST of `applies_to: [" "]` confirms on the server
+  // while the page promised a refusal - the adversarial finding exactly as it
+  // shipped. The pinned line lives in the guardrails module: this entry
+  // repoints the workbook copy's import at a mutant guardrails copy the
+  // harness writes below. Section F7's direct-refusal and byte-identity pins
+  // are what have to catch it. The SAME pin is carried by
+  // api/_coupon-guardrails.test.mjs, api/_workbook.test.mjs and
+  // api/_workbook-apply.test.mjs.
+  blankkeysrestrict: [[
+    `import { cleanAppliesTo } from "./_coupon-guardrails.js";`,
+    `import { cleanAppliesTo } from "./.mutant-contract-guardrails.js";   // (control blankkeysrestrict)`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -1105,6 +1131,21 @@ const SENTRY_STUB = 'const withSentryApiRoute = (h) => h; // (contract suite) @s
 if (!sentryOk) console.log("  (note) @sentry/node is not installed here, so the copy under test has its _sentry import replaced by an identity wrapper. Nothing else about api/workbook.js is changed.\n");
 
 let modulePath = API;
+// The guardrails half of blankkeysrestrict: the pinned line IS the emptiness
+// rule and lives in api/_coupon-guardrails.js, so a mutant copy is written for
+// the (also-pinned) workbook import above to point at.
+if (MUTATE === "blankkeysrestrict") {
+  const G_PATH = path.join(ROOT, "api", "_coupon-guardrails.js");
+  const gMutant = applyPins(fs.readFileSync(G_PATH, "utf8"), [[
+    `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.map((k) => String(k == null ? "" : k).trim()).filter(Boolean) : []);`,
+    `const cleanAppliesTo = (v) =>
+  (Array.isArray(v) ? v.filter(Boolean) : []);   // (control blankkeysrestrict) raw values, no trim`]],
+  "api/_coupon-guardrails.js");
+  const gCopy = path.join(ROOT, "api", ".mutant-contract-guardrails.js");
+  fs.writeFileSync(gCopy, gMutant);
+  tmp.push(gCopy);
+}
 if (!sentryOk || API_CONTROLS[MUTATE]) {
   let src = fs.readFileSync(API, "utf8");
   if (API_CONTROLS[MUTATE]) {
@@ -1832,6 +1873,41 @@ console.log("\n── F3. a code with no stated targets cannot be confirmed ─�
     "an every-payment code says every bill, not the hardcoded first-bill claim");
   check(/including the joining fee on the first one/.test(said),
     "while the fee clause still claims only the first invoice - the fee never recurs");
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F7. THE WHITESPACE KEY: applies-to emptiness is ONE rule on both halves
+// (Step 1, 2026-08-06 whitespace remediation). `[" "]` is byte-reachable by a
+// direct POST, and it used to read TARGETED to the guards' raw length checks
+// while couponAppliesToKeys trimmed it to "everything" for the Stripe coupon.
+// Both halves now read it through the same emptiness rule (the page inline,
+// the server via cleanAppliesTo), refusing in ONE sentence.
+// MUTATE=blankkeysrestrict.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F7. a whitespace-only applies_to reads untargeted on both halves ──");
+{
+  const codesLid = lidOf("codes");
+  await type("codes", "codes.0.applies_to", [" "]);
+  // The page refuses at the deliberate act, BEFORE any network: no confirm
+  // call may leave the page.
+  const confirmsBefore = API_CALLS.filter((c) => c.body && c.body.action === "confirm").length;
+  ALERTS = [];
+  await page.confirmCard(codesLid);
+  await settle();
+  const confirmsAfter = API_CALLS.filter((c) => c.body && c.body.action === "confirm").length;
+  check(ALERTS.length === 1 && confirmsAfter === confirmsBefore && !cardOf("codes").confirmed_at,
+    `the page reads [" "] as untargeted and refuses before any network ("${ALERTS[0]}")`);
+  // And the server, POSTed directly the way the tester did, refuses the same
+  // confirm - in the byte-identical sentence the page just promised.
+  const refusedWs = await callApi({ action: "confirm", card_key: "codes" });
+  check(refusedWs.ok === false && !dbCard("c-codes").confirmed_at,
+    `a direct API confirm of the whitespace-keyed code is refused, card unconfirmed ("${refusedWs.error}")`);
+  check(ALERTS[0] === refusedWs.error,
+    "and the two refusals are BYTE-IDENTICAL - one sentence, two doors");
+  // Put the card back the way F3 left it, so the gate below reads the state
+  // it always did.
+  page.applyEverything(codesLid, 0);
+  TIMERS.clear(); await page.flushAll(); await settle();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
