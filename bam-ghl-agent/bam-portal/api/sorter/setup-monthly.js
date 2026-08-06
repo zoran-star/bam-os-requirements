@@ -70,11 +70,16 @@ function monthlyKeyOf(key) {
   const title = String(key || "").split("|")[0];
   return title ? `${title}|monthly` : null;
 }
+// Months from the key's term suffix. Parsed, not substring-matched, since the
+// vocabulary opened to any <n>_months (2026-08-06): includes("3_month") would
+// have read a 13_months or 23_months prepaid as THREE months and anchored the
+// monthly billing ten-plus months early. 3/6/12 answer identically to before.
 function termMonths(key) {
-  const t = String(key || "").toLowerCase();
-  if (t.includes("3_month")) return 3;
-  if (t.includes("6_month")) return 6;
-  if (t.includes("12_month") || t.includes("year")) return 12;
+  const parts = String(key || "").toLowerCase().split("|");
+  const t = (parts.length > 1 ? parts[1] : parts[0] || "").trim();
+  const m = /^(\d+)_months?$/.exec(t);
+  if (m && +m[1] >= 1 && +m[1] <= 24) return +m[1];
+  if (t.includes("year")) return 12;
   return 1;
 }
 

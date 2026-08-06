@@ -11,6 +11,18 @@ session that APPLIES them (Zoran, locally, via the Supabase CLI).
 row here in the same commit as the migration.** Remote sessions can never
 apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
+## ✅ APPLIED 2026-08-06 by MEMBER MANAGEMENT III
+
+`20260806T063000_workbook_apply.sql` - three additive columns for the workbook review-and-apply flow, applied via Supabase MCP and **read back verified**: `workbooks.snapshot jsonb`, `workbook_cards.approved_at timestamptz`, `workbook_cards.approved_by uuid`.
+
+`snapshot` is the photograph taken before apply touches anything. Phase 3 is irreversible - a Stripe price can be archived, never deleted - so the before-state of the offer jsonb, `clients.tax_config` and the client's `offer_prices` rows is stored first, and it is the only way back. Written first-wins via a conditional filter, so a second apply can never re-photograph the post-write state and call it "before".
+
+`approved_at`/`approved_by` are the STAFF half of the two confirmations. The owner's deliberate act is `confirmed_at`; staff's is `approved_at`. Deliberately separate columns because they are different people answering different questions - "this is what I sell" versus "apply this to the live system" - and the apply gate reads `approved_at` exactly the way the submit gate reads `confirmed_at`.
+
+The route degrades where these are absent: review still answers, and approve/apply/rollback refuse with a sentence naming this migration rather than 500ing.
+
+**Ledger row added late.** An adversarial pass caught that the migration file claimed prod-applied with no row here, which `bam-portal/CLAUDE.md` requires in the same commit, so `/pending-sql` would never have surfaced it.
+
 ## ✅ APPLIED 2026-08-05 by MEMBER MANAGEMENT III
 
 `20260805T003000_workbook_extras.sql` - two additive columns found while building the page and API, both applied via Supabase MCP and **read back verified** (`workbook_answers.current_value jsonb`, `workbook_cards.meta jsonb`).

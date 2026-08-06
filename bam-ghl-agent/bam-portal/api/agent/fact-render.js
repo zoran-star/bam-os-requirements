@@ -212,9 +212,23 @@ export const PRICING_NOT_CONFIGURED = [
   "Do not quote any price, range, plan, or discount, and do not estimate one. Tell the lead you will get them exact numbers, and flag the conversation to the admin.",
 ].join("\n");
 
-// offer_prices.billing_interval -> how a human says it.
+// offer_prices.billing_interval -> how a human says it. The three literals stay
+// byte-identical; any other bounded <n>_months interval reads through the
+// helpers below (adjustable prepay lengths, Zoran 2026-08-06) - without them a
+// 9_months row would be READ TO A PARENT as "every 4 weeks", which is a wrong
+// money claim out of the sales agent's mouth.
 const INTERVAL_LABEL = { "4_weeks": "every 4 weeks", "3_months": "3 months prepaid", "6_months": "6 months prepaid" };
 const TERM_WORDS = { "3_months": "3 month", "6_months": "6 month" };
+const intervalLabelOf = (iv) => {
+  if (INTERVAL_LABEL[iv]) return INTERVAL_LABEL[iv];
+  const m = /^(\d+)_months$/.exec(String(iv || ""));
+  return m ? `${m[1]} months prepaid` : null;
+};
+const termWordOf = (term) => {
+  if (TERM_WORDS[term]) return TERM_WORDS[term];
+  const m = /^(\d+)_months$/.exec(String(term || ""));
+  return m ? `${m[1]} month` : null;
+};
 // Cents -> "$226.00" / "$315.27". Always two decimals: once a price is stated as
 // a stack of parts ("Plan $200.00 + HST 13% $26.00 = TOTAL $226.00"), a bare
 // "$226" next to "$26.00" reads as a different kind of number. Consistent cents
@@ -227,12 +241,20 @@ const fromCents = (c) => {
 };
 // Mirrors termFromLength in api/website/offer.js: a commitment's free-text
 // length ("3 Months (12 Weeks)", "24 Weeks") -> the term key in offer_price_key.
+// OPENED ADDITIVELY (2026-08-06): any whole 1-24 month count is its own
+// `<n>_months` key; the old n>=6 collapse made a 12-month rung quote as a
+// 6-month one. "3 months"/"6 months"/"12 weeks"/"24 weeks" are byte-identical.
 const termFromLength = (length) => {
   const l = String(length || "").toLowerCase();
   const m = l.match(/(\d+)\s*month/);
-  if (m) { const n = +m[1]; if (n >= 6) return "6_months"; if (n >= 3) return "3_months"; }
-  if (/24\s*week/.test(l)) return "6_months";
-  if (/12\s*week/.test(l)) return "3_months";
+  if (m) { const n = +m[1]; return (n >= 1 && n <= 24) ? `${n}_months` : null; }
+  const w = l.match(/(\d+)\s*week/);
+  if (w) { const n = +w[1]; return (n % 4 === 0 && n / 4 >= 1 && n / 4 <= 24) ? `${n / 4}_months` : null; }
+  const y = l.match(/(\d+)\s*(?:year|yr)/);
+  if (y || /\bannual(?:ly)?\b|\byearly\b/.test(l)) {
+    const n = (y ? +y[1] : 1) * 12;
+    return (n >= 1 && n <= 24) ? `${n}_months` : null;
+  }
   return null;
 };
 
@@ -391,7 +413,7 @@ export function renderPricing(data, prices, taxConfig) {
 
   for (const p of plans.values()) {
     const o = offeringFor(p.title);
-    const base = p.monthly ? `${fromCents(p.monthly.amount_cents)} ${INTERVAL_LABEL[p.monthly.billing_interval] || "every 4 weeks"}` : "prepaid terms only";
+    const base = p.monthly ? `${fromCents(p.monthly.amount_cents)} ${intervalLabelOf(p.monthly.billing_interval) || "every 4 weeks"}` : "prepaid terms only";
     out.push(`- ${p.title}: ${base}.${o.whats_included ? ` ${sentence(o.whats_included)}` : ""}`);
     // The parts of the headline amount, on their own line so the agent can read
     // them out as a stacked receipt. The plan headline keeps the TOTAL, because
@@ -400,7 +422,7 @@ export function renderPricing(data, prices, taxConfig) {
       const c = comp.get(p.monthly);
       flag(p.title, "monthly", c);
       const line = parts(c);
-      if (line) { out.push(`    ${line} ${INTERVAL_LABEL[p.monthly.billing_interval] || "every 4 weeks"}.`); sawParts = true; }
+      if (line) { out.push(`    ${line} ${intervalLabelOf(p.monthly.billing_interval) || "every 4 weeks"}.`); sawParts = true; }
     }
     // The fee is charged once per athlete at enrollment, and only on the
     // options the academy marked "Charge". Say the real starting total so
@@ -417,7 +439,7 @@ export function renderPricing(data, prices, taxConfig) {
       const chargedOnBase = String(o.signup_fee_on_base || "").toLowerCase() === "charge";
       const waived = arr(o.commitments)
         .filter((c) => c && String(c.signup_fee_charge || "").toLowerCase() !== "charge" && termFromLength(c.length))
-        .map((c) => TERM_WORDS[termFromLength(c.length)]).filter(Boolean);
+        .map((c) => termWordOf(termFromLength(c.length))).filter(Boolean);
       // The fee's own tax itemizes exactly like a plan's, from signup_fee_taxable.
       out.push(`    One-time sign-up fee: ${feeParts ? feeParts.replace(/^Plan /, "Fee ") + " " : `${fromCents(feeRow.amount_cents)} `}per athlete, charged once when they enroll.`);
       if (chargedOnBase && p.monthly) {
@@ -429,7 +451,7 @@ export function renderPricing(data, prices, taxConfig) {
       const term = termOf(t);
       const c = arr(o.commitments).find((x) => x && termFromLength(x.length) === term) || {};
       const after = c.after === "Other" ? String(c.after_other || "").trim() : String(c.after || "").trim();
-      const label = INTERVAL_LABEL[t.billing_interval] || term.replace("_", " ");
+      const label = intervalLabelOf(t.billing_interval) || term.replace("_", " ");
       const tc = comp.get(t);
       flag(p.title, term, tc);
       const line = parts(tc);

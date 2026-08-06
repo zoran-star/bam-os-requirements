@@ -87,6 +87,17 @@ export function stripeKey(): string | undefined {
 export function intervalFor(term: string | null | undefined): StripeInterval {
   if (term === "3_months") return { interval: "month", interval_count: 3 };
   if (term === "6_months") return { interval: "month", interval_count: 6 };
+  // Adjustable prepay lengths (Zoran, 2026-08-06): any bounded <n>_months term
+  // bills calendar months, mirroring intervalFor in api/website/checkout.js.
+  // The two branches above stay byte-identical - they are what live members
+  // bill on. Out of range REFUSES LOUDLY: the old week x4 default would charge
+  // a "27_months" member every 4 weeks with no error anywhere.
+  const m = /^(\d+)_months$/.exec(String(term || ""));
+  if (m) {
+    const n = Number(m[1]);
+    if (n >= 1 && n <= 24) return { interval: "month", interval_count: n };
+    throw new StripeFetchError(`term "${term}" is ${n} months, outside the 1-24 month range this build can bill - fix the commitment length on the offer`);
+  }
   return { interval: "week", interval_count: 4 };
 }
 

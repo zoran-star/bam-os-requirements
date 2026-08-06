@@ -109,6 +109,18 @@ function isTestMode() { return isOnboardingTestMode(); }
 function intervalFor(term) {
   if (term === "3_months") return { interval: "month", interval_count: 3 };
   if (term === "6_months") return { interval: "month", interval_count: 6 };
+  // Adjustable prepay lengths (Zoran, 2026-08-06): any bounded <n>_months term
+  // bills calendar months. The two branches above stay byte-identical - they are
+  // the shapes every live academy bills on today. An out-of-range <n>_months
+  // REFUSES LOUDLY: billing a "27_months" key as week x4 (the old default)
+  // would be a silent wrong charge, and no such key can be minted, so reaching
+  // this throw means the data is broken and a human must look.
+  const nm = /^(\d+)_months$/.exec(String(term || ""));
+  if (nm) {
+    const n = +nm[1];
+    if (n >= 1 && n <= 24) return { interval: "month", interval_count: n };
+    throw new Error(`term "${term}" is ${n} months, outside the 1-24 month range this build can bill - fix the commitment length on the offer`);
+  }
   return { interval: "week", interval_count: 4 };
 }
 
@@ -225,6 +237,8 @@ function money(cents, currency) {
   if (cents == null) return "";
   return `$${(cents / 100).toFixed(2)} ${String(currency || "cad").toUpperCase()}`;
 }
+// The three live nouns stay literal; any other bounded <n>_months term reads
+// "every n months" at the use site (adjustable prepay lengths, 2026-08-06).
 const TERM_NOUN = { "4_weeks": "every 4 weeks", "3_months": "every 3 months", "6_months": "every 6 months" };
 
 // ── Commitment → revert-to-monthly (billing schedule) ──────────────────────
@@ -237,11 +251,26 @@ const TERM_NOUN = { "4_weeks": "every 4 weeks", "3_months": "every 3 months", "6
 // phase1 = committed ×1 iteration → phase2 = monthly, then release). If anything
 // here is uncertain we return null → plain sub (today's behavior), never a wrong
 // revert. LIVE money: conservative by design.
-const COMMITMENT_TERMS = new Set(["3_months", "6_months"]);
+// A commitment term is any bounded <n>_months key (adjustable prepay lengths,
+// Zoran 2026-08-06). The old closed Set(["3_months","6_months"]) meant a
+// 9-month commitment could never revert to monthly; the bound matches
+// intervalFor's, so what can revert is exactly what can bill.
+function isCommitmentTerm(term) {
+  const m = /^(\d+)_months$/.exec(String(term || ""));
+  return !!m && +m[1] >= 1 && +m[1] <= 24;
+}
 function lengthMatchesTerm(length, term) {
   const s = norm(length);
   if (term === "3_months") return /(^|[^0-9])3\s*month/.test(s) || /12\s*week/.test(s);
   if (term === "6_months") return /(^|[^0-9])6\s*month/.test(s) || /24\s*week/.test(s);
+  // Adjustable prepay lengths: an <n>_months term matches "<n> month..." or the
+  // week notation of the same span ("<n*4> week..."). The two branches above
+  // stay byte-identical for the live vocabulary.
+  const m = /^(\d+)_months$/.exec(String(term || ""));
+  if (m) {
+    const n = +m[1];
+    return new RegExp(`(^|[^0-9])${n}\\s*month`).test(s) || new RegExp(`(^|[^0-9])${n * 4}\\s*week`).test(s);
+  }
   return false;
 }
 // Does the option the parent picked actually charge this plan's sign-up fee?
@@ -266,17 +295,40 @@ async function signupFeeAppliesTo({ clientId, offerId, planText, term }) {
 
 // Free-text commitment length -> the term key used in offer_price_key.
 // Mirrors termFromLength in api/website/offer.js and api/agent/fact-render.js.
+// OPENED ADDITIVELY (Zoran, 2026-08-06). The old body collapsed: n >= 6 became
+// "6_months", so a "12 months" commitment was quietly billed and labelled as a
+// SIX month one, and n < 3 vanished. Now any whole 1-24 month count is its own
+// `<n>_months` key ("3 months"/"6 months"/"12 weeks"/"24 weeks" still produce
+// byte-identical keys to before); out of range refuses loudly instead of
+// collapsing. Same vocabulary as _termFromLength in offers/match-prices.js.
 function _termKeyFromLength(length) {
   const l = String(length || "").toLowerCase();
   const m = l.match(/(\d+)\s*month/);
-  if (m) { const n = +m[1]; if (n >= 6) return "6_months"; if (n >= 3) return "3_months"; }
-  if (/24\s*week/.test(l)) return "6_months";
-  if (/12\s*week/.test(l)) return "3_months";
+  if (m) {
+    const n = +m[1];
+    if (n >= 1 && n <= 24) return `${n}_months`;
+    console.warn(`[website/checkout] commitment length "${length}" reads as ${n} months, outside the 1-24 month range this build can sell - it matches NO term`);
+    return null;
+  }
+  const w = l.match(/(\d+)\s*week/);
+  if (w) {
+    const n = +w[1];
+    if (n % 4 === 0 && n / 4 >= 1 && n / 4 <= 24) return `${n / 4}_months`;
+    console.warn(`[website/checkout] commitment length "${length}" reads as ${n} weeks, which does not map to a whole 1-24 month term - it matches NO term`);
+    return null;
+  }
+  const y = l.match(/(\d+)\s*(?:year|yr)/);
+  if (y || /\bannual(?:ly)?\b|\byearly\b/.test(l)) {
+    const n = (y ? +y[1] : 1) * 12;
+    if (n >= 1 && n <= 24) return `${n}_months`;
+    console.warn(`[website/checkout] commitment length "${length}" reads as ${n} months, outside the 1-24 month range this build can sell - it matches NO term`);
+    return null;
+  }
   return null;
 }
 
 async function resolveCommitmentRevert({ clientId, offerId, planText, term }) {
-  if (!COMMITMENT_TERMS.has(term)) return null;
+  if (!isCommitmentTerm(term)) return null;
   // 1) Confirm the offer's commitment for this plan+term reverts to monthly.
   let offerRows = null;
   try { offerRows = await sb(`offers?id=eq.${encodeURIComponent(offerId)}&select=data&limit=1`); } catch { return null; }
@@ -883,7 +935,7 @@ async function maybeAttachAgreement({ member, client, parentName, athleteName, p
     const bytes = await renderAgreementPdf({
       academyName: client.business_name || "By Any Means",
       parentName, athleteName, planLabel: planText,
-      priceText: `${money(price.amount_cents, price.currency)} ${TERM_NOUN[term] || ""}`.trim(),
+      priceText: `${money(price.amount_cents, price.currency)} ${TERM_NOUN[term] || (/^\d+_months$/.test(String(term || "")) ? `every ${String(term).replace("_", " ")}` : "")}`.trim(),
       signaturePngDataUrl: agreement.signature,
       signedAtIso: signedAt,
       terms: signedDoc ? signedDoc.terms : null,

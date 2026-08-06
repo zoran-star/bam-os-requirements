@@ -705,7 +705,16 @@ function priceKeys(){
     const p=MODEL[c.lid];
     if(!p||p.archived||p.type!==0||!p.title||!(p.price>0))return;
     out.push(p.title+'|monthly');
-    liveRungs(p).forEach(r=>{const mo=monthsOf(r.len);if(mo===3)out.push(p.title+'|3_months');else if(mo===6)out.push(p.title+'|6_months')});
+    /* Any month count, matching the now-open server vocabulary [<n>_months,
+       1..24]. This used to emit only 3_months and 6_months, so a discount code
+       could not be scoped to a 9-month rung the owner had just added - the rung
+       existed, the key generator pretended it did not. Out-of-range counts are
+       skipped here exactly because the server refuses them loudly at apply time;
+       a key this page offers must be one the machinery can honour. A 1-month
+       rung emits 1_months, matching the server's _termFromLength exactly - the
+       base plan's own 'monthly' key is a different thing (the base price, not a
+       commitment) and the server keeps the two distinct, so this page must too. */
+    liveRungs(p).forEach(r=>{const mo=monthsOf(r.len);if(mo>=1&&mo<=24)out.push(p.title+'|'+mo+'_months')});
     if(p.fee===1)out.push(p.title+'|signup_fee');
   });
   return [...new Set(out)];

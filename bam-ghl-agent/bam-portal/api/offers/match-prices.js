@@ -242,10 +242,43 @@ async function aiMatch(targets, prices) {
 }
 
 // Term from a free-text commitment length ("12 Weeks (3 Months)" → 3_months).
+//
+// OPENED ADDITIVELY (Zoran's ruling, 2026-08-06): prepay lengths are adjustable,
+// not locked to 3 and 6 months. Any whole month count 1-24 now yields a
+// `<n>_months` key; "3 months" and "6 months" still yield the byte-identical
+// keys every live academy's stored data uses, so nothing existing re-keys.
+// Weeks map to whole months (12 weeks -> 3_months, exactly as before); years
+// map to 12x months ("1 year" -> 12_months, which used to yield NO key and
+// silently drop the rung from everything downstream). A length outside the
+// range REFUSES LOUDLY instead of collapsing - the old code turned "12 months"
+// into a 6_months key, which mis-billed by six months with no error anywhere.
+// Mirrored in checkout.js _termKeyFromLength / offer.js termFromLength /
+// fact-render.js termFromLength / client-portal.html _bbTermFromLength;
+// api/_term-vocab.test.mjs fails if the copies ever disagree.
+const TERM_MAX_MONTHS = 24;
 function _termFromLength(s) {
   const t = String(s || "").toLowerCase();
-  if (/3\s*month/.test(t) || /\b12\s*week/.test(t)) return "3_months";
-  if (/6\s*month/.test(t) || /\b24\s*week/.test(t)) return "6_months";
+  const m = t.match(/(\d+)\s*month/);
+  if (m) {
+    const n = +m[1];
+    if (n >= 1 && n <= TERM_MAX_MONTHS) return `${n}_months`;
+    console.warn(`[term-vocab] commitment length "${s}" reads as ${n} months, outside the 1-${TERM_MAX_MONTHS} month range this build can sell - this option gets NO price key until the length is fixed`);
+    return null;
+  }
+  const w = t.match(/(\d+)\s*week/);
+  if (w) {
+    const n = +w[1];
+    if (n % 4 === 0 && n / 4 >= 1 && n / 4 <= TERM_MAX_MONTHS) return `${n / 4}_months`;
+    console.warn(`[term-vocab] commitment length "${s}" reads as ${n} weeks, which does not map to a whole 1-${TERM_MAX_MONTHS} month term - this option gets NO price key until the length is fixed`);
+    return null;
+  }
+  const y = t.match(/(\d+)\s*(?:year|yr)/);
+  if (y || /\bannual(?:ly)?\b|\byearly\b/.test(t)) {
+    const n = (y ? +y[1] : 1) * 12;
+    if (n >= 1 && n <= TERM_MAX_MONTHS) return `${n}_months`;
+    console.warn(`[term-vocab] commitment length "${s}" reads as ${n} months, outside the 1-${TERM_MAX_MONTHS} month range this build can sell - this option gets NO price key until the length is fixed`);
+    return null;
+  }
   return null;
 }
 
@@ -278,7 +311,13 @@ function signupFeeChargedAnywhere(off) {
 // (clients.tax_config) with per-row taxable yes/no, falling back to the legacy
 // free-text "added fees" strings for academies with no template. Nothing is
 // added automatically for an academy with neither.
-async function buildOfferTargets(clientId) {
+// Exported for api/workbook.js (coordinator-relayed, 2026-08-06): its apply
+// dry-run reports which targets would be minted, and importing this one
+// function is the non-fork answer. Named export only; behavior unchanged.
+// Target shape: { key, offer_id, offering, term, base_cents, allin_cents,
+// fee_label, label } - unchanged by the term-vocabulary opening (new lengths
+// just produce new `<n>_months` term values inside the same shape).
+export async function buildOfferTargets(clientId) {
   const [offers, taxRows] = await Promise.all([
     sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,type,data`).then(r => r || []),
     sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=tax_config&limit=1`).catch(() => []),
@@ -383,6 +422,10 @@ async function handler(req, res) {
         if (t === "monthly" || t === "4_weeks") return "4_weeks";
         if (t === "3_months" || t === "6_months" || t === "one_time") return t;
         if (t === "signup_fee") return "one_time";   // Build S: the fee is a one-time price
+        // Adjustable prepay lengths (2026-08-06): any bounded <n>_months term IS
+        // its own interval label. 3/6 already returned above, byte-identically.
+        const m = /^(\d+)_months$/.exec(t);
+        if (m && +m[1] >= 1 && +m[1] <= TERM_MAX_MONTHS) return t;
         return null;
       };
       const results = [];

@@ -77,11 +77,20 @@ const iso = (unix) => (unix ? new Date(unix * 1000).toISOString().slice(0, 10) :
 // the AI only explains/sanity-checks it, never decides.
 // Academy's offer-price options (for the "add to an offer price" dropdown).
 const _HST = 1.13;
+// ALIGNED to _termFromLength in offers/match-prices.js (2026-08-06): any whole
+// 1-24 month count, weeks in whole-month multiples, years x12. "12 months" and
+// "1 year" still key 12_months as before; 3/6 byte-identical.
 function _termFromLen(len) {
   const s = String(len || "").toLowerCase();
-  if (/3\s*month|12\s*week/.test(s)) return "3_months";
-  if (/6\s*month|24\s*week/.test(s)) return "6_months";
-  if (/12\s*month|year|52\s*week/.test(s)) return "12_months";
+  const m = s.match(/(\d+)\s*month/);
+  if (m) { const n = +m[1]; return (n >= 1 && n <= 24) ? `${n}_months` : null; }
+  const w = s.match(/(\d+)\s*week/);
+  if (w) { const n = +w[1]; return (n % 4 === 0 && n / 4 >= 1 && n / 4 <= 24) ? `${n / 4}_months` : null; }
+  const y = s.match(/(\d+)\s*(?:year|yr)/);
+  if (y || /\bannual(?:ly)?\b|\byearly\b/.test(s)) {
+    const n = (y ? +y[1] : 1) * 12;
+    return (n >= 1 && n <= 24) ? `${n}_months` : null;
+  }
   return null;
 }
 async function buildTargets(clientId) {

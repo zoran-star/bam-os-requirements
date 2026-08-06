@@ -266,11 +266,24 @@ function baseSourceFor(offerings, title, term) {
 
 // "3 months" -> "3_months". Same normalisation offer_prices' source_offer_price_key
 // carries, so a commitment matches the catalog row that was minted from it.
+// ALIGNED to _termFromLength in offers/match-prices.js (2026-08-06): the old
+// strict `^N units$` regex missed San Jose's real labels ("3 Months (12 Weeks)"
+// normalised to "3_months_(12_weeks)" and matched nothing), so those receipts
+// could never find their commitment row. Weeks fold to whole months and years
+// x12, exactly like every other parser of this vocabulary.
 function termFromLength(len) {
   const s = String(len || "").trim().toLowerCase();
   if (!s) return "";
-  const m = /^(\d+)\s*(week|month|year)s?$/.exec(s);
-  return m ? `${m[1]}_${m[2]}s` : s.replace(/\s+/g, "_");
+  const m = s.match(/(\d+)\s*month/);
+  if (m) { const n = +m[1]; return (n >= 1 && n <= 24) ? `${n}_months` : ""; }
+  const w = s.match(/(\d+)\s*week/);
+  if (w) { const n = +w[1]; return (n % 4 === 0 && n / 4 >= 1 && n / 4 <= 24) ? `${n / 4}_months` : ""; }
+  const y = s.match(/(\d+)\s*(?:year|yr)/);
+  if (y || /\bannual(?:ly)?\b|\byearly\b/.test(s)) {
+    const n = (y ? +y[1] : 1) * 12;
+    return (n >= 1 && n <= 24) ? `${n}_months` : "";
+  }
+  return "";
 }
 
 // What the tax line is CALLED. The academy's template names it ("HST 13%") when the

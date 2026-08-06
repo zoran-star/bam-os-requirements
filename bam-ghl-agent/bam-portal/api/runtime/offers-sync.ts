@@ -169,6 +169,11 @@ export function billingIntervalOf(row: Pick<CatalogRow, "offer_price_key" | "int
   if (term === "6_months") return "6_months";
   if (term === "one_time") return "one_time";
   if (term === "signup_fee") return "one_time";   // Build S: sign-up fee row
+  // Adjustable prepay lengths (2026-08-06): any bounded <n>_months term IS its
+  // own billing_interval - checkout's intervalFor reads it directly. 3/6
+  // already returned above, byte-identically.
+  const nm = /^(\d+)_months$/.exec(term);
+  if (nm && Number(nm[1]) >= 1 && Number(nm[1]) <= 24) return term;
   return row.interval;
 }
 
@@ -350,6 +355,11 @@ export function buildSyncPlan(args: {
     if (term === "monthly") return 1;
     if (term === "3_months") return 2;
     if (term === "6_months") return 3;
+    // Adjustable prepay lengths (2026-08-06): other <n>_months rungs sort after
+    // the legacy trio, ascending by length. The three literals keep their exact
+    // values so no existing row's sort_order is rewritten by a sync.
+    const nm = /^(\d+)_months$/.exec(term);
+    if (nm) return 3 + Number(nm[1]);
     return 9;
   };
 
