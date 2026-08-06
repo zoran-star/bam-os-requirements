@@ -147,12 +147,13 @@
 //       rightly refuses " 9" - a refusal manufactured by our own seed. This
 //       control pins scripts/seed-sj-age-rows.mjs, not api/workbook.js.
 //
-// TWENTY-TWO controls: twenty-one over the route in three families, plus the
+// TWENTY-FOUR controls: twenty-three over the route in three families, plus the
 // seed-side seeduntrimmed above. The route's: PRODUCT rules (partialsubmit,
 // confirmblind, confirmnomaterialize, submittededitable, echoacts, orphanmint,
 // metawritable, dropnulls, addconfirmed, ghostremove, blankadd), DISCLOSURE AND
 // BLAST RADIUS (tokenecho, voidreadable, crosscard, rawcredential, noguard,
-// addforeign, payloadtarget, addcap, addsubmitted) and ORDERING (latewrite,
+// addforeign, payloadtarget, addcap, addsubmitted, codesunmintable,
+// codesmintany) and ORDERING (latewrite,
 // and the addition half of it inside section 12). A pin that no longer matches
 // the source reports NEGATIVE CONTROL FAILED rather than passing quietly - which
 // is not theoretical: rewriting a comment on the echo-is-not-an-act line broke
@@ -167,6 +168,11 @@
 // proof in CI, which runs every name and greps for the banner):
 //   seeduntrimmed -> 4 failures (the padded, whitespace-only and newline/tab
 //                    mapper pins, and the tAgeStrOrEmpty round trip)
+//   codesunmintable -> 6 failures (measured 2026-08-06, D1 fix pass: the codes
+//                    mint section's accept/mint/target/twin/new-index pins)
+//   codesmintany  -> 4 failures (measured 2026-08-06, D1 fix pass: the five
+//                    byte-for-byte refusals minus the plan-card one, which
+//                    mintableOn still refuses on its own)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -419,6 +425,21 @@ const BLANKADD = [[
   `    if (false && isAddition(row)) {   // (control blankadd) an addition can be emptied by a save
       const what = String(row.target_field).slice(ADD_PREFIX.length);`]];
 
+// MUTATE=codesunmintable  the codes branch of canMint returns false, which is
+// the fix reverted: the live defect exactly as the dress rehearsal found it. A
+// null-id save of codes.0.applies_to 404s, so the codes card's mandatory
+// applies-to answer has no row to live in and confirm blocks forever.
+const CODESUNMINTABLE = [[
+  `    return cls.kind === "code" && !!cls.t;`,
+  `    return false; // (control codesunmintable) the codes branch is gone - the live SJ defect`]];
+
+// MUTATE=codesmintany  the codes branch stops consulting classifyField and
+// mints ANY field name on the codes card - `hacker`, `constructor`, an
+// unbounded index. The refusal assertions are what has to catch it.
+const CODESMINTANY = [[
+  `    return cls.kind === "code" && !!cls.t;`,
+  `    return true; // (control codesmintany) the allowlist is gutted`]];
+
 // MUTATE=typingisapproving  puts the gate back on the STATE STRING instead of on
 // the deliberate act. This is the defect exactly as it shipped: a card the owner
 // typed into and never confirmed satisfied "every row has to be confirmed", and
@@ -491,6 +512,7 @@ const EDITS = {
   addsubmitted: ADDSUBMITTED, addconfirmed: ADDCONFIRMED, ghostremove: GHOSTREMOVE,
   emptycardsdontcount: EMPTYCARDSDONTCOUNT, countsflag: COUNTSFLAG, addkeepsconfirm: ADDKEEPSCONFIRM,
   othernofollowup: OTHERNOFOLLOWUP,
+  codesunmintable: CODESUNMINTABLE, codesmintany: CODESMINTANY,
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
   seeduntrimmed: [],   // pins scripts/seed-sj-age-rows.mjs, not workbook.js - see below
@@ -1588,6 +1610,76 @@ console.log("\n── the mint whitelist, plan cards: the age question can grow 
   const r3 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "age_min", answered: "9" }] });
   ok(r3.status === 404 && /does not belong to this card/.test(String(r3.body.error)),
     `a null-id save of age_min on the CODES card still refuses with the existing sentence ("${r3.body.error}")`);
+  reset();
+}
+
+console.log("\n── the mint whitelist, codes cards: every CODE_T leaf can grow its row ──");
+{
+  reset();
+  // THE LIVE SAN JOSE BLOCKER (D1): the seed writes 5 rows per code and none
+  // for applies_to / duration_months / expires_at / max_redemptions. The page
+  // saves those with a null id; the exact-string gate refused them, so the
+  // codes card's MANDATORY applies-to answer had nowhere to live and confirm
+  // blocked forever. The fixture here is exactly SJ-shaped: 5 rows for code 0,
+  // targets on the offer.
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  let seedAt = 0;
+  const codeRow = (field, proposed) => DB.workbook_answers.push({
+    id: "a-code-" + (++seedAt), workbook_id: "wb1", card_id: "c-codes", client_id: "sj",
+    target_kind: "price_row", target_table: "offers", target_id: "off1",
+    target_field: field, current_value: null, proposed: proposed === undefined ? null : proposed,
+    answered: null, applied_at: null, created_at: `2026-08-04T00:01:0${seedAt}Z`,
+  });
+  codeRow("codes.0.code", "SIBLING10");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  codeRow("codes.0.duration", "Every payment");
+  codeRow("codes.0.once_per_customer", "yes");
+
+  const sib = DB.workbook_answers.find((a) => a.card_id === "c-codes" && a.target_field === "codes.0.code");
+  const before = DB.workbook_answers.length;
+  const r1 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: ["Academy 2x/week|monthly"], target_table: "workbooks", target_id: "wb2" }] });
+  ok(r1.status === 200 && r1.body.ok === true, "a null-id save of codes.0.applies_to on the codes card is accepted - the exact save that 404'd in production");
+  const minted = DB.workbook_answers.filter((a) => a.card_id === "c-codes" && a.target_field === "codes.0.applies_to");
+  ok(minted.length === 1 && DB.workbook_answers.length === before + 1 && JSON.stringify(minted[0].answered) === JSON.stringify(["Academy 2x/week|monthly"]),
+    `exactly ONE row is minted, carrying the answer (id ${minted[0] && minted[0].id})`);
+  ok(minted.length === 1 && minted[0].target_kind === sib.target_kind && minted[0].target_table === sib.target_table && minted[0].target_id === sib.target_id,
+    `aimed by the codes card's own codes.0.code sibling (${sib.target_kind}/${sib.target_table}/${sib.target_id}) - never by the payload, which named another table`);
+
+  // The save reply carries no answer ids, so the page's next autosave sends
+  // null again: it must land on the SAME row, never mint a twin.
+  const r2 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: [] }] });
+  const again = DB.workbook_answers.filter((a) => a.card_id === "c-codes" && a.target_field === "codes.0.applies_to");
+  ok(r2.body.ok === true && again.length === 1 && again[0].id === minted[0].id && JSON.stringify(again[0].answered) === JSON.stringify([]),
+    `a second null-id save updates the SAME row (${again[0] && again[0].id}), not a twin`);
+
+  // A NEW INDEX: an owner adding a second code needs codes.1.* rows the seed
+  // never wrote. Every CODE_T leaf is mintable, so the new code's fields grow
+  // their rows too, aimed at the same sibling-derived target.
+  const r3 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.1.code", answered: "TEAM20" }] });
+  const r4 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.1.applies_to", answered: ["Academy 2x/week|monthly"] }] });
+  const c1code = DB.workbook_answers.find((a) => a.card_id === "c-codes" && a.target_field === "codes.1.code");
+  const c1app = DB.workbook_answers.find((a) => a.card_id === "c-codes" && a.target_field === "codes.1.applies_to");
+  ok(r3.body.ok === true && r4.body.ok === true && !!c1code && !!c1app && c1code.answered === "TEAM20",
+    `a NEW code index mints too: codes.1.code (id ${c1code && c1code.id}) and codes.1.applies_to (id ${c1app && c1app.id})`);
+  ok(!!c1code && !!c1app && [c1code, c1app].every((a) => a.target_kind === sib.target_kind && a.target_table === sib.target_table && a.target_id === sib.target_id),
+    "both aimed at the same sibling-derived target as code 0");
+
+  // FAIL-CLOSED DID NOT WEAKEN. Everything outside the CODE_T leaves keeps
+  // today's refusal, byte for byte: an unknown leaf, an inherited property, an
+  // index past the bound, a codes field on a plan card, and the unindexed leaf
+  // name on the codes card itself.
+  for (const [key, field] of [
+    ["codes", "codes.0.hacker"],
+    ["codes", "codes.0.constructor"],
+    ["codes", "codes.200000.applies_to"],
+    ["plan:p1", "codes.0.applies_to"],
+    ["codes", "applies_to"],
+  ]) {
+    const r = await post({ token: TOKEN, action: "save", card_key: key, answers: [{ id: null, target_field: field, answered: "x" }] });
+    ok(r.status === 404 && r.body.error === "that answer does not belong to this card",
+      `a null-id save of ${field} on the ${key} card still refuses byte-for-byte ("${r.body.error}")`);
+  }
   reset();
 }
 

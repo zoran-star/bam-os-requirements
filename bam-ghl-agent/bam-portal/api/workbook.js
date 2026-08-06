@@ -223,6 +223,29 @@ function mintableOn(cardKey) {
   return [];
 }
 
+// THE MINT GATE, as a predicate rather than a list, because the codes card's
+// mintable fields are INDEXED (`codes.0.applies_to`, `codes.1.code`, ...) and
+// an exact-string list can never name them. The live San Jose defect: the seed
+// writes 5 rows per code and none for applies_to / duration_months /
+// expires_at / max_redemptions, the page saves those with a null id, and the
+// exact-match gate refused them - so the codes card's MANDATORY applies-to
+// answer had no row to live in and confirm blocked forever. classifyField is
+// reused on purpose: it buys the own-property CODE_T lookup (`constructor` /
+// `__proto__` refuse), the MAX_LIST_INDEX bound, and the `codes.<i>.<leaf>`
+// shape - every leaf it admits is one the apply translator already knows how
+// to judge, and a NEW index (`codes.1.*`) is mintable the moment an owner adds
+// a code. Everything else keeps today's refusal, byte for byte.
+// MUTATE=codesunmintable / MUTATE=codesmintany.
+function canMint(cardKey, field) {
+  if (mintableOn(cardKey).includes(field)) return true;
+  const k = String(cardKey || "");
+  if (k === "codes" || k.startsWith("codes:")) {
+    const cls = classifyField(field);            // hoisted; defined below
+    return cls.kind === "code" && !!cls.t;
+  }
+  return false;
+}
+
 // ── THE CAPS, and why these numbers ─────────────────────────────────────────
 // A no-login link that can create unlimited rows is a denial of service on our
 // own database, written by us, reachable by anyone who ever sees the URL.
@@ -682,7 +705,7 @@ async function doSave(wb, body) {
     // name its own target can aim a write at any row in the database.
     if (!row && (item || {}).id == null) {
       const field = String((item || {}).target_field || "");
-      if (mintableOn(card.card_key).includes(field)) {
+      if (canMint(card.card_key, field)) {
         row = mine.find((a) => a.target_field === field) || null;
         if (!row) {
           const sib = mine.find((a) => !isAddition(a) && a.target_table);

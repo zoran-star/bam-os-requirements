@@ -175,9 +175,11 @@
  * withheld fee report, Variant A codes guard, confirmed-no tax, registration
  * number, duration scope sentence, every-card-counts, live-Stripe dry run,
  * fee-line truth, Other-cadence follow-up, stale-note clear, approve-card
- * vocabulary, per-plan age bands). Unmutated ALL PASS (162 assertions;
+ * vocabulary, per-plan age bands). Unmutated ALL PASS (174 assertions;
  * was 148 before the Step 12 age sections D3/G/H4 joined, 161 before the
- * R3 pagination pin).
+ * R3 pagination pin, 167 before the 2026-08-06 D1 fix pass added section F5 -
+ * the header previously said 162 while the run printed 167; the recorded
+ * total had drifted and is trued up here).
  * typingisapproving -> 18 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 10, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -195,7 +197,12 @@
  * also breaks live in api/_workbook-apply.test.mjs, where the same pin
  * catches 4), monthsunbounded -> 3 (measured 2026-08-06, R4: section J's
  * review refusal, apply refusal and untouched-offer pins; the same pin
- * catches 2 in api/_workbook-apply.test.mjs).
+ * catches 2 in api/_workbook-apply.test.mjs),
+ * codesunmintable -> 5 (measured 2026-08-06, D1 fix pass: section F5's
+ * save/mint/target/keys/confirm pins - the live defect reproduced end to
+ * end; the same pin catches 6 in api/_workbook.test.mjs),
+ * codesmintany -> 1 (measured 2026-08-06, D1 fix pass: F5's byte-for-byte
+ * codes.0.hacker refusal; the same pin catches 4 in api/_workbook.test.mjs).
  * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
  * flow never submits an inverted band because the page guard refuses it in
  * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
@@ -465,6 +472,17 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   onepagestripe: [[
     `      for (let page = 0; page < 10; page++) {   // cap ~1000 prices; an academy past that is a conversation`,
     `      for (let page = 0; page < 1; page++) {    // (control onepagestripe) the first page is the whole truth`]],
+  // The codes branch of canMint returns false - the D1 fix reverted, which IS
+  // the live defect: the Everything chip's null-id save of codes.0.applies_to
+  // 404s and the codes card can never confirm. F5 must reproduce it.
+  codesunmintable: [[
+    `    return cls.kind === "code" && !!cls.t;`,
+    `    return false; // (control codesunmintable) the codes branch is gone - the live SJ defect`]],
+  // The codes branch stops consulting classifyField and mints ANY field name on
+  // the codes card. F5's byte-for-byte refusal of codes.0.hacker has to catch it.
+  codesmintany: [[
+    `    return cls.kind === "code" && !!cls.t;`,
+    `    return true; // (control codesmintany) the allowlist is gutted`]],
   // The server drops the Other-cycle follow-up requirement, so the two halves
   // stop refusing in the same sentence - the page refuses, the API stores the
   // riddle.
@@ -1564,6 +1582,72 @@ console.log("\n── F4. 'something else' asks how often, on both halves ──
   // Take the probe back so the flow's counts stay the fixture's own.
   const probe = page.additionsOf(cardOf("plans")).find((a) => a.answered && a.answered.title === "Skills clinic");
   await page.removeAddition(plansLid, probe.id);
+  await settle();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F5. THE SJ-SHAPED CODES CARD: the missing rows grow back through the page
+// (D1, the deployment blocker). The live San Jose workbook was seeded with 5
+// rows per code and NONE for applies_to / duration_months / expires_at /
+// max_redemptions, so the page's null-id save of the MANDATORY applies-to
+// answer 404'd and confirm blocked forever. Here the fixture is cut down to
+// exactly that shape, a fresh page is booted against it, and the REAL page
+// call that failed in production - the Everything chip's save - must mint the
+// row (aimed by the card's own sibling, never the payload) and confirm must
+// unblock. MUTATE=codesunmintable / MUTATE=codesmintany.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F5. the SJ-shaped codes card grows its missing rows through the page ──");
+{
+  const SPLICED = ["codes.0.applies_to", "codes.0.duration_months", "codes.0.expires_at", "codes.0.max_redemptions"];
+  const snapAnswers = structuredClone(DB.workbook_answers);
+  const snapCards = structuredClone(DB.workbook_cards);
+  DB.workbook_answers = DB.workbook_answers.filter((r) => !(r.card_id === "c-codes" && SPLICED.includes(r.target_field)));
+  check(DB.workbook_answers.length === snapAnswers.length - 4,
+    "the fixture is cut to the live SJ shape: 5 rows for code 0, the 4 late-question rows gone");
+
+  // A fresh page, booted against the SJ-shaped database - the same script, the
+  // same fake DOM, the same router.
+  const sjPage = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await sjPage.boot();
+  await settle();
+  const codesLid = (sjPage.CARDS.find((c) => c.card_key === "codes") || {}).lid;
+
+  // The exact call that 404'd in production: the owner ticks the Everything
+  // chip, the page saves codes.0.applies_to with a null id.
+  sjPage.applyEverything(codesLid, 0);
+  TIMERS.clear();
+  const saved = await sjPage.flushAll();
+  await settle();
+  check(saved === true && sjPage.SAVE.state !== "error",
+    "the Everything chip's save goes through (this exact save 404'd on the live workbook)");
+  const mintedRow = dbAnswer("c-codes", "codes.0.applies_to");
+  const sibRow = dbAnswer("c-codes", "codes.0.code");
+  check(!!mintedRow && DB.workbook_answers.filter((r) => r.card_id === "c-codes" && r.target_field === "codes.0.applies_to").length === 1,
+    `the row was MINTED, exactly once (id ${mintedRow && mintedRow.id})`);
+  check(!!mintedRow && mintedRow.target_kind === sibRow.target_kind && mintedRow.target_table === sibRow.target_table && mintedRow.target_id === sibRow.target_id,
+    `aimed by the card's own codes.0.code sibling (${sibRow.target_kind}/${sibRow.target_table}/${sibRow.target_id}), never by the page's payload`);
+  const savedKeys = Array.isArray(mintedRow && mintedRow.answered) ? mintedRow.answered.length : 0;
+  check(savedKeys > 0 && savedKeys === sjPage.priceKeys().length,
+    `carrying the page's whole materialized key list (${savedKeys} keys saved)`);
+
+  // And the deliberate act the blocker was blocking: confirm succeeds end to end.
+  ALERTS = [];
+  await sjPage.confirmCard(codesLid);
+  await settle();
+  check(!!dbCard("c-codes").confirmed_at && ALERTS.length === 0,
+    "and the codes card CONFIRMS - the mandatory applies-to answer finally has a row to live in");
+
+  // FAIL-CLOSED DID NOT WEAKEN: a field CODE_T does not know keeps the refusal,
+  // byte for byte, on the same door.
+  const foreign = await callApi({ action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.hacker", answered: "x" }] });
+  check(foreign.ok === false && foreign.error === "that answer does not belong to this card",
+    `a null-id save of codes.0.hacker still refuses byte-for-byte ("${foreign.error}")`);
+
+  // Put the fixture back and reboot the main page off it, so every later
+  // section reads the state it always did.
+  DB.workbook_answers = snapAnswers;
+  DB.workbook_cards = snapCards;
+  await page.boot();
   await settle();
 }
 
