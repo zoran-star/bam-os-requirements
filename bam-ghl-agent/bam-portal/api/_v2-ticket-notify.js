@@ -139,12 +139,16 @@ const LANE_PAGE = {
   content: "content-v2",
   marketing: "marketing-v2",
   systems: "website-v2",
+  // Backlog got its own staff page on 2026-08-06. It previously pointed at
+  // ?p=feedback, which reads portal_feedback (the older widget) and not
+  // v2_tickets, so a client bug report DMed a link to a page that could not
+  // show the ticket it was about.
+  backlog: "backlog-v2",
 };
 
-// Lanes with no page of their own land on the staff portal root, which is a
-// dead end for the reader. Point them at the feedback queue, which is where
-// backlog (client bug reports and ideas) is actually worked.
-const LANE_PAGE_FALLBACK = "feedback";
+// Any lane still without a page of its own lands on the staff portal root,
+// which is a dead end for the reader. agent_supervision is the remaining one.
+const LANE_PAGE_FALLBACK = "backlog-v2";
 
 // Env overrides api/marketing.js honours before any DB lookup. Mirrored here so
 // the two Slack paths cannot disagree about who gets the ping.

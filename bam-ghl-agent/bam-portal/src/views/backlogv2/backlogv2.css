@@ -1,0 +1,351 @@
+/* Staff Backlog V2: triage queue + right-side ticket drawer.
+   Every value comes from design-system/tokens.css (loaded by v2rail.css).
+   Radii use the locked scale only: 6 / 8 / 12 / 16 / 24 / 999. */
+
+/* ── Queue head: tabs + kind filter ─────────────────────────────────────── */
+
+.bl2-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.bl2-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-sub);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.bl2-tab:hover { background: var(--surface-hov); color: var(--text); }
+.bl2-tab.is-active { background: var(--gold); color: var(--on-gold); border-color: var(--gold); font-weight: 700; }
+.bl2-tab-count { font-family: var(--font-mono); font-size: 10px; opacity: 0.85; }
+
+.bl2-kinds {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.bl2-kind {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-mute);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.bl2-kind:hover { color: var(--text); background: var(--surface-hov); }
+.bl2-kind.is-active { color: var(--text); background: var(--gold-sheen); border-color: var(--accent-border); }
+
+.bl2-loading, .bl2-error {
+  padding: 28px 16px;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-mute);
+}
+.bl2-error { color: var(--red); }
+.bl2-retry {
+  margin-top: 10px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--t-fast);
+}
+.bl2-retry:hover { border-color: var(--gold); }
+
+/* ── Drawer (house detail idiom: right side, never a bottom sheet) ───────── */
+
+.bl2-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  animation: bl2-fade 0.2s var(--es);
+}
+@keyframes bl2-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.bl2-drawer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 460px;
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-pop);
+  font-family: var(--font-ui);
+  animation: bl2-slide 0.28s var(--es);
+}
+@keyframes bl2-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bl2-overlay, .bl2-drawer { animation: none; }
+}
+
+.bl2-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.bl2-head-main { flex: 1; min-width: 0; }
+.bl2-head-academy {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.bl2-head-title {
+  margin: 3px 0 0;
+  font-family: var(--font-num);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text);
+}
+.bl2-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.bl2-close:hover { border-color: var(--gold); color: var(--text); }
+
+.bl2-banner {
+  padding: 9px 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.bl2-banner-ok { background: var(--green-soft); color: var(--green); }
+.bl2-banner-err { background: var(--red-soft); color: var(--red); }
+
+.bl2-body { flex: 1; overflow-y: auto; padding: 16px; }
+.bl2-block { margin-bottom: 22px; }
+.bl2-block:last-child { margin-bottom: 0; }
+
+.bl2-label {
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+/* The client's verbatim text. white-space:pre-wrap so their line breaks (an
+   address typed across three lines, for example) survive as they wrote them. */
+.bl2-said {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--surface-el);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bl2-said-empty { color: var(--text-mute); font-style: italic; }
+
+.bl2-shot {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface-el);
+  transition: border-color var(--t-fast);
+}
+.bl2-shot:hover { border-color: var(--gold); }
+/* Capped, because clients photograph and screenshot in portrait: an uncapped
+   1086x1448 flyer rendered 570px tall and pushed the facts, the tap trail and
+   the triage button below the fold. The thumbnail links to the full image, so
+   nothing is lost by fitting it. */
+.bl2-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  object-position: top;
+}
+
+.bl2-filelink {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-sm);
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.bl2-filelink:hover { border-color: var(--gold); }
+
+.bl2-facts { margin: 0; display: grid; gap: 7px; }
+.bl2-fact { display: flex; gap: 10px; font-size: 12px; }
+.bl2-fact dt { flex: 0 0 116px; color: var(--text-mute); }
+.bl2-fact dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+
+/* Raw exception text, so it reads as a technical value rather than prose. */
+.bl2-errors { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.bl2-errors li {
+  padding: 8px 10px;
+  background: var(--red-soft);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--red);
+  overflow-wrap: anywhere;
+}
+
+.bl2-trail { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.bl2-trail li { display: flex; gap: 10px; font-size: 12px; align-items: baseline; }
+.bl2-trail-t {
+  flex: 0 0 34px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-mute);
+}
+.bl2-trail-el { color: var(--text-sub); overflow-wrap: anywhere; }
+
+/* ── Footer actions ─────────────────────────────────────────────────────── */
+
+.bl2-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.bl2-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--gold);
+  color: var(--on-gold);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter var(--t-fast);
+}
+.bl2-primary:hover:not(:disabled) { filter: brightness(1.06); }
+.bl2-primary:disabled { opacity: 0.55; cursor: default; }
+
+.bl2-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--t-fast);
+}
+.bl2-mini:hover:not(:disabled) { border-color: var(--gold); }
+.bl2-mini:disabled { opacity: 0.55; cursor: default; }
+
+.bl2-menuwrap { position: relative; }
+.bl2-menu-backdrop { position: fixed; inset: 0; z-index: 1; }
+
+.bl2-menu {
+  position: absolute;
+  z-index: 2;
+  min-width: 230px;
+  /* Fits all 7 triage targets without clipping, and still scrolls for the
+     owner menu, which grows with the staff table. */
+  max-height: min(60vh, 440px);
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface-el);
+  border: 1px solid var(--border-med);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+}
+/* Docked above the button: the footer sits at the bottom of the drawer, so a
+   downward menu would open off-screen. */
+.bl2-menu-up { bottom: calc(100% + 6px); left: 0; }
+
+.bl2-menu-label {
+  padding: 6px 10px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.bl2-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+.bl2-menu-item:hover { background: var(--surface-hov); }
+.bl2-menu-item.is-current { background: var(--gold-sheen); }
+.bl2-menu-item-main {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.bl2-menu-item-hint {
+  display: block;
+  margin-top: 1px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-mute);
+}
+
+/* Phone: the drawer takes the full screen, per the V2 drawer recipe. */
+@media (max-width: 640px) {
+  .bl2-drawer { max-width: 100%; border-left: none; }
+  .bl2-menu { min-width: 200px; }
+}
