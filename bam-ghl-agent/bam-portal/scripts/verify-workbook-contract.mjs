@@ -210,7 +210,11 @@
  * save/mint/target/keys/confirm pins - the live defect reproduced end to
  * end; the same pin catches 6 in api/_workbook.test.mjs),
  * codesmintany -> 1 (measured 2026-08-06, D1 fix pass: F5's byte-for-byte
- * codes.0.hacker refusal; the same pin catches 4 in api/_workbook.test.mjs).
+ * codes.0.hacker refusal; the same pin catches 4 in api/_workbook.test.mjs),
+ * refusedaddwipes -> 6 (measured 2026-08-06, D2 fix pass: F6's survive and
+ * succeed-with-preserved-values pins plus F4's carry-across and its
+ * downstream follow-up pins - the wipe breaks the F4 flow too, which is why
+ * both probe cleanups are guarded so the banner still prints).
  * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
  * flow never submits an inverted band because the page guard refuses it in
  * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
@@ -323,6 +327,13 @@ const PAGE_CONTROLS = {
     else if(charged.length)
       bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee when you pay up front for \${lens(charged)}.\`);`,
     `    if(p.feeOnBase===0)bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee.\`);   // (control feelineflat)`]],
+  // The restore half of redrawAddsKeep is a no-op again, so every refusal
+  // redraw wipes the owner's typed name and price - the D2 defect back.
+  refusedaddwipes: [[
+    `  Object.entries(keep).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v});
+}`,
+    `  // (control refusedaddwipes) the typing is not restored
+}`]],
   monthsmisparse: [[
     `  const t=String(s==null?'':s);
   const mo=t.match(/(\\d+(?:\\.\\d+)?)\\s*(?:mo|mos|month|months)\\b/i);
@@ -629,7 +640,13 @@ function registerMarkup(containerId, markup) {
   const next = new Set([...markup.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
   for (const old of OWNED.get(containerId) || []) if (!next.has(old) && old !== containerId) DOMBOX.delete(old);
   OWNED.set(containerId, next);
-  for (const id of next) mint(id);
+  // A RE-RENDERED INPUT COMES BACK EMPTY, exactly as innerHTML re-creation
+  // does in a browser: a fresh input carries only its markup value, and the
+  // add box's inputs carry none. Object identity is kept (held references
+  // stay valid); only .value resets. Without this the double quietly preserved
+  // typing across a redraw a real browser wipes, which is how the D2 defect -
+  // a refused add eating the owner's typing - was invisible from in here.
+  for (const id of next) { const e = DOMBOX.get(id); if (e && id !== containerId) e.value = ""; mint(id); }
 }
 // The static shell, read out of the real file rather than transcribed.
 for (const m of html.slice(0, SCRIPT_OPEN).matchAll(/\bid="([^"]+)"/g)) mint(m[1]);
@@ -1121,7 +1138,7 @@ const RETURNS = [
   "capReason", "pillOf", "additionsOf", "hasAdditionFields", "sendBlocked", "drawPlan",
   "openAdd", "applyEverything", "appliesEverything", "setTax", "drawCodes", "pickCyc",
   "drawLadder", "prevOpts", "TYPES", "TYPES_W", "CYCLES", "CYCLES_W", "AFTER", "AFTER_W",
-  "YESNO_W", "CHARGE_W", "DUR", "KIND", "ADDOPEN", "MAX_ADD_PER_CARD",
+  "YESNO_W", "CHARGE_W", "DUR", "KIND", "ADDOPEN", "ADDERR", "MAX_ADD_PER_CARD",
 ].join(", ");
 const pageBody = pageSrc + `\nreturn { ${RETURNS}, get CARDS(){return CARDS}, get MODEL(){return MODEL}, get WB(){return WB}, get RO(){return RO}, get SAVE(){return SAVE} };\n`;
 const pageGlobals = {
@@ -1594,10 +1611,54 @@ console.log("\n── F4. 'something else' asks how often, on both halves ──
   check(/every 6 weeks/.test(byId("card_" + plansLid).outerHTML),
     "the addition list on his screen renders the follow-up text");
 
-  // Take the probe back so the flow's counts stay the fixture's own.
+  // Take the probe back so the flow's counts stay the fixture's own. Guarded,
+  // because under MUTATE=refusedaddwipes the add above never succeeds and a
+  // crash here would end the run without its NEGATIVE CONTROL banner.
   const probe = page.additionsOf(cardOf("plans")).find((a) => a.answered && a.answered.title === "Skills clinic");
-  await page.removeAddition(plansLid, probe.id);
+  if (probe) { await page.removeAddition(plansLid, probe.id); await settle(); }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F6. A REFUSED ADD KEEPS THE OWNER'S TYPING (D2)
+// Every refusal path in submitAdd redraws the add box (the error line lives
+// inside it), and a redrawn input is EMPTY in a real browser - so the refusal
+// wiped the plan name and price he had just typed, and correcting one missing
+// answer meant retyping everything. redrawAddsKeep carries the typing across,
+// the same pattern pickCyc already used for its own redraw.
+// MUTATE=refusedaddwipes.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F6. a refused add keeps the owner's typing ──");
+{
+  const plansLid = lidOf("plans");
+  page.openAdd(plansLid);
+  byId("af_title_" + plansLid).value = "Skills clinic";
+  byId("af_price_" + plansLid).value = "85";
+  page.pickCyc(plansLid, 6);                      // "something else", follow-up left empty
+  await page.submitAdd(plansLid, "plan");
   await settle();
+  const survivedTitle = byId("af_title_" + plansLid) ? byId("af_title_" + plansLid).value : "(no such element)";
+  const survivedPrice = byId("af_price_" + plansLid) ? byId("af_price_" + plansLid).value : "(no such element)";
+  console.log(`  NOTE  after the refusal the box still holds title ${JSON.stringify(survivedTitle)} and price ${JSON.stringify(survivedPrice)}`);
+  check(page.ADDERR[plansLid] === "Please say how often this plan bills before adding it.",
+    `the refusal is on the box ("${page.ADDERR[plansLid]}")`);
+  check(survivedTitle === "Skills clinic" && survivedPrice === "85",
+    "and his typed name and price SURVIVED the refusal redraw");
+
+  // Fill in only what was missing: the add must succeed with the preserved
+  // values, proving nothing restored was silently stale.
+  byId("af_cycother_" + plansLid).value = "every 6 weeks";
+  await page.submitAdd(plansLid, "plan");
+  await settle();
+  const stored = DB.workbook_answers.filter((r) => r.card_id === "c-plans").map((r) => r.answered)
+    .find((v) => v && v.title === "Skills clinic");
+  check(!!stored && stored.price === 85 && stored.billing_cycle === "Other" && stored.billing_cycle_other === "every 6 weeks",
+    `the add then succeeds carrying the preserved values (${JSON.stringify(stored)})`);
+
+  // Take the probe back so the flow's counts stay the fixture's own. Guarded
+  // for the same reason as F4's cleanup: under MUTATE=refusedaddwipes the add
+  // never succeeds, and the banner must still print.
+  const probe = page.additionsOf(cardOf("plans")).find((a) => a.answered && a.answered.title === "Skills clinic");
+  if (probe) { await page.removeAddition(plansLid, probe.id); await settle(); }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

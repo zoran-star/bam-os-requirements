@@ -1537,13 +1537,7 @@ function pickCyc(lid,j){
      box is redrawn - carrying his typed name and price across, because a
      redraw that eats the plan name he just typed reads as the page losing his
      work. Inside either regime the chips just restyle, exactly as before. */
-  if((was===6)!==(j===6)){
-    const keep={};
-    ['af_title_'+lid,'af_price_'+lid,'af_cycother_'+lid].forEach(id=>{const e=document.getElementById(id);if(e)keep[id]=e.value});
-    redrawAdds(lid);
-    Object.entries(keep).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v});
-    return;
-  }
+  if((was===6)!==(j===6)){redrawAddsKeep(lid);return}
   document.querySelectorAll('#addbox_'+lid+' [data-cyc]').forEach(b=>{
     const on=+b.dataset.cyc===j;
     b.style.cssText=on?'background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700':'';
@@ -1608,6 +1602,22 @@ function redrawAdds(lid){
   const c=card(lid);
   if(c.type==='plan')drawPlan(lid); else if(c.type==='codes')drawCodes(); else drawPlansAdd();
 }
+/* Redraw the add box WITHOUT eating what the owner typed. Redrawing rebuilds
+   the inputs from markup, and a rebuilt input is EMPTY - so every refusal
+   path that redraws (the error line lives inside the box) was wiping the plan
+   name and price he had just typed, and the refusal read as the page losing
+   his work. pickCyc solved this exact problem for its own redraw; the pattern
+   lives here once now, for every add-box redraw while the box is still open.
+   Harmless after a successful add: ADDOPEN is 0, the inputs are gone, and
+   there is nothing to restore. MUTATE=refusedaddwipes. */
+function redrawAddsKeep(lid){
+  const keep={};
+  ['af_title_','af_price_','af_cycother_','af_months_','af_code_'].forEach(p=>{
+    const e=document.getElementById(p+lid); if(e)keep[p+lid]=e.value;
+  });
+  redrawAdds(lid);
+  Object.entries(keep).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v});
+}
 function openAdd(lid){ADDOPEN[lid]=1;ADDERR[lid]='';redrawAdds(lid)}
 function cancelAdd(lid){ADDOPEN[lid]=0;ADDERR[lid]='';redrawAdds(lid)}
 /* Applies whatever the add and remove routes say about the card. Their state is
@@ -1643,15 +1653,15 @@ let addBusy=false;
 async function submitAdd(lid,kind){
   if(addBusy)return;
   const c=card(lid);
-  const cap=capReason(c); if(cap){ADDERR[lid]=cap;redrawAdds(lid);return}
+  const cap=capReason(c); if(cap){ADDERR[lid]=cap;redrawAddsKeep(lid);return}
   const v=readAdd(lid,kind);
   // Checked here only so he gets the answer instantly. The server runs the same
   // rules and its refusal is the one that counts.
   const problem=addProblem(kind,v);
-  if(problem){ADDERR[lid]=problem;redrawAdds(lid);return}
+  if(problem){ADDERR[lid]=problem;redrawAddsKeep(lid);return}
   if(JSON.stringify(v).length>MAX_ADD_CHARS){
     ADDERR[lid]='That is too long to add here. Please shorten it, or tell us the details directly.';
-    redrawAdds(lid);return;
+    redrawAddsKeep(lid);return;
   }
   addBusy=true; setSave('saving');
   try{
@@ -1680,7 +1690,7 @@ async function submitAdd(lid,kind){
       : e.message;
     setSave('idle');
   }finally{ addBusy=false; }
-  rebuild(lid);paintPill(lid);updProg();redrawAdds(lid);
+  rebuild(lid);paintPill(lid);updProg();redrawAddsKeep(lid);
 }
 /* A HARD DELETE on the server: no tombstone and no emptied row left behind on a
    "needs creating" list for a human to puzzle over. Nothing leaves the page until
@@ -1701,7 +1711,7 @@ async function removeAddition(lid,id){
       ? 'You look offline, so we could not take that off the list yet. It is still on it.'
       : e.message);
   }finally{ addBusy=false; }
-  rebuild(lid);paintPill(lid);updProg();redrawAdds(lid);
+  rebuild(lid);paintPill(lid);updProg();redrawAddsKeep(lid);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
