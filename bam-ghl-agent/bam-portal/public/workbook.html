@@ -1347,6 +1347,15 @@ function codeCardHTML(lid){
     <div class="qhint">Leave this empty if you do not use codes. Waiving a setup fee for some families is exactly what a code does.</div>
     ${C.map(c=>{const i=c.i;const F=`'codes.${i}.`;
       const wasNamed=codeWasNamed(card(lid),i);
+      /* The scope sentence tracks the DURATION the owner picked, because "on
+         the first bill" was hardcoded while the duration chips said otherwise:
+         a code set to Every payment was described as first-bill-only, a wrong
+         claim about money on the page whose job is checking the money. The fee
+         clause never claims more than the code does either - the joining fee
+         only ever rides the FIRST invoice, so a many-bill duration says "on
+         the first one" rather than implying the fee recurs. */
+      const scope=c.dur===2?'on every bill':c.dur===1?('on the first '+(c.durMonths||'?')+' months of bills'):'on the first bill';
+      const feeClause=anyJoiningFee()?(c.dur===0?', including the joining fee':', including the joining fee on the first one'):'';
       // A code he cleared shows as removed with a way back, rather than as an
       // empty box he cannot tell apart from one he never filled in.
       if(!String(c.code).trim()&&wasNamed)return `<div class="subrow">
@@ -1366,7 +1375,7 @@ function codeCardHTML(lid){
       ${c.dur===1?`<input class="bb-input" type="number" inputmode="numeric" style="max-width:80px" placeholder="3" value="${c.durMonths||''}" oninput="setA('${lid}',${F}duration_months',+this.value||0)"><span class="ml">months</span>`:''}</div>
       <div class="q" style="margin:12px 0 6px;font-size:12.5px">What does it apply to?</div>
       <div class="chiprow">${keys.length?`<button class="bchip sm ${appliesEverything(c)?'sel':''}" onclick="applyEverything('${lid}',${i})">Everything, including the joining fee</button>`+keys.map(k=>`<button class="bchip sm ${(c.applies||[]).includes(k)?'sel':''}" onclick="toggleApplies('${lid}',${i},${JSON.stringify(k).replace(/"/g,'&quot;')})">${esc(keyLabel(k))}</button>`).join(''):'<span class="ml">Add your prices above first.</span>'}</div>
-      ${String(c.code).trim()?`<div class="qhint" style="margin-top:8px">Tick the prices this code covers. Choosing "Everything, including the joining fee" is a real choice, not a default.</div>`:''}
+      ${String(c.code).trim()?`<div class="qhint" style="margin-top:8px">Tick the prices this code covers. It comes off them ${esc(scope)}${esc(feeClause)}. Choosing "Everything, including the joining fee" is a real choice, not a default.</div>`:''}
       <div class="subgrid" style="margin-top:10px">
         <span class="ml">Expires</span><input class="bb-input" type="date" style="max-width:160px" value="${esc(c.expires)}" oninput="setA('${lid}',${F}expires_at',this.value)">
         <span class="ml">Max total uses</span><input class="bb-input" type="number" inputmode="numeric" style="max-width:130px" placeholder="unlimited" value="${c.max||''}" oninput="setA('${lid}',${F}max_redemptions',+this.value||0)">

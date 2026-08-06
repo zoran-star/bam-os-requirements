@@ -164,7 +164,8 @@
  * Measured 2026-08-06 (after the D1 builds: withheld-fee report + Variant A
  * codes guard + the D5 confirmed-no + the G2 registration number), unmutated
  * ALL PASS (125 assertions).
- * confirmuntargetedcode -> 2 failures, noisnull -> 3, taxregnowhere -> 10.
+ * confirmuntargetedcode -> 2 failures, noisnull -> 3, taxregnowhere -> 10,
+ * firstbillalways -> 1. Unmutated total after the D3 scope sentence: 129.
  * typingisapproving -> 9 failures, pagecountsall -> 13, feecasing -> 5,
  * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 5,
  * staffcountsanswered -> 4, renameisnotachange -> 2, reviewdropscards -> 1,
@@ -254,6 +255,12 @@ const PAGE_CONTROLS = {
   confirmuntargetedcode: [[
     `    if(untargeted){alert('Say what '+untargeted.code+' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');return}`,
     `    // (control confirmuntargetedcode) the guard is gone`]],
+  // The scope sentence goes back to the hardcoded first-bill claim, so a code
+  // whose duration chips say Every payment is described as first-bill-only - a
+  // wrong claim about money on the page whose job is checking the money.
+  firstbillalways: [[
+    `      const scope=c.dur===2?'on every bill':c.dur===1?('on the first '+(c.durMonths||'?')+' months of bills'):'on the first bill';`,
+    `      const scope='on the first bill';   // (control firstbillalways)`]],
   monthsmisparse: [[
     `  const t=String(s==null?'':s);
   const mo=t.match(/(\\d+(?:\\.\\d+)?)\\s*(?:mo|mos|month|months)\\b/i);
@@ -950,7 +957,7 @@ const RETURNS = [
   "submitAdd", "removeAddition", "flushAll", "idxOf", "monthsOf", "sameShape", "val", "ansOf",
   "planModel", "taxModel", "codeModel", "priceKeys", "addSummary", "readAdd", "addProblem",
   "capReason", "pillOf", "additionsOf", "hasAdditionFields", "sendBlocked", "drawPlan",
-  "openAdd", "applyEverything", "appliesEverything", "setTax",
+  "openAdd", "applyEverything", "appliesEverything", "setTax", "drawCodes",
   "drawLadder", "prevOpts", "TYPES", "TYPES_W", "CYCLES", "CYCLES_W", "AFTER", "AFTER_W",
   "YESNO_W", "CHARGE_W", "DUR", "KIND", "ADDOPEN", "MAX_ADD_PER_CARD",
 ].join(", ");
@@ -1320,6 +1327,25 @@ console.log("\n── F3. a code with no stated targets cannot be confirmed ─�
     `and the saved applies_to equals the page's own key list, fee keys included (${Array.isArray(savedList) ? savedList.length : "?"} keys)`);
   check(page.appliesEverything((page.MODEL[codesLid] || [])[0] || {}) === true,
     "which the page reads back as the Everything state, so the chip stays lit");
+
+  // ── D3: the scope sentence tracks the DURATION the owner picked ───────────
+  // Driven through the same write path the duration chips use, then the card
+  // is redrawn and its rendered copy read - the sentence is the claim.
+  const cardMarkup = () => byId("card_" + codesLid).outerHTML;
+  page.setA(codesLid, "codes.0.duration", page.DUR[0]);   // First payment only
+  page.drawCodes();
+  let said = cardMarkup();
+  check(/on the first bill/.test(said) && !/on every bill/.test(said),
+    "a first-payment code says its discount rides the first bill only");
+  check(/including the joining fee(?! on the first one)/.test(said),
+    "and the fee clause claims the fee plainly - the fee rides that same first invoice");
+  page.setA(codesLid, "codes.0.duration", page.DUR[2]);   // Every payment
+  page.drawCodes();
+  said = cardMarkup();
+  check(/on every bill/.test(said) && !/on the first bill/.test(said),
+    "an every-payment code says every bill, not the hardcoded first-bill claim");
+  check(/including the joining fee on the first one/.test(said),
+    "while the fee clause still claims only the first invoice - the fee never recurs");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
