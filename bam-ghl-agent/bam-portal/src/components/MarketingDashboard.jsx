@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import MetaError from "./MetaError.jsx";
+import { LOAD_FAILED } from "../lib/metaError.js";
 
 // Staff-side Ad Performance dashboard — the same KPI view clients see, scoped
 // to one client via ?client_id=. Reuses /api/marketing?resource=meta-report
@@ -262,10 +264,13 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
   }, [period, data, view, clientId, session, insights]);
 
   if (loading) return <div style={{ padding: 18, color: t.textSub }}>Loading performance…</div>;
-  if (err) return <div style={{ padding: 18, color: t.red }}>Couldn't load report: {err}</div>;
+  // `err` is set from ANY non-ok response, which includes our own server
+  // erring, a stale login, and a dropped connection. Meta gets named only when
+  // the text actually looks like Meta.
+  if (err) return <MetaError tokens={t} raw={err} unknownText={LOAD_FAILED} style={{ padding: 18 }} />;
   if (!data || !period) {
-    const why = data?.reason === "no_ad_account" ? " — no ad account connected."
-      : data?.reason === "no_campaigns_selected" ? " — pick this client's campaigns in the Campaigns tab."
+    const why = data?.reason === "no_ad_account" ? " - no ad account connected."
+      : data?.reason === "no_campaigns_selected" ? " - pick this client's campaigns in the Campaigns tab."
       : ".";
     return <div style={{ padding: 18, color: t.textSub }}>No performance data for this range yet{why}</div>;
   }
