@@ -51,6 +51,42 @@
  *                     the owner reads on his own screen against the number the
  *                     server will actually enforce.
  *
+ * AND THEN THE STAFF HALF, on the SAME workbook he just sent. api/workbook.js
+ * grew five staff actions - review, approve-card, apply, publish, rollback - and
+ * they carry the identical disagreement class: staff review RENDERS values the
+ * API translates, the apply rehearsal DESCRIBES work the mint will do, and the
+ * approval gate counts cards with the same "has answers" idea the submit gate
+ * uses. Each of those can drift from the page while both halves' own suites stay
+ * green, because each half stubs the other. The page object here is not rebuilt
+ * from a fixture: it is the same live page, rebooted off the real read-only GET.
+ *
+ *   H1 THE TWO GATES  approvalGate (which cards staff must approve) against
+ *                     counted() (which cards the owner must confirm), as SETS of
+ *                     card keys, with the add-a-plan card asked twice - holding
+ *                     an addition, and empty. A drift is staff approving a card
+ *                     nobody was asked to confirm, or the reverse.
+ *   H2 CONFIRMED = REVIEWED  every card the page shows as confirmed appears in
+ *                     review, and is_change is true for exactly the rows whose
+ *                     BOX ON HIS SCREEN differs from what the portal stores -
+ *                     which is what makes a card he confirmed WITHOUT EDITING
+ *                     read as a change. San Jose's renames, one by a word and one
+ *                     by a letter case.
+ *   H3 WILL_WRITE     the offer-vocabulary value review previews must select the
+ *                     same chip he pressed, and must select one at all. Casing on
+ *                     this exact path shipped a live defect.
+ *   H4 APPROVE/APPLY  the refusal NAMES the unapproved card; every value review
+ *                     previewed is the value the offer then holds; and the owner
+ *                     is still locked out afterwards, proved on a row apply never
+ *                     stamped so it is the SENT state doing the refusing.
+ *   H5 THE REHEARSAL  every price the mint would create is a key the page can
+ *                     name in applies_to (two independent length parsers), and
+ *                     the parent price on HIS screen is the amount the mint would
+ *                     charge, tax and all (two independent tax computations).
+ *   H6 ROLLBACK       offer jsonb, the staff decision set, and his rendered page,
+ *                     each byte-identical to a copy the HARNESS took before the
+ *                     apply - never to the snapshot the restore read from, which
+ *                     would only prove the copy loop ran.
+ *
  * HOW IT WORKS
  * The whole <script> block of public/workbook.html is extracted and run as one
  * unit against a fake DOM - not a hand-picked list of functions, and nothing is
@@ -91,9 +127,57 @@
  *       every prepay option reads "no saving" when one saves $151 - and the
  *       page can no longer offer the |3_months key the API itself sent.
  *
- * Measured 2026-08-06, unmutated ALL PASS (81 assertions).
- * typingisapproving -> 9 failures, pagecountsall -> 11, feecasing -> 4,
- * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 4.
+ *   MUTATE=staffcountsanswered      API. The approval gate stops counting the
+ *       cards the submit gate counts: a card counts only where an ANSWER was
+ *       written down, so the card whose whole content is "nothing to add" drops
+ *       out of the approval set the owner was still made to confirm.
+ *   MUTATE=renameisnotachange       API. Review adopts the PAGE's flag rule ("a
+ *       change is what he typed over what we showed") instead of the
+ *       against-current rule, so a rename he confirmed WITHOUT EDITING reads as
+ *       untouched and staff approve a rename nobody ever looked at.
+ *   MUTATE=reviewdropscards         API. A card with nothing to SHOW is dropped
+ *       from review while the gate still demands its approval, so the tax card,
+ *       the add-a-plan card and the notes card vanish off the surface staff read.
+ *   MUTATE=reviewshowsuntranslated  API. will_write becomes the raw answer, so
+ *       the preview shows staff the page's "Charge" and the apply one call later
+ *       writes the offer's "charge". Pinned across two lines with the anchor line
+ *       reproduced unchanged, so exactly one line moves - and that line was
+ *       verified to be caught on its own.
+ *   MUTATE=staffgateoff             API. The every-card-approved gate is gone, so
+ *       apply writes configuration nobody signed off.
+ *   MUTATE=refusalnamescount        API. The refusal counts the unapproved cards
+ *       instead of naming them, on the one surface whose job is telling a
+ *       reviewer what is left.
+ *   MUTATE=applyreopensediting      API. A submitted workbook is editable again,
+ *       so a late autosave can rewrite an answer underneath the reviewer who
+ *       already approved it.
+ *   MUTATE=rollbackleavesoffers     API. Rollback still answers ok and still says
+ *       what it restored; the offer simply stays where the apply left it.
+ *   MUTATE=rollbackclearsanswers    API. Rollback clears the OWNER's answers with
+ *       the applied stamps, so the read-only page he was promised would not change
+ *       under him renders BAM's proposals back at him instead of what he sent.
+ *   MUTATE=taxneverlands            API. The tax write never lands, so every
+ *       amount the rehearsal prints is PRE-TAX while his own page told him what a
+ *       parent pays with tax on. The defect the tax card exists to close, one
+ *       write later.
+ *
+ * Measured 2026-08-06, unmutated ALL PASS (111 assertions).
+ * typingisapproving -> 9 failures, pagecountsall -> 13, feecasing -> 5,
+ * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 5,
+ * staffcountsanswered -> 4, renameisnotachange -> 2, reviewdropscards -> 1,
+ * reviewshowsuntranslated -> 1, staffgateoff -> 4, refusalnamescount -> 1,
+ * applyreopensediting -> 3, rollbackleavesoffers -> 1,
+ * rollbackclearsanswers -> 2, taxneverlands -> 2.
+ *
+ * EVERY MULTI-LINE PIN IN THIS FILE WAS SPLIT AND EACH HALF RUN ON ITS OWN
+ * (2026-08-06), because a control that patches two lines otherwise reports one
+ * bit of information about two claims - which is how two decorative controls were
+ * found on this project. feecasing's two halves catch 2 and 5 assertions
+ * independently; addkeepsconfirm's catch 3 and 3; typingisapproving's behavioural
+ * line catches 9 on its own (its other line only declares a constant);
+ * reviewshowsuntranslated's one moving line catches 1 on its own. No half is
+ * decorative. monthsmisparse replaces a whole function body and has no meaningful
+ * split.
  *
  * WHAT THIS DOES NOT PROVE
  *   - Anything about real Postgres. RLS, constraints and the unique index on
@@ -101,7 +185,15 @@
  *   - Anything about layout. The DOM is a value-carrying double, not a browser:
  *     no CSS, no real event dispatch, no focus. Rendered STRINGS are asserted
  *     where the string is the claim ("saves $151"), never pixels.
- *   - Anything about applying a submitted workbook to live configuration.
+ *   - Anything about the STAFF PAGE. There is no staff review front end yet, so
+ *     H1-H6 hold the staff API against the OWNER's page and against the harness's
+ *     own copies. When a staff surface ships, its render belongs on this side of
+ *     the comparison the way public/workbook.html is on the other.
+ *   - Anything about Stripe. Phase 3 is a preview built from the catalog table,
+ *     and a call to api.stripe.com throws in the router rather than being mocked.
+ *   - The staff-only door. api/_workbook-apply.test.mjs proves the owner's token
+ *     opens none of the five actions (MUTATE=ownertoken); this file assumes it
+ *     and only ever calls them with the staff bearer.
  *   - The deployment with no workbook_cards.meta column. The stub HAS the column,
  *     so the API's 42703 degradation path is not walked here; api/_workbook.test.mjs
  *     covers it from its own side.
@@ -184,6 +276,76 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   const confirmedAt = retire ? null : card.confirmed_at;`,
     `  const retire = false;                          // (control addkeepsconfirm)
   const confirmedAt = card.confirmed_at;         // the approval survives the request`]],
+
+  // ── THE STAFF HALF. Every one of these is a SINGLE LINE, because a control
+  // that patches two lines reports one bit of information about two claims -
+  // which is how two decorative controls were found on this project. Where a pin
+  // needs a second line to be unique, that second line is reproduced UNCHANGED in
+  // the replacement, so exactly one line still moves.
+
+  // The staff gate stops counting the same cards the owner was asked to confirm:
+  // it counts a card only where an ANSWER was written down. The notes card - the
+  // one whose whole content is "nothing to add" - drops out of the approval set,
+  // so staff are never asked to approve a card the owner was made to confirm.
+  staffcountsanswered: [[
+    `  const counted = cards.filter((c) => cardCounts(grouped.get(c.id)));`,
+    `  const counted = cards.filter((c) => (grouped.get(c.id) || []).some((a) => a.answered != null));   // (control staffcountsanswered)`]],
+  // Review adopts the PAGE's flag rule - "a change is what he typed over what we
+  // showed" - instead of the against-current rule. San Jose's three renames were
+  // confirmed WITHOUT editing, so every one of them reads as untouched and staff
+  // approve a rename they never saw.
+  renameisnotachange: [[
+    `    is_change: !jsonEqual(eff, a.current_value),`,
+    `    is_change: !!(a.answered != null && !jsonEqual(a.answered, a.proposed)),   // (control renameisnotachange)`]],
+  // A card with nothing to SHOW is dropped from review even when the gate counts
+  // it, so the tax card, the add-a-plan card and the notes card vanish from the
+  // surface staff read while apply still demands their approval.
+  reviewdropscards: [[
+    `    if (!items.length && !cardCounts(mine)) continue;   // nothing to show for an empty card`,
+    `    if (!items.length) continue;   // (control reviewdropscards)`]],
+  // will_write stops being the TRANSLATED value and becomes the raw answer, so
+  // the preview shows staff the page's own "Charge" while the apply one call
+  // later writes the offer's "charge". The anchor line above it is reproduced
+  // unchanged; only the assignment moves.
+  reviewshowsuntranslated: [[
+    `    const out = cls.t(eff);
+    if (out.ok) entry.will_write = out.value;`,
+    `    const out = cls.t(eff);
+    if (out.ok) entry.will_write = eff;   // (control reviewshowsuntranslated)`]],
+  // The every-card-approved gate is gone, so an apply with a card nobody signed
+  // off writes configuration anyway.
+  staffgateoff: [[
+    `  if (unapproved.length) {`,
+    `  if (false && unapproved.length) {   // (control staffgateoff)`]],
+  // The refusal counts the unapproved cards instead of NAMING them. Staff are
+  // told "1 card" and have to go looking for which one, on a surface whose whole
+  // job is telling them what is left.
+  refusalnamescount: [[
+    "      `apply is refused: ${unapproved.length} card(s) are not approved yet (${unapproved.join(\", \")}). Approve every card first - partial apply does not exist.`,",
+    "      `apply is refused: ${unapproved.length} card(s) are not approved yet (${unapproved.length} of them). Approve every card first - partial apply does not exist.`,   // (control refusalnamescount)"]],
+  // Staff review reopens the owner's half: a submitted workbook is editable
+  // again, so a late autosave can rewrite an answer underneath the reviewer who
+  // already approved it.
+  applyreopensediting: [[
+    `const OPEN_STATES = new Set(["draft", "sent"]);`,
+    `const OPEN_STATES = new Set(["draft", "sent", "submitted", "reviewed"]);   // (control applyreopensediting)`]],
+  // Rollback stops restoring the offer jsonb. It still answers ok and still says
+  // what it restored; the configuration simply stays where the apply left it.
+  rollbackleavesoffers: [[
+    `  for (const o of Array.isArray(snap.offers) ? snap.offers : []) {`,
+    `  for (const o of []) {   // (control rollbackleavesoffers) nothing is put back`]],
+  // Rollback clears the OWNER's answers along with the applied stamps, so the
+  // read-only page he was promised would not change under him renders BAM's
+  // proposals back at him instead of what he sent.
+  rollbackclearsanswers: [[
+    `    body: JSON.stringify({ applied_at: null, apply_error: null, updated_at: nowIso() }),`,
+    `    body: JSON.stringify({ applied_at: null, apply_error: null, answered: null, updated_at: nowIso() }),   // (control rollbackclearsanswers)`]],
+  // The tax write never lands, so every amount the mint rehearsal prints is
+  // PRE-TAX while the owner's own page told him what a parent pays with tax on.
+  // This is the defect the tax card exists to close, reintroduced one write later.
+  taxneverlands: [[
+    `      body: JSON.stringify({ tax_config: value }),`,
+    `      body: JSON.stringify({ tax_config: null }),   // (control taxneverlands)`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -362,11 +524,19 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "stub-service-key";
 delete process.env.SUPABASE_SERVICE_KEY;
 
 const TOKEN = "wbk_tok_contract";
+// The STAFF credential. Nothing the owner's page ever sends carries it, which is
+// the point: the five review actions are reachable only from this side.
+const STAFF_BEARER = "staff-session-" + "contract-Kp3";
+const OFFER_ID = "off1";
 const COLUMNS = {
-  clients: ["id", "public_name", "business_name"],
-  workbooks: ["id", "client_id", "kind", "token", "status", "submitted_at", "created_at", "updated_at"],
-  workbook_cards: ["id", "workbook_id", "card_key", "title", "sort_order", "state", "confirmed_at", "meta", "created_at", "updated_at"],
-  workbook_answers: ["id", "workbook_id", "card_id", "client_id", "target_kind", "target_table", "target_id", "target_field", "current_value", "proposed", "answered", "applied_at", "created_at", "updated_at"],
+  clients: ["id", "public_name", "business_name", "tax_config"],
+  staff: ["id", "user_id", "name", "email"],
+  offers: ["id", "client_id", "status", "title", "type", "data"],
+  workbooks: ["id", "client_id", "kind", "token", "status", "submitted_at", "reviewed_at", "snapshot", "created_at", "updated_at"],
+  workbook_cards: ["id", "workbook_id", "card_key", "title", "sort_order", "state", "confirmed_at", "approved_at", "approved_by", "meta", "created_at", "updated_at"],
+  workbook_answers: ["id", "workbook_id", "card_id", "client_id", "target_kind", "target_table", "target_id", "target_field", "current_value", "proposed", "answered", "applied_at", "apply_error", "created_at", "updated_at"],
+  pricing_catalog: ["id", "client_id", "stripe_price_id", "offer_price_key", "tier", "amount_cents", "interval", "currency", "display_name"],
+  offer_prices: ["id", "tenant_id", "source_offer_id", "source_offer_price_key", "billing_cadence"],
 };
 
 // ── THE FIXTURE: San Jose's price workbook, in the shapes the offer really uses ──
@@ -391,7 +561,11 @@ let ansSeq = 0;
 function a(cardId, field, current, proposed, extra = {}) {
   ANS.push({
     id: `a${++ansSeq}`, workbook_id: "wb1", card_id: cardId, client_id: "sj",
-    target_kind: "price_row", target_table: "offer_prices", target_id: cardId.replace("c-", ""),
+    // THE ANSWERS AIM AT THE OFFER JSONB, because that is the only table the
+    // apply step will write. A workbook whose rows aimed anywhere else could be
+    // reviewed and approved and would then refuse at apply, which is a gate the
+    // owner already walked through discovering itself one step too late.
+    target_kind: "price_row", target_table: "offers", target_id: OFFER_ID,
     target_field: field, current_value: current, proposed: proposed === undefined ? current : proposed,
     answered: null, applied_at: null,
     created_at: `2026-08-04T00:00:${String(ansSeq).padStart(2, "0")}Z`,
@@ -414,7 +588,11 @@ function planAnswers(cardId, o) {
   a(cardId, "expires_after", null);
   a(cardId, "other_description", null);
   a(cardId, "description", null);
-  a(cardId, "archived", o.archived === true);
+  // ARCHIVING IS A PROPOSAL LIKE ANY OTHER. currentArchived is what the offer
+  // holds today; archived is what BAM proposed. Keeping them apart matters: a
+  // card whose offering is ALREADY archived cannot be resolved at all, so a
+  // fixture that pre-archived it would be testing the refusal, not the write.
+  a(cardId, "archived", o.currentArchived === true, o.archived === true);
   (o.rungs || []).forEach((r, i) => {
     const f = (n) => `commitments.${i}.${n}`;
     a(cardId, f("length"), r.currentLength === undefined ? r.length : r.currentLength, r.length);
@@ -452,7 +630,9 @@ planAnswers("c-p1", {
     { length: "9 Months (36 Weeks)", price: "2100", currentLength: null, currentPrice: null },
   ],
 });
-planAnswers("c-p2", { currentTitle: "Academy Unlimited", title: "Academy Unlimited", included: "Every session we run.", price: "425", fee: "40", feeOnBase: "charge", rungs: [] });
+// A SECOND RENAME, and it is a WORD rather than a letter case, so the two shapes
+// of "confirmed without editing is still a change" are both on the table.
+planAnswers("c-p2", { currentTitle: "Academy Unlimited Pass", title: "Academy Unlimited", included: "Every session we run.", price: "425", fee: "40", feeOnBase: "charge", rungs: [] });
 planAnswers("c-p3", { currentTitle: "Elementary 1x/Week", title: "Elementary 1x/week", included: "One session a week.", price: "180", fee: "40", feeOnBase: "waive", rungs: [] });
 planAnswers("c-p4", { currentTitle: "Legacy Elite", title: "Legacy Elite", included: "Not sold to new families.", price: "500", fee: "0", feeOnBase: "charge", archived: true, rungs: [] });
 // The tax card: one column, one answer, keys in a DIFFERENT order in `proposed`
@@ -472,11 +652,67 @@ a("c-codes", "codes.0.max_redemptions", null);
 a("c-codes", "codes.0.once_per_customer", "yes");
 a("c-notes", "notes", null);
 
+// ── THE LIVE OFFER the workbook is a proposal ABOUT ──────────────────────────
+//
+// Written in the OFFER's vocabulary, not the page's: "waive" lowercase, "Monthly"
+// and "Membership" capitalised, prices as STRINGS, once_per_customer as a
+// BOOLEAN. Every offering's title is the current_value the matching plan card
+// carries, because that title answer is the only thing that resolves a card to an
+// offering - a plan whose title does not match is a refusal, never a create.
+//
+// It is deliberately BEHIND the workbook in three places, so apply has real work:
+// the third commitment rung on the first plan does not exist here at all, the
+// Elementary plan still charges its joining fee where the owner waived it, and
+// two of the four plan names are the ones his Stripe shows rather than the ones
+// BAM proposed.
+const OFFER_DATA = () => ({
+  pricing: {
+    pricing_offerings: [
+      {
+        title: "2 Trainings/Week", type: "Membership", price: "300", billing_cycle: "Monthly",
+        whats_included: "Two team trainings a week.", taxable: "Yes",
+        signup_fee: "40", signup_fee_taxable: "Yes", signup_fee_on_base: "waive", archived: false,
+        commitments: [
+          { length: "3 Months (12 Weeks)", price: "749", after: "Renews same length", taxable: "Yes", signup_fee_charge: "waive", archived: false },
+          { length: "6 Months (24 Weeks)", price: "1450", after: "Renews same length", taxable: "Yes", signup_fee_charge: "waive", archived: false },
+        ],
+      },
+      {
+        title: "Academy Unlimited Pass", type: "Membership", price: "425", billing_cycle: "Monthly",
+        whats_included: "Every session we run.", taxable: "Yes",
+        signup_fee: "40", signup_fee_taxable: "Yes", signup_fee_on_base: "charge", archived: false,
+      },
+      {
+        title: "Elementary 1x/Week", type: "Membership", price: "180", billing_cycle: "Monthly",
+        whats_included: "One session a week.", taxable: "Yes",
+        signup_fee: "40", signup_fee_taxable: "Yes", signup_fee_on_base: "waive", archived: false,
+      },
+      {
+        // STILL LIVE in the offer, and the workbook is the thing proposing to
+        // retire it. An already-archived offering cannot be resolved by name at
+        // all, so pre-archiving it here would test the refusal instead of the write.
+        title: "Legacy Elite", type: "Membership", price: "500", billing_cycle: "Monthly",
+        whats_included: "Not sold to new families.", taxable: "Yes",
+        signup_fee: "0", signup_fee_taxable: "Yes", signup_fee_on_base: "charge", archived: false,
+      },
+    ],
+    // once_per_customer is a BOOLEAN here and the string "yes" in the workbook.
+    // That is not a typo: it is the shape the translation exists to bridge.
+    discount_codes: [
+      { code: "SIBLING10", kind: "Percent off", value: "10", duration: "Every payment", once_per_customer: true, applies_to: ["Academy 2x/week|monthly", "Academy 2x/week|3_months"] },
+    ],
+  },
+});
+
 function reset() {
   seq = 0;
   DB = {
-    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose" }],
-    workbooks: [{ id: "wb1", client_id: "sj", kind: "price", token: TOKEN, status: "sent", submitted_at: null, created_at: "2026-08-04T00:00:00Z", updated_at: "2026-08-04T00:00:00Z" }],
+    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null }],
+    staff: [{ id: "staff-1", user_id: "user-1", name: "Zoran", email: "zoran@byanymeansbball.com" }],
+    offers: [{ id: OFFER_ID, client_id: "sj", status: "active", title: "Training", type: "training", data: OFFER_DATA() }],
+    pricing_catalog: [],
+    offer_prices: [],
+    workbooks: [{ id: "wb1", client_id: "sj", kind: "price", token: TOKEN, status: "sent", submitted_at: null, reviewed_at: null, snapshot: null, created_at: "2026-08-04T00:00:00Z", updated_at: "2026-08-04T00:00:00Z" }],
     workbook_cards: [
       { id: "c-tax", workbook_id: "wb1", card_key: "tax", title: "Sales tax", sort_order: 0, state: "untouched", confirmed_at: null, meta: {} },
       { id: "c-p1", workbook_id: "wb1", card_key: "plan:p1", title: "Academy 2x/week", sort_order: 1, state: "untouched", confirmed_at: null, meta: { fam: "two", live: true, members: "9 members pay this today", default_signup_fee: 40, commitments: [{ members: "4 members" }, {}, { fresh: true }] } },
@@ -501,7 +737,9 @@ function applyFilters(table, params) {
     if (["select", "order", "limit", "offset", "on_conflict"].includes(k)) continue;
     const s = String(v);
     if (s.startsWith("eq.")) { const val = s.slice(3); rows = rows.filter((r) => String(r[k] == null ? "" : r[k]) === val); }
+    else if (s.startsWith("neq.")) { const val = s.slice(4); rows = rows.filter((r) => String(r[k] == null ? "" : r[k]) !== val); }
     else if (s.startsWith("in.(")) { const vals = s.slice(4, -1).split(","); rows = rows.filter((r) => vals.includes(String(r[k]))); }
+    else if (s === "not.is.null") rows = rows.filter((r) => r[k] != null);
     else if (s.startsWith("is.null")) rows = rows.filter((r) => r[k] == null);
     else if (s.startsWith("like.")) {
       // PostgREST spells the wildcard `*` and translates it to SQL's `%`. The
@@ -562,9 +800,22 @@ async function router(url, init = {}) {
     API_CALLS.push({ method, url: u, body });
     let status = 200, out = null;
     const res = { status(c) { status = c; return this; }, json(b) { out = b; return this; } };
-    await HANDLER({ method, url: u, headers: {}, query: {}, body }, res);
+    // HEADERS ARE FORWARDED, and the page never sets any. That asymmetry is the
+    // whole staff door: resolveStaff reads req.headers.authorization, and the
+    // owner's page has nothing to put there.
+    await HANDLER({ method, url: u, headers: init.headers || {}, query: {}, body }, res);
     return json(out, status);
   }
+  // Staff auth. Only the one bearer the harness hands the STAFF calls resolves to
+  // a user; anything else - including the owner's workbook token - is a 401 from
+  // the auth service before the route ever reads a row.
+  if (u.startsWith(`${SB_BASE}/auth/v1/`)) {
+    const bearer = String((init.headers || {}).Authorization || "");
+    return bearer === `Bearer ${STAFF_BEARER}`
+      ? json({ id: "user-1", email: "zoran@byanymeansbball.com" })
+      : json({ msg: "invalid" }, 401);
+  }
+  if (u.startsWith("https://api.stripe.com/")) throw new Error(`STRIPE WAS CALLED: ${method} ${u} - nothing in this pass may talk to Stripe`);
   if (!u.startsWith(`${SB_BASE}/rest/v1/`)) throw new Error(`UNSTUBBED CALL: ${method} ${u}`);
   // The runtime builds a Headers object out of init.headers and its validator
   // throws quoting the whole value; keeping that here means the credential guard
@@ -642,6 +893,16 @@ async function callApi(body) {
 async function getApi() {
   const r = await router(`/api/workbook?token=${encodeURIComponent(TOKEN)}`, { method: "GET" });
   return r.json();
+}
+// THE STAFF DOOR. Same router, same handler; the only difference is a header the
+// owner's page cannot produce.
+async function staffApi(body) {
+  const r = await router("/api/workbook", {
+    method: "POST",
+    headers: { authorization: `Bearer ${STAFF_BEARER}` },
+    body: JSON.stringify(body),
+  });
+  return { status: r.status, body: await r.json() };
 }
 const dbCard = (id) => DB.workbook_cards.find((c) => c.id === id);
 const dbAnswer = (cardId, field) => DB.workbook_answers.find((r) => r.card_id === cardId && r.target_field === field);
@@ -914,6 +1175,14 @@ check(dbCard("c-p1").state === "changed" && cardOf("plan:p1").state === "changed
 check(page.flaggedCount() === 1, "save: exactly one change is flagged, not one per keystroke");
 agree("after a save", await serverRemaining());
 
+// A CHIP PRESSED IN THE PAGE'S OWN VOCABULARY, deliberately kept for the staff
+// half. Elementary stores "waive"; he presses Charge, and what lands is the
+// page's capitalised word. Section H holds the staff surface against it: a value
+// only the offer's own casing may reach configuration in.
+await type("plan:p3", "signup_fee_on_base", page.CHARGE_W[0]);
+check(dbAnswer("c-p3", "signup_fee_on_base").answered === "Charge",
+  `a chip press answers in the PAGE's casing (${JSON.stringify(dbAnswer("c-p3", "signup_fee_on_base").answered)} over a stored ${JSON.stringify(dbAnswer("c-p3", "signup_fee_on_base").current_value)})`);
+
 // CONFIRM. The server materializes `answered` from `proposed` for every row he
 // never touched, so staff review compares a value against a value.
 await confirm("plan:p1");
@@ -944,7 +1213,7 @@ console.log("\n── F2. an addition: a request, never a write ──");
   await settle();
   const created = DB.workbook_answers.filter((r) => r.card_id === "c-plans");
   check(created.length === 1 && created[0].target_field === "add:plan", "add: the server minted one add:plan row");
-  check(created[0].target_id === null && created[0].target_table === "offer_prices", "add: with the target derived by the server, not named by the page");
+  check(created[0].target_id === null && created[0].target_table === "offers", "add: with the target derived by the server, not named by the page");
   check(created[0].answered && created[0].answered.title === "Summer 1x/week" && created[0].answered.price === 150, "add: carrying what he typed, with the price as a NUMBER the validator accepts");
   check(page.additionsOf(cardOf("plans")).length === 1, "add: and the page lists it back");
   const fresh = await getApi();
@@ -1022,6 +1291,349 @@ console.log("\n── G. the submit gate ──");
   // rather than papered over with an empty string.
   const unanswered = DB.workbook_answers.filter((r) => r.answered === null && r.proposed !== null && !String(r.target_field).startsWith("add:"));
   check(unanswered.length === 0, `every row we proposed something for carries a written-down answer for staff to compare against${unanswered.length ? " - NOT: " + unanswered.slice(0, 3).map((r) => r.target_field).join(", ") : ""}`);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// H. THE STAFF HALF, against the same page
+//
+// Everything above proved the owner's page and the API agree about what he was
+// asked and what he sent. From here the SAME workbook - the real one he just
+// submitted, not a fixture written to look like it - is driven through review,
+// approve-card, apply(dry) and rollback, and every claim the staff surface makes
+// is held against what the owner's page actually showed him.
+//
+// The disagreement class is identical to the one that produced six defects in
+// the owner half: staff review RENDERS values the API translates, the preview
+// DESCRIBES work the mint will do, and the approval gate counts cards with the
+// same "has answers" idea the submit gate uses. Any of those three can drift from
+// the page without either side's own suite noticing, because each side stubs the
+// other.
+//
+// The page object is deliberately NOT rebuilt from a fixture here. It is the same
+// live page, rebooted off the real read-only GET, so "what the owner sees" is
+// read out of the same DOM the assertions above read.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// jsonb equality for the harness to READ results with: key order does not
+// survive a jsonb round trip, so a stringify that respects it would report
+// differences the database cannot even represent. Only the VALUES compared with
+// it are derived independently - this is the harness's ruler, not either half's.
+const norm = (v) => (Array.isArray(v) ? v.map(norm)
+  : (v && typeof v === "object")
+    ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, norm(v[k])]))
+    : v);
+const jsonEq = (a, b) => JSON.stringify(norm(a === undefined ? null : a)) === JSON.stringify(norm(b === undefined ? null : b));
+const setOf = (xs) => [...new Set(xs)].sort().join(", ");
+
+// EVERYTHING ON HIS SCREEN, as one string. The three card containers, every
+// ladder, every pill and the footer. Local card ids are minted fresh on each
+// boot, so they are replaced by the card_key they belong to (longest first, so a
+// 'c9' can never eat the front of a 'c90'); without that, "byte-identical" would
+// only ever mean "the same boot".
+function pageSurface() {
+  let out = ["taxcard", "cards", "extras"].map((id) => `~~~${id}\n${inner(id)}`).join("\n");
+  for (const c of page.CARDS) out += `\n~~~ladder ${c.card_key}\n${inner("ladder_" + c.lid)}`;
+  for (const c of page.CARDS) out += `\n~~~pill ${c.card_key}\n${page.pillOf(c.lid)}`;
+  out += `\n~~~footer\n${txt("ncf")} of ${txt("ntot")} confirmed, ${txt("nflag")} ${txt("nflagword")}, "${txt("lefttxt")}"`;
+  for (const lid of page.CARDS.map((c) => c.lid).sort((a, b) => b.length - a.length)) {
+    const c = page.CARDS.find((x) => x.lid === lid);
+    out = out.split(lid).join("#" + c.card_key);
+  }
+  return out;
+}
+
+await page.boot();               // the read-only page, off the real submitted GET
+await settle();
+
+console.log("\n── H1. the approval gate and the confirm gate select the same cards ──");
+const firstReview = await staffApi({ action: "review", workbook_id: "wb1" });
+check(firstReview.status === 200 && firstReview.body.ok === true, "staff review answers on the workbook the owner just sent");
+check(firstReview.body.gate.approved === 0, `and nothing is approved yet, so unapproved_card_keys IS the counted set (${firstReview.body.gate.approved} approved)`);
+{
+  // THE SAME QUESTION ASKED OF BOTH HALVES. approvalGate decides which cards
+  // staff must approve; counted() decides which cards the owner must confirm.
+  // They are two implementations of one idea, and a drift either way is either
+  // staff approving a card nobody was asked to confirm, or an owner confirming a
+  // card nobody will ever be asked to approve.
+  const serverSet = setOf(firstReview.body.gate.unapproved_card_keys);
+  const pageSet = setOf(page.countedCards().map((c) => c.card_key));
+  check(serverSet === pageSet, `the same cards, named: page [${pageSet}] / staff gate [${serverSet}]`);
+  check(firstReview.body.gate.unapproved_card_keys.includes("plans") && page.counted(cardOf("plans")) === true,
+    "a card holding ONLY an addition is counted by both - the request needs an owner confirm and a staff approval");
+}
+{
+  // THE EMPTY ADD-A-PLAN CARD, which is the whole reason the gate is not simply
+  // "every card". Its addition is lifted out and both halves are asked again.
+  const stash = DB.workbook_answers.filter((r) => r.card_id === "c-plans");
+  DB.workbook_answers = DB.workbook_answers.filter((r) => r.card_id !== "c-plans");
+  await page.boot(); await settle();
+  const r = await staffApi({ action: "review", workbook_id: "wb1" });
+  const serverSet = setOf(r.body.gate.unapproved_card_keys);
+  const pageSet = setOf(page.countedCards().map((c) => c.card_key));
+  check(serverSet === pageSet, `with the request taken back off it, still the same cards: page [${pageSet}] / staff gate [${serverSet}]`);
+  check(!r.body.gate.unapproved_card_keys.includes("plans") && page.counted(cardOf("plans")) === false,
+    "and NEITHER half counts the empty add-a-plan card - it holds neither Send nor apply");
+  DB.workbook_answers.push(...stash);
+  await page.boot(); await settle();
+}
+
+console.log("\n── H2. what he confirmed is what staff review ──");
+const REVIEW_ITEMS = (body) => [
+  ...body.review.academy_settings,
+  ...body.review.cards.flatMap((c) => c.items),
+  ...body.review.additions,
+  ...body.review.notes,
+];
+{
+  const pageConfirmed = setOf(page.CARDS.filter((c) => page.isReady(c)).map((c) => c.card_key));
+  const inReview = setOf(firstReview.body.review.cards.map((c) => c.card_key));
+  check(pageConfirmed === inReview, `every card the page shows as confirmed is a card review shows: page [${pageConfirmed}] / review [${inReview}]`);
+
+  // IS IT A CHANGE, asked of the two halves independently. The page's side of it
+  // is the VALUE IN THE BOX ON HIS SCREEN, read through the page's own val()
+  // precedence; the server's side is is_change. A row where the box shows
+  // something other than what the portal stores IS a change, whatever route the
+  // value took to get into the box - which is exactly what makes a confirm
+  // without an edit a change.
+  const drift = [];
+  for (const it of REVIEW_ITEMS(firstReview.body)) {
+    if (String(it.target_field).startsWith("add:")) continue;   // an addition has no current value to differ from
+    const c = cardOf(it.card_key);
+    if (!c) { drift.push(`${it.card_key}: review names a card the page does not have`); continue; }
+    const shown = page.val(c, it.target_field, null);
+    const differs = !jsonEq(shown, it.current_value);
+    if (differs !== it.is_change) {
+      drift.push(`${it.card_key}/${it.target_field}: his box shows ${JSON.stringify(shown)} over a stored ${JSON.stringify(it.current_value)}, so the page shows a ${differs ? "change" : "match"} while review calls it ${it.is_change ? "a change" : "unchanged"}`);
+    }
+  }
+  check(drift.length === 0, `is_change is true for exactly the rows whose box differs from what the portal stores (${REVIEW_ITEMS(firstReview.body).length} rows${drift.length ? " - " + drift[0] : ""})`);
+
+  // THE SINGLE MOST IMPORTANT ROW IN THE REVIEW: a plan the owner confirmed and
+  // never typed into, whose proposed name differs from the one his portal stores.
+  // Two of them here, one differing by a WORD and one only by a LETTER CASE,
+  // because San Jose has three of these and a review that showed them as
+  // untouched would have staff approve renames nobody ever looked at.
+  const silent = [];
+  for (const key of ["plan:p2", "plan:p3"]) {
+    const it = firstReview.body.review.cards.find((c) => c.card_key === key).items.find((i) => i.target_field === "title");
+    const box = page.val(cardOf(key), "title", null);
+    const untouched = jsonEq(it.answered, it.proposed);            // he never typed over it
+    const renames = !jsonEq(it.proposed, it.current_value);        // and it is a rename anyway
+    if (!(untouched && renames && it.is_change === true && jsonEq(box, it.proposed))) {
+      silent.push(`${key}: box ${JSON.stringify(box)}, stored ${JSON.stringify(it.current_value)}, proposed ${JSON.stringify(it.proposed)}, answered ${JSON.stringify(it.answered)}, is_change ${it.is_change}`);
+    }
+  }
+  check(silent.length === 0, `a card CONFIRMED WITHOUT EDITING whose name differs from the portal's reads as a CHANGE, by a word and by a case${silent.length ? " - " + silent.join("; ") : ""}`);
+}
+
+console.log("\n── H3. the value staff see is a value the page can read back ──");
+{
+  // Every chip field, both ways: the offer-vocabulary value review previews must
+  // select the SAME chip the owner was looking at, and it must select one at all.
+  // A will_write the page cannot read back is a value staff approved and the
+  // owner can never be shown again - that is the sign-up-fee casing defect,
+  // arriving from the other end.
+  const listFor = (field) => {
+    const leaf = String(field).replace(/^(?:commitments|codes)\.\d+\./, "");
+    if (leaf === "type") return ["TYPES_W", page.TYPES_W];
+    if (leaf === "billing_cycle") return ["CYCLES_W", page.CYCLES_W];
+    if (leaf === "taxable" || leaf === "signup_fee_taxable") return ["YESNO_W", page.YESNO_W];
+    if (leaf === "signup_fee_on_base" || leaf === "signup_fee_charge") return ["CHARGE_W", page.CHARGE_W];
+    if (leaf === "after") return ["AFTER_W", page.AFTER_W];
+    if (leaf === "kind") return ["KIND", page.KIND];
+    if (leaf === "duration") return ["DUR", page.DUR];
+    return null;
+  };
+  const bad = [];
+  let chips = 0;
+  for (const it of REVIEW_ITEMS(firstReview.body)) {
+    const L = listFor(it.target_field);
+    if (!L || it.will_write === undefined) continue;
+    if (typeof it.will_write !== "string") continue;      // the boolean field is measured separately below
+    chips++;
+    const shownIdx = page.idxOf(L[1], page.val(cardOf(it.card_key), it.target_field, null), -1);
+    const writeIdx = page.idxOf(L[1], it.will_write, -1);
+    if (writeIdx < 0 || writeIdx !== shownIdx) {
+      bad.push(`${it.card_key}/${it.target_field}: his chip was ${JSON.stringify(L[1][shownIdx])} (index ${shownIdx} of ${L[0]}) and will_write ${JSON.stringify(it.will_write)} reads back as index ${writeIdx}`);
+    }
+  }
+  check(chips > 0 && bad.length === 0, `every chip value staff will approve reads back to the chip he pressed (${chips} chip answers${bad.length ? " - " + bad[0] : ""})`);
+
+  // MEASURED, NOT ASSERTED, because the fix belongs in public/workbook.html which
+  // this script does not own. once_per_customer is the one field whose offer form
+  // is a BOOLEAN, and idxOf stringifies before it matches, so `true` finds no
+  // chip at all and falls to the default.
+  const once = REVIEW_ITEMS(firstReview.body).find((i) => /once_per_customer$/.test(i.target_field));
+  if (once) {
+    const idx = page.idxOf(page.YESNO_W, once.will_write, -1);
+    console.log(`  NOTE  once_per_customer previews as ${JSON.stringify(once.will_write)} (the offer's boolean form) and the page reads that back as chip index ${idx}${idx < 0 ? ", i.e. NOT AT ALL - a re-opened workbook would show the DEFAULT chip over a stored boolean, which is the sign-up-fee casing defect in a different field. REPORTED, not fixed here." : "."}`);
+  }
+}
+
+console.log("\n── H4. approve, refuse, apply ──");
+// Which offering in the live offer each plan card means, resolved BEFORE apply -
+// apply renames two of them, so a title lookup afterwards would be looking for
+// names that no longer exist.
+const offerRow = () => DB.offers.find((o) => o.id === OFFER_ID);
+const OFFERING_IX = new Map();
+for (const c of firstReview.body.review.cards) {
+  const t = (c.items || []).find((i) => i.target_field === "title");
+  if (!t) continue;
+  const ix = offerRow().data.pricing.pricing_offerings.findIndex((o) => o.title === t.current_value);
+  if (ix >= 0) OFFERING_IX.set(c.card_key, ix);
+}
+function offerValueAt(cardKey, field) {
+  const pricing = offerRow().data.pricing || {};
+  let m = /^codes\.(\d+)\.(.+)$/.exec(field);
+  if (m) return ((pricing.discount_codes || [])[+m[1]] || {})[m[2]];
+  const off = (pricing.pricing_offerings || [])[OFFERING_IX.get(cardKey)];
+  if (!off) return undefined;
+  m = /^commitments\.(\d+)\.(.+)$/.exec(field);
+  if (m) return ((off.commitments || [])[+m[1]] || {})[m[2]];
+  return off[field];
+}
+
+const ALL_KEYS = firstReview.body.gate.unapproved_card_keys.slice();
+const HELD = ALL_KEYS[ALL_KEYS.length - 1];
+for (const k of ALL_KEYS.slice(0, -1)) await staffApi({ action: "approve-card", workbook_id: "wb1", card_key: k });
+{
+  const before = JSON.stringify([DB.offers, DB.clients, DB.workbooks[0].snapshot]);
+  const refused = await staffApi({ action: "apply", workbook_id: "wb1" });
+  check(refused.status === 409 && refused.body.code === "unapproved_cards"
+    && JSON.stringify([DB.offers, DB.clients, DB.workbooks[0].snapshot]) === before,
+    `apply with one card unapproved is refused and writes nothing - no snapshot, no tax, no offer edit (${refused.status} ${refused.body.code})`);
+  // AND IT SAYS WHICH ONE. The reviewer's next action is opening that card; a
+  // count sends them looking. Held against the gate's own list rather than
+  // against the key the harness withheld, so the two staff surfaces have to
+  // agree with each other as well as with the truth.
+  const gateSays = setOf((await staffApi({ action: "review", workbook_id: "wb1" })).body.gate.unapproved_card_keys);
+  const named = setOf(String((String(refused.body.error).match(/not approved yet \(([^)]*)\)/) || [])[1] || "").split(",").map((s) => s.trim()).filter(Boolean));
+  check(named === gateSays && named === HELD, `the refusal NAMES the card that is missing: refusal [${named}] / gate [${gateSays}] / withheld [${HELD}]`);
+}
+
+await staffApi({ action: "approve-card", workbook_id: "wb1", card_key: HELD });
+const beforeApply = await staffApi({ action: "review", workbook_id: "wb1" });
+check(beforeApply.body.gate.ready_to_apply === true, "with the last card approved the gate opens");
+
+// THE STATE TO COME BACK TO. Copied out of the stub, not read off the workbook's
+// own snapshot - a rollback compared against the photograph it restored from
+// proves only that the copy loop ran.
+// The offer ROWS as configuration - id and data. The stub, like PostgREST, lets a
+// PATCH add updated_at to a row it touches, and a timestamp moving is not the
+// question being asked here.
+const offerConfig = () => JSON.stringify(DB.offers.map((o) => ({ id: o.id, data: o.data })));
+const OFFERS_BEFORE = offerConfig();
+const TAX_BEFORE = JSON.stringify(DB.clients[0].tax_config);
+const REVIEW_BEFORE = JSON.stringify(beforeApply.body.review);
+const SURFACE_BEFORE = pageSurface();
+check(SURFACE_BEFORE.length > 2000, `and his read-only page is rendering something to compare against later (${SURFACE_BEFORE.length} chars)`);
+
+const applied = await staffApi({ action: "apply", workbook_id: "wb1" });
+check(applied.status === 200 && applied.body.ok === true && applied.body.dry_run === true,
+  `apply runs dry by default${applied.body.ok ? "" : " - it said: " + JSON.stringify(applied.body.failures || applied.body.error)}`);
+{
+  // WHAT STAFF WERE SHOWN IS WHAT LANDED. will_write was printed on the review
+  // screen BEFORE the approval; this reads the offer jsonb afterwards and asks
+  // whether the two are the same value. A drift here is a human approving one
+  // thing and a money surface receiving another.
+  const gap = [];
+  let previewed = 0;
+  for (const it of REVIEW_ITEMS(beforeApply.body)) {
+    if (it.will_write === undefined || it.target_table !== "offers") continue;
+    previewed++;
+    const landed = offerValueAt(it.card_key, it.target_field);
+    if (!jsonEq(landed, it.will_write)) gap.push(`${it.card_key}/${it.target_field}: review previewed ${JSON.stringify(it.will_write)}, the offer now holds ${JSON.stringify(landed)}`);
+  }
+  check(previewed > 0 && gap.length === 0, `every value review previewed is the value the offer now holds (${previewed} previewed${gap.length ? " - " + gap[0] : ""})`);
+
+  const taxItem = beforeApply.body.review.academy_settings.find((i) => i.target_field === "tax_config");
+  check(!!taxItem && jsonEq(DB.clients[0].tax_config, taxItem.will_write),
+    `and the academy setting too: review previewed ${JSON.stringify(taxItem && taxItem.will_write)}, clients.tax_config now holds ${JSON.stringify(DB.clients[0].tax_config)}`);
+}
+{
+  // THE OWNER'S HALF DID NOT REOPEN. Staff reviewing, approving and applying must
+  // leave him exactly as read-only as the moment he pressed Send - through his
+  // own page AND through the route his page would call.
+  await page.boot(); await settle();
+  const before = JSON.stringify(DB.workbook_answers);
+  page.setA(lidOf("plan:p1"), "price", 111);
+  TIMERS.clear();
+  await page.flushAll();
+  await settle();
+  check(page.RO === true && JSON.stringify(DB.workbook_answers) === before,
+    "after apply his page is still read only, and a keystroke on it writes nothing");
+  // AND THROUGH THE ROUTE, ON A ROW APPLY NEVER TOUCHED. His free text is skipped
+  // by apply, so it carries no applied_at and the applied-stamp guard has nothing
+  // to say about it: the only thing between a late autosave and the copy the
+  // reviewer already approved is the workbook's own status. Probing an APPLIED row
+  // instead would pass on the other guard and prove nothing about this one.
+  const notesRow = dbAnswer("c-notes", "notes");
+  check(notesRow.applied_at == null, "the free-text row really is one apply left alone, so this probe tests the status rule and nothing else");
+  const direct = await callApi({ action: "save", card_key: "notes", answers: [{ id: notesRow.id, answered: "changed my mind" }] });
+  check(direct.ok === false && JSON.stringify(DB.workbook_answers) === before,
+    `and the route refuses a save on it, so it is the SENT state doing the refusing ("${direct.error}")`);
+
+  const afterApply = await staffApi({ action: "review", workbook_id: "wb1" });
+  check(afterApply.body.gate.approved === afterApply.body.gate.counted && afterApply.body.gate.ready_to_apply === true,
+    `the gate still reads every counted card as approved (${afterApply.body.gate.approved} of ${afterApply.body.gate.counted})`);
+  page.updProg();
+  check(+txt("ntot") === afterApply.body.gate.counted,
+    `the total on HIS screen is the number the staff gate counts (page "${txt("ntot")}", gate ${afterApply.body.gate.counted})`);
+  check(+txt("ncf") === afterApply.body.gate.approved && page.remainingCount() === 0,
+    `and the count he confirmed is the count staff approved (page "${txt("ncf")}", gate ${afterApply.body.gate.approved})`);
+}
+
+console.log("\n── H5. the rehearsal describes work in the page's own key vocabulary ──");
+{
+  // The mint preview names each price `<plan title>|<term>`. That is the SAME key
+  // vocabulary the page offers the owner when he scopes a discount code, and the
+  // two sides parse the commitment length with two different parsers. A key phase
+  // 3 would mint that the page cannot name is a price nobody can ever attach a
+  // coupon to.
+  const p3keys = (applied.body.phase3.targets || []).map((t) => t.key);
+  const offered = new Set(page.priceKeys());
+  const orphan = p3keys.filter((k) => !offered.has(k));
+  check(p3keys.length > 0 && orphan.length === 0,
+    `every price the mint would create is one the page can name in applies_to (${p3keys.length} targets${orphan.length ? " - ORPHANED: " + orphan.join(", ") : ""})`);
+
+  // THE MONEY, computed twice and compared once. The page multiplies the plan
+  // price by the tax he entered and prints a sentence; the rehearsal takes the
+  // tax it just wrote to clients and mints cents through _fees.applyFee. Nothing
+  // is shared between those two paths except the workbook.
+  const byKey = new Map((applied.body.phase3.targets || []).map((t) => [t.key, t]));
+  const money = [];
+  let priced = 0;
+  for (const c of page.CARDS.filter((x) => x.type === "plan")) {
+    const m = page.MODEL[c.lid];
+    if (!m || m.archived) continue;
+    page.prevOpts(c.lid);
+    const said = txt("pv_fee_" + c.lid);
+    const t = byKey.get(m.title + "|monthly");
+    if (!t) { money.push(`${c.card_key}: the rehearsal has no monthly target for ${JSON.stringify(m.title)}`); continue; }
+    priced++;
+    const his = (said.match(/a parent pays (\$[\d,]+)/) || [])[1];
+    const mint = "$" + Math.round(t.allin_cents / 100).toLocaleString();
+    if (his !== mint) money.push(`${c.card_key}: his page says a parent pays ${his} for ${JSON.stringify(m.title)} and the mint would charge ${mint} ("${said}")`);
+  }
+  check(priced > 0 && money.length === 0, `the parent price on his screen is the amount the mint would charge, tax and all (${priced} plans${money.length ? " - " + money[0] : ""})`);
+}
+
+console.log("\n── H6. rollback puts back exactly what he was looking at ──");
+{
+  const rolled = await staffApi({ action: "rollback", workbook_id: "wb1" });
+  check(rolled.status === 200 && rolled.body.ok === true && rolled.body.status === "submitted",
+    "rollback answers and lands the workbook back on 'submitted'");
+  check(offerConfig() === OFFERS_BEFORE && JSON.stringify(DB.clients[0].tax_config) === TAX_BEFORE,
+    "the offer jsonb and the academy tax setting are byte-identical to what the harness copied out before the apply");
+
+  const after = await staffApi({ action: "review", workbook_id: "wb1" });
+  check(JSON.stringify(after.body.review) === REVIEW_BEFORE,
+    "and the whole decision set staff read is byte-identical to what it was before the apply - every stamp cleared, every value back");
+
+  await page.boot(); await settle();
+  const surface = pageSurface();
+  check(surface === SURFACE_BEFORE,
+    `his read-only page renders byte-identically to before the apply${surface === SURFACE_BEFORE ? "" : " - first difference at char " + [...surface].findIndex((ch, i) => ch !== SURFACE_BEFORE[i])}`);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

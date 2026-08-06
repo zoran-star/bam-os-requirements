@@ -120,7 +120,12 @@ async function accountCurrency(clientId) {
 // 4_weeks default, because minting a "27_months" commitment as a week x4
 // subscription is a silent wrong charge on a real card.
 const TERM_MAX_MONTHS = 24;
-function termToInterval(term) {
+// Exported read-only so the workbook's dry-run preview can state the SAME
+// rhythm the mint will choose, instead of computing its own second opinion.
+// A preview that can disagree with the action it previews is the dead-control
+// failure with money attached, and a second copy of cadence logic on a money
+// path is a fork. Behaviour unchanged; named export only.
+export function termToInterval(term) {
   const t = String(term || "").toLowerCase();
   if (t === "3_months") return { interval: "3_months", recurring: { interval: "month", interval_count: 3 } };
   if (t === "6_months") return { interval: "6_months", recurring: { interval: "month", interval_count: 6 } };
@@ -163,7 +168,9 @@ function _termFromLength(s) {
 // would recreate the exact minted-on-one-clock-billed-on-another failure the
 // cadence build closed. A week count outside it warns loudly and mints the
 // term's calendar shape. A months-only label stays calendar months.
-function cadenceFromLength(len) {
+// Exported for the same reason as termToInterval: the preview must read this
+// answer, never re-derive it.
+export function cadenceFromLength(len) {
   const w = String(len || "").toLowerCase().match(/(\d+)\s*week/);
   if (!w) return null;
   const cad = `${+w[1]}_weeks`;
@@ -182,7 +189,10 @@ function cadenceFromLength(len) {
 // the code that actually charges. A price minted on one shape and billed on
 // another is the worst outcome available here, so api/_billing-cadence.test.mjs
 // reads both files and fails if they ever drift.
-const CADENCES = {
+// Exported so a caller can tell a rhythm this file WILL honour from one it
+// will silently fall back on. Without it the preview could announce an 8-week
+// rhythm that the mint quietly turns into calendar months.
+export const CADENCES = {
   "4_weeks": { interval: "week", interval_count: 4 },
   monthly: { interval: "month", interval_count: 1 },
   "12_weeks": { interval: "week", interval_count: 12 },
