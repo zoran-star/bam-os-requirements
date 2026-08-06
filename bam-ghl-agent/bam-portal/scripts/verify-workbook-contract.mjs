@@ -95,11 +95,11 @@
  * is imported and called as the real handler. The page's fetch and the handler's
  * Supabase fetch are the same router: page -> real handler -> in-memory PostgREST.
  *
- * ONE DELIBERATE ASYMMETRY IS EXPECTED AND ALLOWED, and it is asserted as such
- * rather than waved through: counted() counts a card holding an addition even
- * when the server says counts:false. That can only ever ask for MORE review, and
- * the page says so in a comment. It is asserted one-way (page >= server), so the
- * guard cannot be quietly widened into "the page counts whatever it likes".
+ * COUNTING IS SYMMETRIC SINCE THE D6 RULING: every card counts on both halves,
+ * from first render, and section E asserts the two sets are identical. The
+ * page keeps its addition guard (a card holding a request counts whatever a
+ * future wire value says) as a trivial pass - it can only ever ask for MORE
+ * review, and the guard's direction is still the safe one.
  *
  * NEGATIVE CONTROLS - one per real defect, and the part that proves this file has
  * teeth. Each reintroduces the disagreement exactly as it shipped. A control that
@@ -110,9 +110,11 @@
  *       STRING instead of the deliberate act, so a card the owner typed into and
  *       never confirmed counts as ready. The server's `remaining` drops below the
  *       page's, and the server accepts a submit the page is still holding back.
- *   MUTATE=pagecountsall       PAGE. counted() counts every card, including the
- *       empty add-a-plan card the server excludes. The page said 8, the server
- *       said 7, and the owner was told to confirm a card with nothing on it.
+ *   MUTATE=pagedenominatorgrows PAGE. counted() goes back to trusting the wire
+ *       flag, so the total can move mid-session. (Replaced MUTATE=pagecountsall,
+ *       retired when the D6 ruling made every-card-counts the correct rule.)
+ *   MUTATE=emptycardsdontcount API. cardCounts goes back to "has answers", so
+ *       the server's denominator grows on an add while the page's stays fixed.
  *   MUTATE=feecasing           PAGE. idxOf matches vocabulary case-sensitively,
  *       so a stored "waive" falls through to the default - which on the sign-up
  *       fee is CHARGE. This one silently told the owner we take his $40 joining
@@ -161,11 +163,19 @@
  *       parent pays with tax on. The defect the tax card exists to close, one
  *       write later.
  *
- * Measured 2026-08-06 (after the D1 builds: withheld-fee report + Variant A
- * codes guard + the D5 confirmed-no + the G2 registration number), unmutated
- * ALL PASS (125 assertions).
- * confirmuntargetedcode -> 2 failures, noisnull -> 3, taxregnowhere -> 10,
- * firstbillalways -> 1. Unmutated total after the D3 scope sentence: 129.
+ * Measured 2026-08-06, after the rehearsal-round-1 builds through D6 (withheld
+ * fee report, Variant A codes guard, confirmed-no tax, registration number,
+ * duration scope sentence, every-card-counts). Unmutated ALL PASS
+ * (135 assertions).
+ * typingisapproving -> 17 failures, pagedenominatorgrows -> 7,
+ * emptycardsdontcount -> 7, feecasing -> 5, addkeepsconfirm -> 5,
+ * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
+ * renameisnotachange -> 2, reviewdropscards -> 2,
+ * reviewshowsuntranslated -> 1, staffgateoff -> 4, refusalnamescount -> 1,
+ * applyreopensediting -> 3, rollbackleavesoffers -> 1,
+ * rollbackclearsanswers -> 2, taxneverlands -> 5, feewithheldsilently -> 1,
+ * confirmuntargetedcode -> 2, noisnull -> 3, taxregnowhere -> 10,
+ * firstbillalways -> 1.
  * typingisapproving -> 9 failures, pagecountsall -> 13, feecasing -> 5,
  * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 5,
  * staffcountsanswered -> 4, renameisnotachange -> 2, reviewdropscards -> 1,
@@ -230,11 +240,17 @@ const die = (msg) => { console.log("\n" + msg); process.exit(1); };
 // caught on this project before.
 // ═════════════════════════════════════════════════════════════════════════════
 const PAGE_CONTROLS = {
-  // The page counts every card, so the empty add-a-plan card holds Send hostage
-  // and the owner is told to confirm a card with nothing on it.
-  pagecountsall: [[
-    `  return c.counts!==false;`,
-    `  return true; // (control pagecountsall) every card counts, empty or not`]],
+  // The page's denominator grows again: counted() goes back to deriving the
+  // total from what the card HOLDS, so an add moves the total under the
+  // owner's cursor - the 0-of-7 -> 5-of-8 defect. (The plan's suggested pin,
+  // `c.counts !== false`, is DECORATIVE now that the server sends counts:true
+  // for every card - a wire-trusting page cannot diverge from a wire that
+  // agrees - so the control reintroduces the page's real old rule instead.
+  // The old MUTATE=pagecountsall was retired by the same D6 ruling: every
+  // card counting is the correct behaviour on both halves.)
+  pagedenominatorgrows: [[
+    `  return true;                       // every card counts, empty or not`,
+    `  return (c.answers||[]).length>0;   // (control pagedenominatorgrows) the denominator moves with the rows`]],
   // Vocabulary matched case-sensitively. Stored "waive" no longer finds "Waive",
   // falls to the default, and the default on the sign-up fee is CHARGE.
   feecasing: [[
@@ -314,12 +330,21 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   renameisnotachange: [[
     `    is_change: !jsonEqual(eff, a.current_value),`,
     `    is_change: !!(a.answered != null && !jsonEqual(a.answered, a.proposed)),   // (control renameisnotachange)`]],
-  // A card with nothing to SHOW is dropped from review even when the gate counts
-  // it, so the tax card, the add-a-plan card and the notes card vanish from the
-  // surface staff read while apply still demands their approval.
+  // A card with nothing to SHOW is dropped from review even though the gate
+  // counts it, so the empty add-a-plan card vanishes from the surface staff
+  // read while apply still demands its approval - an approval nobody can give
+  // for a card nobody can see.
   reviewdropscards: [[
-    `    if (!items.length && !cardCounts(mine)) continue;   // nothing to show for an empty card`,
-    `    if (!items.length) continue;   // (control reviewdropscards)`]],
+    `    cardGroups.push({`,
+    `    if (!items.length) continue;   // (control reviewdropscards) the empty card vanishes
+    cardGroups.push({`]],
+  // The API's counting rule goes back to "has answers": the server's total
+  // grows when an addition lands and drops when one is removed, while the
+  // page's denominator stays fixed - the two halves telling the owner two
+  // different numbers about the same workbook.
+  emptycardsdontcount: [[
+    `const cardCounts = (answers) => true;`,
+    `const cardCounts = (answers) => (answers || []).length > 0;   // (control emptycardsdontcount)`]],
   // will_write stops being the TRANSLATED value and becomes the raw answer, so
   // the preview shows staff the page's own "Charge" while the apply one call
   // later writes the offer's "charge". The anchor line above it is reproduced
@@ -1172,26 +1197,37 @@ console.log("\n── D. \"3 Months (12 Weeks)\": what the page reads it as ─�
 // ═════════════════════════════════════════════════════════════════════════════
 // E. COUNTING - which cards hold Send
 // ═════════════════════════════════════════════════════════════════════════════
-console.log("\n── E. which cards the gate counts ──");
+console.log("\n── E. which cards the gate counts: every card, from first render ──");
 {
+  // D6: one definition, both halves - every card counts, empty or not, and the
+  // denominator is fixed the moment the page paints. The empty add-a-plan card
+  // is no longer the exception; "confirm it empty" is a real answer.
   const fresh = await getApi();
   const serverCounts = new Map(fresh.cards.map((c) => [c.card_key, c.counts]));
-  check(serverCounts.get("plans") === false, "the server does not count the empty add-a-plan card");
-  check([...serverCounts.values()].filter(Boolean).length === 7, "so 7 of the 8 cards count");
+  check(serverCounts.get("plans") === true, "the server counts the EMPTY add-a-plan card");
+  check([...serverCounts.values()].every(Boolean) && serverCounts.size === 8, "so all 8 of 8 cards count");
   let wrong = [];
   for (const c of page.CARDS) {
     const mine = page.counted(c), theirs = serverCounts.get(c.card_key);
-    if (mine === theirs) continue;
-    // The ONE allowed asymmetry, and it is one-way on purpose: a card holding a
-    // request always counts on the page whatever the server says, which can only
-    // ever ask for MORE review. The page says so in a comment; this asserts it
-    // stays that narrow rather than becoming "the page counts what it likes".
-    if (mine === true && theirs === false && page.hasAdditionFields(c)) continue;
-    wrong.push(`${c.card_key}: page ${mine}, server ${theirs}`);
+    if (mine !== theirs) wrong.push(`${c.card_key}: page ${mine}, server ${theirs}`);
   }
   check(wrong.length === 0, `every card is counted the same way by both${wrong.length ? " - " + wrong.join("; ") : ""}`);
-  check(page.countedCards().length === 7, `the page counts 7 too (it counts ${page.countedCards().length})`);
-  check(txt("ntot") === "7", `and prints 7 as the total on his screen ("${txt("ncf")} of ${txt("ntot")} confirmed")`);
+  check(page.countedCards().length === 8, `the page counts 8 too (it counts ${page.countedCards().length})`);
+  check(txt("ntot") === "8", `and prints 8 as the total on his screen ("${txt("ncf")} of ${txt("ntot")} confirmed")`);
+
+  // THE GATE HOLDS ON THE EMPTY CARDS TOO, and both halves refuse with the
+  // same number before a single confirm has happened.
+  const refused0 = await callApi({ action: "submit" });
+  page.updProg();
+  check(refused0.ok === false && refused0.remaining === page.remainingCount(),
+    `with nothing confirmed, submit refuses and remaining agrees (server ${refused0.remaining}, page ${page.remainingCount()})`);
+  // "Confirm it empty" takes the deliberate act with nothing on the card, so
+  // "he was asked and had nothing to add" finally has a record.
+  ALERTS = [];
+  await confirm("plans");
+  check(!!dbCard("c-plans").confirmed_at && ALERTS.length === 0,
+    "the EMPTY add-a-plan card can be confirmed - he was asked, nothing to add");
+  agree("after confirming an empty card", await serverRemaining());
 }
 
 // The server's own number, read without the page in the middle: an empty save is
@@ -1247,6 +1283,8 @@ await confirm("plan:p1");
 console.log("\n── F2. an addition: a request, never a write ──");
 {
   const plansLid = lidOf("plans");
+  page.updProg();
+  const denomBefore = { tot: txt("ntot"), set: (await getApi()).cards.filter((c) => c.counts).map((c) => c.card_key).join(",") };
   page.openAdd(plansLid);                       // the real "+ Add a plan" button
   byId("af_title_" + plansLid).value = "Summer 1x/week";
   byId("af_price_" + plansLid).value = "150";
@@ -1258,8 +1296,12 @@ console.log("\n── F2. an addition: a request, never a write ──");
   check(created[0].answered && created[0].answered.title === "Summer 1x/week" && created[0].answered.price === 150, "add: carrying what he typed, with the price as a NUMBER the validator accepts");
   check(page.additionsOf(cardOf("plans")).length === 1, "add: and the page lists it back");
   const fresh = await getApi();
-  check(fresh.cards.find((c) => c.card_key === "plans").counts === true, "add: the empty card now COUNTS on the server");
-  check(page.counted(cardOf("plans")) === true, "add: and on the page - it holds Send now, with an unreviewed request in it");
+  page.updProg();
+  const denomAfter = { tot: txt("ntot"), set: fresh.cards.filter((c) => c.counts).map((c) => c.card_key).join(",") };
+  check(denomBefore.tot === "8" && denomAfter.tot === "8" && denomBefore.set === denomAfter.set,
+    `add: the card counted all along and the add did not move the denominator (page ${denomBefore.tot} -> ${denomAfter.tot}) - the 0-of-7 -> 5-of-8 defect, pinned`);
+  check(page.counted(cardOf("plans")) === true && fresh.cards.find((c) => c.card_key === "plans").counts === true,
+    "add: it holds Send through the confirm it retired, not through a denominator change");
   agree("after an addition", await serverRemaining());
 
   // AN ADDITION AFTER A CONFIRM RETIRES THAT CONFIRM. He approved a card that did
@@ -1466,8 +1508,10 @@ check(firstReview.body.gate.approved === 0, `and nothing is approved yet, so una
     "a card holding ONLY an addition is counted by both - the request needs an owner confirm and a staff approval");
 }
 {
-  // THE EMPTY ADD-A-PLAN CARD, which is the whole reason the gate is not simply
-  // "every card". Its addition is lifted out and both halves are asked again.
+  // THE EMPTY ADD-A-PLAN CARD counts on BOTH halves now (D6). Its addition is
+  // lifted out and both halves are asked again: the denominator must not move,
+  // review must still SHOW the card, and staff must be able to approve the
+  // owner's "nothing to add".
   const stash = DB.workbook_answers.filter((r) => r.card_id === "c-plans");
   DB.workbook_answers = DB.workbook_answers.filter((r) => r.card_id !== "c-plans");
   await page.boot(); await settle();
@@ -1475,8 +1519,14 @@ check(firstReview.body.gate.approved === 0, `and nothing is approved yet, so una
   const serverSet = setOf(r.body.gate.unapproved_card_keys);
   const pageSet = setOf(page.countedCards().map((c) => c.card_key));
   check(serverSet === pageSet, `with the request taken back off it, still the same cards: page [${pageSet}] / staff gate [${serverSet}]`);
-  check(!r.body.gate.unapproved_card_keys.includes("plans") && page.counted(cardOf("plans")) === false,
-    "and NEITHER half counts the empty add-a-plan card - it holds neither Send nor apply");
+  check(r.body.gate.unapproved_card_keys.includes("plans") && page.counted(cardOf("plans")) === true,
+    "and BOTH halves still count the empty card - the denominator does not move when a card empties");
+  const shownEmpty = r.body.review.cards.find((c) => c.card_key === "plans");
+  check(!!shownEmpty && Array.isArray(shownEmpty.items) && shownEmpty.items.length === 0,
+    "review SHOWS the empty card with items: [], so staff can see he was asked and had nothing to add");
+  const approvedEmpty = await staffApi({ action: "approve-card", workbook_id: "wb1", card_key: "plans" });
+  check(approvedEmpty.status === 200 && approvedEmpty.body.ok === true,
+    `an empty confirmed card can be approve-carded - no 409 (status ${approvedEmpty.status})`);
   DB.workbook_answers.push(...stash);
   await page.boot(); await settle();
 }

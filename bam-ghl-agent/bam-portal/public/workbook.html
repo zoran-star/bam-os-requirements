@@ -900,26 +900,20 @@ async function confirmCard(lid){
     alert('We could not save that confirmation. '+(e.message==='offline'?'You look offline. Try again when you have signal.':e.message));
   }
 }
-/* A card the SERVER does not count cannot be counted here either, or the owner
-   reads "Confirm the remaining 8 cards" while the server will happily accept at
-   7 - two different numbers about the same workbook, one of them on his screen.
-   The gate has ONE definition and it lives on the server; `counts` is that
-   definition arriving over the wire. Only a card carrying nothing to review is
-   ever excluded, which is why an empty add-a-plan card does not hold Send.
-   The `!==false` shape is deliberate: an older API that sends no `counts` key at
-   all must keep counting every card, never silently stop counting them. */
+/* EVERY CARD COUNTS, FROM FIRST RENDER (D6, one definition on both halves).
+   The denominator is CARDS.length the moment the page paints and it cannot
+   grow mid-session: under the old rule an addition landing on the empty
+   add-a-plan card turned "0 of 7" into "5 of 8" under the owner's cursor, and
+   the empty card could ship unseen while its own hint promised "confirm it
+   empty and we will know you were asked". The server's cardCounts says the
+   same thing; `counts` still arrives on the wire and the two must agree
+   (MUTATE=pagedenominatorgrows / MUTATE=emptycardsdontcount). */
 function counted(c){
-  // A CARD HOLDING A REQUEST ALWAYS COUNTS, whatever `counts` says. Verified on
-  // the live handler 2026-08-06: adding "Summer 1x/week" to the empty add-a-plan
-  // card returned counts:false on the ADD response while the very next GET
-  // returned counts:true. The page therefore stayed at "7 cards, 5 still to
-  // review" while the server meant 8 and 6, and Send would have gone with an
-  // unreviewed request for a plan we do not sell riding inside it.
-  // Reported rather than worked around, but the guard stays regardless: it can
-  // only ever ask for MORE review, and it does not depend on the API getting the
-  // ordering right on every future action.
+  // The addition guard stays as a trivial pass: a card holding a request must
+  // count whatever any future wire value says, because that direction can only
+  // ever ask for MORE review.
   if(hasAdditionFields(c))return true;
-  return c.counts!==false;
+  return true;                       // every card counts, empty or not
 }
 function countedCards(){return CARDS.filter(counted)}
 function remainingCount(){return countedCards().filter(c=>!isReady(c)).length}

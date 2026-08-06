@@ -364,28 +364,27 @@ const OPEN_STATES = new Set(["draft", "sent"]);
 // exactly San Jose's three renames.
 const cardIsReady = (card) => !!(card && card.confirmed_at);
 
-// ── WHICH CARDS THE SUBMIT GATE COUNTS ───────────────────────────────────────
+// ── WHICH CARDS THE SUBMIT GATE COUNTS: EVERY CARD, FROM FIRST RENDER ────────
 //
-// A CARD WITH NO ANSWERS AND NO ADDITIONS HAS NOTHING TO REVIEW, so it cannot
-// hold Send hostage. The product owner approved a SEVEN-card workbook and got
-// there by cutting two cards for exactly this reason: a card that could only
-// ever answer "none" was a mandatory click that taught us nothing. The empty
-// "anything missing?" card exists in the table because an addition needs a card
-// to belong to - the card is the unit of confirmation - but it must not become
-// the eighth mandatory click by the back door.
+// D6 (2026-08-06): the gate counts CARDS, and "confirm it empty" is a real
+// answer. The previous rule - a card with no answers cannot hold Send - had
+// two defects the rehearsal caught:
+//   1. THE DENOMINATOR GREW MID-SESSION. An addition landing on the empty
+//      add-a-plan card turned "0 of 7" into "5 of 8" under the owner's cursor,
+//      which reads as the page inventing work.
+//   2. "HE WAS ASKED AND HAD NOTHING TO ADD" WAS UNRECORDABLE. The empty card
+//      could ship unconfirmed, so nobody could tell it apart from "he never
+//      looked" - while the card's own hint promised "confirm it empty and we
+//      will know you were asked".
+// So every card counts, empty or not, and the deliberate act is required on
+// all of them. The page's copy already promised this; the gate now keeps it.
 //
-// THE DISCRIMINATOR IS EMPTINESS, MEASURED FROM THE ROWS, and it is nothing
-// else. Not a card_key, not a flag, not anything seeding or a payload can set.
-// That distinction is the whole safety of this rule: a "this card is optional"
-// flag would hand seeding the power to make a REAL question invisible to the
-// gate, which is the no-partial-submit ruling defeated from the inside by the
-// people it binds. A card with answers ALWAYS counts. There is no opt-out, and
-// there is deliberately no way to write one.
-//
-// A card with no answers cannot hold an answer either - there is no row for one
-// to live in - so "nothing to review" is a fact about the data rather than a
-// judgement about the card.
-const cardCounts = (answers) => (answers || []).length > 0;
+// STILL NOTHING WRITABLE DECIDES COUNTING. Not a card_key, not a meta flag,
+// not a payload: an exemption anyone can write is the no-partial-submit ruling
+// defeated from the inside (MUTATE=countsflag). The `(answers)` signature is
+// kept so every call site compiles unchanged and so the counting rule still
+// has exactly one definition to mutate.
+const cardCounts = (answers) => true;
 
 // remaining, computed from the LIVE ROWS every time, with an optional override
 // for the card this request just changed (whose new state is not in the table
@@ -995,16 +994,22 @@ async function doSubmit(wb) {
   const cards = await readCards(wb.id);
   const grouped = byCard(await readAnswers(wb.id));
 
-  // Recompute EVERY card, and write back any that drifted - including the ones
-  // the gate does not count, so staff review never reads a stale state either.
+  // Recompute EVERY card, and write back any that drifted, so staff review
+  // never reads a stale state.
+  //
+  // "ANYTHING TO REVIEW" IS KEYED ON THE ROWS, not on the counting rule: with
+  // every card counting (D6), a workbook of nothing but empty cards would
+  // otherwise pass the emptiness check below by confirming its way through,
+  // and an entirely empty workbook is not finished, it is empty. Answers must
+  // belong to a card that EXISTS - an orphan row under a deleted card is not
+  // something anyone can review or confirm.
   let remaining = 0;
-  let anythingToReview = false;
+  const anythingToReview = cards.some((card) => (grouped.get(card.id) || []).length > 0);
   for (const card of cards) {
     const answers = grouped.get(card.id) || [];
     const state = cardState(card, answers);
     if (state !== card.state) await writeCardState(card, state);
-    if (!cardCounts(answers)) continue;      // nothing to review, nothing to hold Send for
-    anythingToReview = true;
+    if (!cardCounts(answers)) continue;      // every card counts now; the shape stays (see cardCounts)
     // The gate asks for the DELIBERATE ACT, not for the answer to look different.
     if (!cardIsReady(card)) remaining++;
   }
@@ -1630,7 +1635,9 @@ async function doReviewStaff(req, body) {
       if (a.target_kind === "academy_setting") { academy.push(entry); continue; }
       items.push(entry);
     }
-    if (!items.length && !cardCounts(mine)) continue;   // nothing to show for an empty card
+    // An empty confirmed card APPEARS in review with items: [] (D6): "he was
+    // asked, nothing to add" is a decision staff see and approve, not a row
+    // that vanishes off the surface they read while the gate still counts it.
     cardGroups.push({
       card_key: card.card_key,
       title: card.title,
@@ -1744,11 +1751,11 @@ async function doApproveCard(req, body) {
   if (!card) throw bad("not found", 404);
 
   const grouped = byCard(answers);
-  const mine = grouped.get(card.id) || [];
-  if (!cardCounts(mine)) throw bad("there is nothing on this card to approve", 409);
-  // STAFF APPROVE WHAT THE OWNER CONFIRMED, never more. A card he did not
-  // confirm is a card whose answer does not exist yet, and approving it would
-  // stamp the staff act onto a value nobody stands behind.
+  // STAFF APPROVE WHAT THE OWNER CONFIRMED, never more - and never less: an
+  // EMPTY confirmed card is approvable, because "he was asked and had nothing
+  // to add" is a decision staff sign off like any other (D6). The confirmed_at
+  // check below is the real gate; the old "nothing on this card to approve"
+  // refusal is gone with the counting rule that produced it.
   if (!card.confirmed_at) throw bad("the owner has not confirmed this card, so there is nothing to approve yet", 409);
 
   // Idempotent: the FIRST stamp is the record. Re-approving does not move it,

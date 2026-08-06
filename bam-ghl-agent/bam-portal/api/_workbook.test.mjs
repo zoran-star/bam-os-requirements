@@ -104,9 +104,13 @@
 //       MUTATE=submittededitable cannot see: that one covers a save that
 //       arrives late, this one covers a save already in flight.
 //
-//   MUTATE=emptycardblocks     node api/_workbook.test.mjs
-//       every card counts again, including one with nothing on it - the eighth
-//       mandatory click the product owner cut two cards to avoid.
+//   MUTATE=emptycardsdontcount node api/_workbook.test.mjs
+//       cardCounts goes back to "has answers", so the denominator GROWS when an
+//       addition lands (0-of-7 becomes 5-of-8 under the owner's cursor) and the
+//       empty add-a-plan card can ship with nobody able to tell "he was asked
+//       and had nothing to add" from "he never looked". (The old
+//       MUTATE=emptycardblocks was RETIRED by the D6 ruling: the behaviour it
+//       reintroduced - every card counts - is now the correct one.)
 //   MUTATE=countsflag          node api/_workbook.test.mjs
 //       "does this card count" becomes writable by a card_key or a meta flag, so
 //       seeding can make a REAL question invisible to the submit gate. The
@@ -420,32 +424,32 @@ const CONFIRMSURVIVESEDIT = [[
   `  const retire = actedNow && !!card.confirmed_at;`,
   `  const retire = false && actedNow && !!card.confirmed_at;   // (control confirmsurvivesedit)`]];
 
-// ── the emptiness rule, and the loophole it could become ─────────────────────
+// ── the counting rule, and the loophole it could become ──────────────────────
 
-// EVERY CARD COUNTS AGAIN, including the empty one. This is the eighth
-// mandatory click the product owner cut two cards to avoid: a card with nothing
-// on it sits reading "Not reviewed yet" and holds Send hostage over a question
-// with no content.
-const EMPTYCARDBLOCKS = [[
-  `const cardCounts = (answers) => (answers || []).length > 0;`,
-  `const cardCounts = (answers) => true; // (control emptycardblocks) an empty card holds Send hostage`]];
+// THE DENOMINATOR GROWS AGAIN. cardCounts goes back to "has answers", which is
+// the pre-D6 rule: an addition landing on the empty add-a-plan card grows the
+// total mid-session, and "he was asked and had nothing to add" becomes
+// unrecordable because the empty card never demands its confirm.
+const EMPTYCARDSDONTCOUNT = [[
+  `const cardCounts = (answers) => true;`,
+  `const cardCounts = (answers) => (answers || []).length > 0; // (control emptycardsdontcount) empty cards stop counting`]];
 
 // THE RULE KEYS ON SOMETHING WRITABLE. The moment "does this card count" can be
-// set by seeding, a card_key or a payload, the no-partial-submit ruling is
+// set by seeding, a card_key or a meta flag, the no-partial-submit ruling is
 // defeated from the inside by the people it binds - a REAL question can be made
 // invisible to the gate.
 const COUNTSFLAG = [[
-  `const cardCounts = (answers) => (answers || []).length > 0;`,
+  `const cardCounts = (answers) => true;`,
   `const cardCounts = (answers, card) => { // (control countsflag) an exemption anyone can write
   if (card && card.card_key === "plans") return false;
   if (card && card.meta && card.meta.counts === false) return false;
-  return (answers || []).length > 0;
+  return true;
 };`],
   [`  for (const c of cards) {
     if (!cardCounts(grouped.get(c.id))) continue;`,
    `  for (const c of cards) {
     if (!cardCounts(grouped.get(c.id), c)) continue;`],
-  [`    if (!cardCounts(answers)) continue;      // nothing to review, nothing to hold Send for`,
+  [`    if (!cardCounts(answers)) continue;`,
    `    if (!cardCounts(answers, card)) continue;`]];
 
 // AN ADDITION MADE AFTER A CONFIRM LEAVES THE CONFIRM STANDING, so an
@@ -465,7 +469,7 @@ const EDITS = {
   metawritable: METAWRITABLE, latewrite: LATEWRITE, dropnulls: DROPNULLS,
   addforeign: ADDFOREIGN, payloadtarget: PAYLOADTARGET, addcap: ADDCAP,
   addsubmitted: ADDSUBMITTED, addconfirmed: ADDCONFIRMED, ghostremove: GHOSTREMOVE,
-  emptycardblocks: EMPTYCARDBLOCKS, countsflag: COUNTSFLAG, addkeepsconfirm: ADDKEEPSCONFIRM,
+  emptycardsdontcount: EMPTYCARDSDONTCOUNT, countsflag: COUNTSFLAG, addkeepsconfirm: ADDKEEPSCONFIRM,
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
 };
@@ -1331,56 +1335,59 @@ console.log("\n── 12. the caps, the ghost, and the ordering, on the addition
   reset();
 }
 
-console.log("\n── 13. a card with nothing to review, and the loophole that rule could become ──");
+console.log("\n── 13. every card counts, and confirm-it-empty is a real answer ──");
 {
-  // The product owner approved a SEVEN-card workbook, and got there by cutting
-  // two cards because a card that could only ever answer "none" was a mandatory
-  // click that taught us nothing. The empty "anything missing?" card exists in
-  // the TABLE because an addition needs a card to belong to, but it must not
-  // become the eighth mandatory click by the back door.
-  //
-  // THE RULE SHIPPED WITH NO BEHAVIOURAL ASSERTION AT ALL - only the shape pin
-  // knew `counts` existed. Everything below is that gap closed.
+  // D6 (2026-08-06): the gate counts CARDS, from first render. The previous
+  // rule (a card with no answers cannot hold Send) grew the denominator when
+  // an addition landed - the owner watched "0 of 7" become "5 of 8" - and let
+  // the add-a-plan card ship with nobody able to tell "he was asked and had
+  // nothing to add" from "he never looked", while the card's own hint promised
+  // "confirm it empty and we will know you were asked".
   const plansCard = () => DB.workbook_cards.push({ id: "c-plans", workbook_id: "wb1", card_key: "plans", title: "Anything missing?", sort_order: 3, state: "untouched", confirmed_at: null });
   const confirmAll = async () => { for (const k of ["tax", "plan:p1", "plan:p2"]) await post({ token: TOKEN, action: "confirm", card_key: k }); };
 
-  // ── TRANSITION 1: empty does not block ────────────────────────────────────
+  // ── the empty card COUNTS, and holds Send until confirmed empty ───────────
   plansCard();
   let r = await getWb(TOKEN);
-  const plans = r.body.cards.find((c) => c.card_key === "plans");
-  ok(plans.counts === false && r.body.cards.filter((c) => c.card_key !== "plans").every((c) => c.counts === true),
-    "an empty card reports counts:false; every card with answers reports counts:true");
+  ok(r.body.cards.every((c) => c.counts === true),
+    "every card reports counts:true - the empty add-a-plan card included");
   await confirmAll();
+  const heldEmpty = await post({ token: TOKEN, action: "submit" });
+  ok(heldEmpty.body.ok === false && heldEmpty.body.remaining === 1,
+    `with the other three confirmed, Send still waits for the empty card (remaining ${heldEmpty.body.remaining})`);
+  const emptyConfirm = await post({ token: TOKEN, action: "confirm", card_key: "plans" });
+  ok(emptyConfirm.body.ok === true && !!row("workbook_cards", "c-plans").confirmed_at,
+    "confirming it EMPTY is accepted - 'he was asked, nothing to add' now has a record");
   const sent = await post({ token: TOKEN, action: "submit" });
   ok(sent.body.ok === true && sent.body.remaining === 0,
-    "with the other three confirmed, Send goes through - the empty card never held it hostage");
-  ok(stateOf("c-plans") === "untouched",
-    "and it was never confirmed - it is not a click he had to make");
+    "and Send goes through with the deliberate act on every card");
 
-  // ── TRANSITION 2: the moment it holds an addition it counts AND blocks ─────
+  // ── an addition does not move the denominator ─────────────────────────────
   reset(); plansCard();
   await confirmAll();
+  const preTotal = (await getWb(TOKEN)).body.cards.filter((c) => c.counts).length;
   const added = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Summer 1x/week", price: 150 } });
-  ok(added.body.card.counts === true && added.body.remaining === 1,
-    `one addition makes the card count, and remaining goes back to 1 (saw ${added.body.remaining})`);
+  const postTotal = (await getWb(TOKEN)).body.cards.filter((c) => c.counts).length;
+  ok(preTotal === 4 && postTotal === 4 && added.body.card.counts === true,
+    `the denominator is ${preTotal} before the add and ${postTotal} after - it cannot grow mid-session (the 0-of-7 -> 5-of-8 defect)`);
+  ok(added.body.remaining === 1, `and remaining is 1 - the card holds Send for the request (saw ${added.body.remaining})`);
   const held = await post({ token: TOKEN, action: "submit" });
   ok(held.body.ok === false && held.body.remaining === 1,
-    "and Send is REFUSED until he confirms it - an unreviewed request is not a sent workbook");
+    "Send is REFUSED until he confirms it - an unreviewed request is not a sent workbook");
   const okNow = await post({ token: TOKEN, action: "confirm", card_key: "plans" });
   ok(okNow.body.remaining === 0 && (await post({ token: TOKEN, action: "submit" })).body.ok === true,
-    "confirming it releases Send, like any other card that has something on it");
+    "confirming it releases Send, like any other card");
 
-  // ── TRANSITION 3: remove it and it stops blocking ─────────────────────────
+  // ── removing the addition does not un-count the card ──────────────────────
   reset(); plansCard();
   await confirmAll();
   const temp = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Never mind", price: 10 } });
   const back = await post({ token: TOKEN, action: "remove", card_key: "plans", id: temp.body.answer.id });
-  ok(back.body.card.counts === false && back.body.remaining === 0,
-    "removing the addition empties the card again and it stops counting");
-  ok(stateOf("c-plans") === "untouched",
-    "its stored state is 'untouched' - which under the old rule would have blocked Send forever");
+  ok(back.body.card.counts === true && back.body.remaining === 1,
+    `emptied again, the card STILL counts and still waits for its confirm (remaining ${back.body.remaining})`);
+  await post({ token: TOKEN, action: "confirm", card_key: "plans" });
   ok((await post({ token: TOKEN, action: "submit" })).body.ok === true,
-    "and Send goes through, on a card carrying a state that is not ready");
+    "and confirm-it-empty sends it");
 
   // ── THE LOOPHOLE: emptiness is the ONLY discriminator ──────────────────────
   // If seeding, a card_key or a payload could mark a card exempt, the
