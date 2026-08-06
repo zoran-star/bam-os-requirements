@@ -1328,16 +1328,23 @@ const CODE_T = {
 };
 
 // clients.tax_config, canonical shape { pct, label } EXACTLY as GTA stores it
-// ({ pct: 13, label: "HST" }), or null when he answered no. Extra keys the
-// workbook capture carried (charges_tax, the example sentence, chip indexes)
-// are STRIPPED: resolveFee reads pct and label and nothing else, and a shape
-// with passengers is a shape someone eventually reads a passenger out of.
+// ({ pct: 13, label: "HST" }), or { charges_tax: false } when he answered no.
+// A CONFIRMED NO IS A VALUE, NEVER null: null means "never asked", and the two
+// used to collapse - the owner's deliberate "I do not charge tax" was stored
+// as the same nothing an unasked academy carries, so a future workbook asked
+// him again and nothing downstream could tell the answers apart. The page's
+// taxModel reads charges_tax === false as ANSWERED No, resolveFee (_fees.js)
+// treats it as "no tax, and do not fall back to a stale typed string", and
+// every other consumer reads .pct and sees no tax. MUTATE=noisnull.
+// Extra keys the workbook capture carried (the example sentence, chip indexes,
+// a null pct riding a No) are STRIPPED: a shape with passengers is a shape
+// someone eventually reads a passenger out of.
 function canonicalTax(v) {
-  if (v === false) return tOk(null);
+  if (v === false) return tOk({ charges_tax: false });
   if (typeof v !== "object" || v === null || Array.isArray(v)) {
     return tErr(`not a tax answer this can store: ${JSON.stringify(v)}`);
   }
-  if (v.charges_tax === false) return tOk(null);
+  if (v.charges_tax === false) return tOk({ charges_tax: false });
   const pct = Number(v.pct);
   if (!Number.isFinite(pct) || pct <= 0) return tErr("a tax rate must be a number above zero");
   return tOk({ pct, label: String(v.label == null ? "" : v.label).trim() });
@@ -2140,7 +2147,7 @@ async function phase3Preview(clientId, mod) {
       refused: String((e && e.message) || "the price machinery refused to build targets"),
     };
   }
-  const [catalogRead, offersRead, cadenceRead] = await Promise.all([
+  const [catalogRead, offersRead, cadenceRead, clientRead] = await Promise.all([
     // MUTATE=catalogblind. Executed with this read throwing under the old
     // `.catch(() => [])`: matched=1 / would_mint=4 became matched=0 /
     // would_mint=5 with status 200 - the rehearsal telling staff to mint five
@@ -2158,10 +2165,35 @@ async function phase3Preview(clientId, mod) {
       + "&select=source_offer_id,source_offer_price_key,billing_cadence,sort_order&order=sort_order.asc",
       "offer_prices billing_cadence"
     ),
+    // The academy row itself, for the READINESS surface below (tax_state). Read
+    // fresh here rather than trusted from the apply's earlier state, because
+    // the tax write in phase b landed BEFORE this preview runs and the state
+    // reported must be the state the mint would actually see.
+    readForPreview(`clients?id=eq.${enc(clientId)}&select=tax_config&limit=1`, "clients tax_config"),
   ]);
   const catalog = catalogRead.rows;
   const previewOffers = offersRead.rows;
   const canCompare = catalogRead.state === "read";
+
+  // ── TAX READINESS, three-outcome plus the confirmed no ────────────────────
+  // "confirmed_no" and "never_asked" are DIFFERENT answers and the whole point
+  // of storing { charges_tax: false }: a rehearsal that showed untaxed amounts
+  // could not previously say whether the owner decided that or nobody asked.
+  // "could_not_read" is its own outcome - a failed read must never report as
+  // either of the real states (house rule: a read that failed is not a read
+  // that found nothing).
+  let taxState;
+  if (clientRead.state !== "read") taxState = "could_not_read";
+  else {
+    const cfg = (clientRead.rows[0] || {}).tax_config;
+    if (cfg == null) taxState = "never_asked";
+    else if (cfg.charges_tax === false) taxState = "confirmed_no";
+    else if (Number(cfg.pct) > 0) taxState = "configured";
+    // A stored shape taxFee cannot price (no usable pct, not a confirmed no)
+    // charges nothing, exactly as never-asked does - and unlike a confirmed
+    // no, somebody should still ask.
+    else taxState = "never_asked";
+  }
 
   // REPORT-ONLY shape. The live mint (when it exists) goes through
   // create-price.js recurringFor, which also honors declared week rhythms and
@@ -2339,6 +2371,7 @@ async function phase3Preview(clientId, mod) {
     matched: canCompare ? rows.filter((r) => r.needs_mint === false).length : null,
     would_mint: canCompare ? rows.filter((r) => r.needs_mint === true).length : null,
     withheld_fees: withheld ? withheld.length : null,
+    tax_state: taxState,
     catalog: catalogRead.state === "read" ? (catalog.length ? "read" : "empty") : catalogRead.state,
     ...(canCompare ? {} : {
       could_not_compare: "the price catalog could not be read, so nothing here says whether these prices already exist. Do NOT mint from this run: minting against an unread catalog is how duplicate Stripe prices get made.",

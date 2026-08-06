@@ -365,9 +365,18 @@ const FEEWITHHELDSILENTLY = [[
   `    withheld_signup_fees: withheld,`,
   `    // (control feewithheldsilently) the withhold is dropped from the response`]];
 
+// The deliberate No collapses back into never-asked: canonicalTax stores null
+// for { charges_tax: false }, so the owner's answer and an unasked academy are
+// the same nothing again, and a future workbook asks him a question he already
+// answered.
+const NOISNULL = [[
+  `  if (v.charges_tax === false) return tOk({ charges_tax: false });`,
+  `  if (v.charges_tax === false) return tOk(null);   // (control noisnull) the deliberate no collapses into never-asked`]];
+
 const EDITS = {
   applybeforereview: APPLYBEFOREREVIEW,
   feewithheldsilently: FEEWITHHELDSILENTLY,
+  noisnull: NOISNULL,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -1278,6 +1287,50 @@ console.log("\n── 15. a withheld joining fee is DATA in the response, not a 
   ok(r2.body.phase3.targets.some((t) => t.key === "Elementary Academy|signup_fee"),
     "while the fee target is present in the targets");
   reset();
+}
+
+console.log("\n── 16. a confirmed No to tax is a VALUE, never null ──");
+{
+  // ── the No lands as { charges_tax: false } and the rehearsal says so ──────
+  reset();
+  approveAll();
+  // What the page's writeTax really sends for a No: the marker plus passengers.
+  row("workbook_answers", "a-tax").answered = { charges_tax: false, pct: null, label: "Sales tax" };
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const cfg = row("clients", "sj").tax_config;
+  ok(r.body.ok === true && JSON.stringify(cfg) === JSON.stringify({ charges_tax: false }),
+    `a No lands as clients.tax_config = { charges_tax: false } - a value, not null (saw ${JSON.stringify(cfg)})`);
+  ok(r.body.phase3.tax_state === "confirmed_no",
+    `and the rehearsal states it (tax_state ${JSON.stringify(r.body.phase3.tax_state)})`);
+  const byKey16 = Object.fromEntries(r.body.phase3.targets.map((t) => [t.key, t]));
+  const eleM16 = byKey16["Elementary Academy|monthly"] || {};
+  ok(eleM16.allin_cents === 20000 && eleM16.base_cents === 20000,
+    `while every amount is the BASE amount - a confirmed no taxes nothing (Elementary monthly all-in ${eleM16.allin_cents})`);
+  reset();
+
+  // ── never-asked stays its own answer ──────────────────────────────────────
+  reset();
+  approveAll();
+  row("workbook_answers", "a-tax").answered = null;
+  row("workbook_answers", "a-tax").proposed = null;
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(row("clients", "sj").tax_config === null && r2.body.phase3.tax_state === "never_asked",
+    `an academy nobody asked stays null and reports never_asked (saw ${JSON.stringify(r2.body.phase3.tax_state)})`);
+  reset();
+
+  // ── and a configured academy reports configured ───────────────────────────
+  reset();
+  approveAll();
+  const r3 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r3.body.phase3.tax_state === "configured",
+    `a real rate reports configured (saw ${JSON.stringify(r3.body.phase3.tax_state)})`);
+  reset();
+
+  // ── the _fees guard: a confirmed no beats a stale typed string ────────────
+  const fees = await import("./_fees.js");
+  const resolved = fees.resolveFee({ taxConfig: { charges_tax: false }, legacyText: "13% HST" });
+  ok(resolved === null,
+    `resolveFee: a confirmed no beats a stale typed "13% HST" instead of falling through to it (resolved ${JSON.stringify(resolved)})`);
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────

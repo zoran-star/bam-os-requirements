@@ -162,8 +162,8 @@
  *       write later.
  *
  * Measured 2026-08-06 (after the D1 builds: withheld-fee report + Variant A
- * codes guard), unmutated ALL PASS (118 assertions).
- * confirmuntargetedcode -> 2 failures.
+ * codes guard + the D5 confirmed-no), unmutated ALL PASS (122 assertions).
+ * confirmuntargetedcode -> 2 failures, noisnull -> 3.
  * typingisapproving -> 9 failures, pagecountsall -> 13, feecasing -> 5,
  * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 5,
  * staffcountsanswered -> 4, renameisnotachange -> 2, reviewdropscards -> 1,
@@ -362,6 +362,12 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   feewithheldsilently: [[
     `    withheld_signup_fees: withheld,`,
     `    // (control feewithheldsilently) the withhold is dropped from the response`]],
+  // The deliberate No collapses back into never-asked: canonicalTax stores
+  // null again for { charges_tax: false }, so a future workbook renders the
+  // tax card as unanswered over a question the owner already answered.
+  noisnull: [[
+    `  if (v.charges_tax === false) return tOk({ charges_tax: false });`,
+    `  if (v.charges_tax === false) return tOk(null);   // (control noisnull)`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -932,7 +938,7 @@ const RETURNS = [
   "submitAdd", "removeAddition", "flushAll", "idxOf", "monthsOf", "sameShape", "val", "ansOf",
   "planModel", "taxModel", "codeModel", "priceKeys", "addSummary", "readAdd", "addProblem",
   "capReason", "pillOf", "additionsOf", "hasAdditionFields", "sendBlocked", "drawPlan",
-  "openAdd", "applyEverything", "appliesEverything",
+  "openAdd", "applyEverything", "appliesEverything", "setTax",
   "drawLadder", "prevOpts", "TYPES", "TYPES_W", "CYCLES", "CYCLES_W", "AFTER", "AFTER_W",
   "YESNO_W", "CHARGE_W", "DUR", "KIND", "ADDOPEN", "MAX_ADD_PER_CARD",
 ].join(", ");
@@ -1703,6 +1709,45 @@ console.log("\n── H6. rollback puts back exactly what he was looking at ─�
   const surface = pageSurface();
   check(surface === SURFACE_BEFORE,
     `his read-only page renders byte-identically to before the apply${surface === SURFACE_BEFORE ? "" : " - first difference at char " + [...surface].findIndex((ch, i) => ch !== SURFACE_BEFORE[i])}`);
+}
+
+console.log("\n── I. a confirmed No to tax survives as a value the next workbook reads ──");
+{
+  // A FRESH RUN in the same harness: the stub world is reset wholesale and a
+  // NEW page instance is built, because the real page never un-submits (RO is
+  // one-way by design) and this section needs an editable workbook. Everything
+  // else - the router, the handler, the DOM double - is the same machinery.
+  reset();
+  page = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await page.boot(); await settle();
+  page.setTax(0);                                   // the real "No, my prices are the full amount" chip
+  TIMERS.clear(); await page.flushAll(); await settle();
+  for (const key of ["tax", "plan:p1", "plan:p2", "plan:p3", "plan:p4", "codes", "plans", "notes"]) await confirm(key);
+  ALERTS = [];
+  await page.doSubmit(); await settle();
+  check(DB.workbooks[0].status === "submitted", `the No workbook sends${ALERTS.length ? " (alerts: " + ALERTS.join(" | ") + ")" : ""}`);
+  const rvI = await staffApi({ action: "review", workbook_id: "wb1" });
+  for (const k of rvI.body.gate.unapproved_card_keys) await staffApi({ action: "approve-card", workbook_id: "wb1", card_key: k });
+  const apI = await staffApi({ action: "apply", workbook_id: "wb1" });
+  check(apI.body.ok === true && JSON.stringify(DB.clients[0].tax_config) === JSON.stringify({ charges_tax: false }),
+    `apply stores the No as { charges_tax: false }, never null (saw ${JSON.stringify(DB.clients[0].tax_config)})`);
+  check(apI.body.phase3.tax_state === "confirmed_no",
+    `and the rehearsal reports it (tax_state ${JSON.stringify(apI.body.phase3.tax_state)})`);
+
+  // THE DISTINGUISHABILITY THE PAGE COPY PROMISES ("Answering No is a real
+  // answer, not a skip"): a future workbook minted over this academy carries
+  // the stored config as current_value, and the page must render the card as
+  // ANSWERED No - not as never asked. MUTATE=noisnull collapses exactly this.
+  const taxRowI = dbAnswer("c-tax", "tax_config");
+  taxRowI.current_value = DB.clients[0].tax_config;
+  taxRowI.proposed = null;
+  taxRowI.answered = null;
+  DB.workbooks[0].status = "sent";                  // a fresh link over the same rows
+  page = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await page.boot(); await settle();
+  const TI = page.MODEL[lidOf("tax")];
+  check(TI.on === 0,
+    `the next workbook renders the tax card as ANSWERED No (on ${JSON.stringify(TI.on)}), not as never asked (null)`);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
