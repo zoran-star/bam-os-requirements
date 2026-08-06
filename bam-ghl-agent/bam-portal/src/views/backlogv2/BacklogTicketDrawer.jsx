@@ -147,6 +147,9 @@ export default function BacklogTicketDrawer({
     ["From", trail.view ? `the ${trail.view} view` : (intake.page || "the portal")],
     ["Device", trail.viewport ? `${trail.viewport.w} by ${trail.viewport.h}` : null],
     ["Time on page", trail.seconds_on_page ? `${trail.seconds_on_page}s` : null],
+    // The count only, because the error TEXT gets its own block below: on a bug
+    // report the actual exception is the most useful thing in the payload and
+    // burying it in a definition list wastes it.
     ["Errors on screen", errors.length ? `${errors.length}` : "none"],
   ].filter(([, v]) => v);
 
@@ -202,6 +205,17 @@ export default function BacklogTicketDrawer({
               ))}
             </dl>
           </section>
+
+          {errors.length > 0 && (
+            <section className="bl2-block">
+              <div className="bl2-label">What the page threw</div>
+              <ul className="bl2-errors">
+                {errors.slice(0, 5).map((e, i) => (
+                  <li key={i}>{typeof e === "string" ? e : (e?.message || JSON.stringify(e))}</li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {clicks.length > 0 && (
             <section className="bl2-block">

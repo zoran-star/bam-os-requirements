@@ -184,7 +184,18 @@
   transition: border-color var(--t-fast);
 }
 .bl2-shot:hover { border-color: var(--gold); }
-.bl2-shot img { display: block; width: 100%; height: auto; }
+/* Capped, because clients photograph and screenshot in portrait: an uncapped
+   1086x1448 flyer rendered 570px tall and pushed the facts, the tap trail and
+   the triage button below the fold. The thumbnail links to the full image, so
+   nothing is lost by fitting it. */
+.bl2-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  object-position: top;
+}
 
 .bl2-filelink {
   display: inline-block;
@@ -203,6 +214,19 @@
 .bl2-fact { display: flex; gap: 10px; font-size: 12px; }
 .bl2-fact dt { flex: 0 0 116px; color: var(--text-mute); }
 .bl2-fact dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+
+/* Raw exception text, so it reads as a technical value rather than prose. */
+.bl2-errors { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.bl2-errors li {
+  padding: 8px 10px;
+  background: var(--red-soft);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--red);
+  overflow-wrap: anywhere;
+}
 
 .bl2-trail { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
 .bl2-trail li { display: flex; gap: 10px; font-size: 12px; align-items: baseline; }
@@ -269,7 +293,9 @@
   position: absolute;
   z-index: 2;
   min-width: 230px;
-  max-height: 320px;
+  /* Fits all 7 triage targets without clipping, and still scrolls for the
+     owner menu, which grows with the staff table. */
+  max-height: min(60vh, 440px);
   overflow-y: auto;
   padding: 6px;
   background: var(--surface-el);
