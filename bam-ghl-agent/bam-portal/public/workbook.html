@@ -873,6 +873,18 @@ async function confirmCard(lid){
     if(t.on===null){alert('Pick Yes or No first.');return}
     if(t.on===1&&!(parseFloat(t.pct)>0)){alert('Type the tax rate first.');return}
   }
+  if(c.type==='codes'){
+    /* Variant A (Zoran's ruling, 2026-08-06): a named code with nothing ticked
+       cannot be confirmed. Under an empty applies_to, Stripe discounts every
+       line of the first invoice - the joining fee included - as a DEFAULT, and
+       the mint then withholds the fee target in self-defence. The refusal
+       lives here, at the moment of the deliberate act, so the everything-scope
+       is something the owner CHOSE (the explicit chip) rather than inherited.
+       The server stays permissive on confirm; the Step 1 withhold report is
+       the backstop for a code that somehow arrives untargeted anyway. */
+    const untargeted=(MODEL[lid]||[]).find(x=>String(x.code).trim()&&!(x.applies&&x.applies.length));
+    if(untargeted){alert('Say what '+untargeted.code+' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');return}
+  }
   // Confirm after the edits it is confirming, never before, or the server would
   // record an approval of a value it has not been told about yet.
   if(!await flushAll()){alert('Your last change has not saved yet, so we did not confirm this card. Check the message at the top of the page and try again.');return}
@@ -1349,8 +1361,8 @@ function codeCardHTML(lid){
       <div class="chiprow">${DUR.map((d,j)=>`<button class="bchip sm ${c.dur===j?'sel':''}" onclick="setA('${lid}',${F}duration',DUR[${j}]);drawCodes()">${d}</button>`).join('')}
       ${c.dur===1?`<input class="bb-input" type="number" inputmode="numeric" style="max-width:80px" placeholder="3" value="${c.durMonths||''}" oninput="setA('${lid}',${F}duration_months',+this.value||0)"><span class="ml">months</span>`:''}</div>
       <div class="q" style="margin:12px 0 6px;font-size:12.5px">What does it apply to?</div>
-      <div class="chiprow">${keys.length?keys.map(k=>`<button class="bchip sm ${(c.applies||[]).includes(k)?'sel':''}" onclick="toggleApplies('${lid}',${i},${JSON.stringify(k).replace(/"/g,'&quot;')})">${esc(keyLabel(k))}</button>`).join(''):'<span class="ml">Add your prices above first.</span>'}</div>
-      ${!(c.applies&&c.applies.length)&&String(c.code).trim()?`<div class="warnbox">Nothing ticked means this code comes off <b>everything</b> on the first bill${anyJoiningFee()?', including the joining fee':''}. Tick the prices it should apply to if that is not what you want.</div>`:''}
+      <div class="chiprow">${keys.length?`<button class="bchip sm ${appliesEverything(c)?'sel':''}" onclick="applyEverything('${lid}',${i})">Everything, including the joining fee</button>`+keys.map(k=>`<button class="bchip sm ${(c.applies||[]).includes(k)?'sel':''}" onclick="toggleApplies('${lid}',${i},${JSON.stringify(k).replace(/"/g,'&quot;')})">${esc(keyLabel(k))}</button>`).join(''):'<span class="ml">Add your prices above first.</span>'}</div>
+      ${String(c.code).trim()?`<div class="qhint" style="margin-top:8px">Tick the prices this code covers. Choosing "Everything, including the joining fee" is a real choice, not a default.</div>`:''}
       <div class="subgrid" style="margin-top:10px">
         <span class="ml">Expires</span><input class="bb-input" type="date" style="max-width:160px" value="${esc(c.expires)}" oninput="setA('${lid}',${F}expires_at',this.value)">
         <span class="ml">Max total uses</span><input class="bb-input" type="number" inputmode="numeric" style="max-width:130px" placeholder="unlimited" value="${c.max||''}" oninput="setA('${lid}',${F}max_redemptions',+this.value||0)">
@@ -1385,8 +1397,30 @@ function codeWasNamed(c,i){
   const a=ansOf(c,'codes.'+i+'.code'); if(!a)return '';
   return (has(a.proposed)?a.proposed:a.current_value)||'';
 }
+/* THE EXPLICIT "everything" CHOICE (Variant A, Zoran's ruling 2026-08-06).
+   Clicking it MATERIALIZES the full key list - real keys, the joining fee's
+   included - rather than storing a sentinel, because an empty applies_to is
+   exactly the state the confirm guard below refuses: under it Stripe discounts
+   every line of the first invoice BY DEFAULT, and the mint withholds the fee
+   target in response. With every key ticked, unrestrictedCodes() on the server
+   sees a populated list, the fee target MINTS, and the coupon covers it
+   because the owner said so - a decision, not an inheritance. */
+function appliesEverything(c){
+  const keys=priceKeys();
+  if(!keys.length)return false;
+  const list=(c.applies||[]).slice().sort();
+  const want=keys.slice().sort();
+  return list.length===want.length&&want.every((k,j)=>k===list[j]);
+}
+function applyEverything(lid,i){
+  setA(lid,'codes.'+i+'.applies_to',priceKeys());drawCodes();
+}
 function toggleApplies(lid,i,k){
   const C=MODEL[lid]||[];const c=C.find(x=>x.i===i);if(!c)return;
+  /* Ticking ONE key out of the materialized everything-list means "just this
+     one", not "everything minus this one": the chip he pressed is the scope he
+     chose. Normal toggle behaviour takes over from there. */
+  if(appliesEverything(c)){setA(lid,'codes.'+i+'.applies_to',[k]);drawCodes();return}
   const list=(c.applies||[]).slice();
   const j=list.indexOf(k);if(j<0)list.push(k);else list.splice(j,1);
   setA(lid,'codes.'+i+'.applies_to',list);drawCodes();

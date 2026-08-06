@@ -161,8 +161,9 @@
  *       parent pays with tax on. The defect the tax card exists to close, one
  *       write later.
  *
- * Measured 2026-08-06 (after the D1 withheld-fee build), unmutated ALL PASS
- * (113 assertions).
+ * Measured 2026-08-06 (after the D1 builds: withheld-fee report + Variant A
+ * codes guard), unmutated ALL PASS (118 assertions).
+ * confirmuntargetedcode -> 2 failures.
  * typingisapproving -> 9 failures, pagecountsall -> 13, feecasing -> 5,
  * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 5,
  * staffcountsanswered -> 4, renameisnotachange -> 2, reviewdropscards -> 1,
@@ -246,6 +247,12 @@ const PAGE_CONTROLS = {
     `  // (control numericprice) a number is sent where the offer stores a string`]],
   // The parser as it was: first number in the string, then convert if the string
   // mentions weeks ANYWHERE. "3 Months (12 Weeks)" -> 3 -> /4.345 -> 1.
+  // The codes-card confirm guard is gone, so a named code with nothing ticked
+  // confirms straight through - and the everything-scope goes back to being a
+  // default the owner inherited rather than a choice he made.
+  confirmuntargetedcode: [[
+    `    if(untargeted){alert('Say what '+untargeted.code+' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');return}`,
+    `    // (control confirmuntargetedcode) the guard is gone`]],
   monthsmisparse: [[
     `  const t=String(s==null?'':s);
   const mo=t.match(/(\\d+(?:\\.\\d+)?)\\s*(?:mo|mos|month|months)\\b/i);
@@ -925,7 +932,7 @@ const RETURNS = [
   "submitAdd", "removeAddition", "flushAll", "idxOf", "monthsOf", "sameShape", "val", "ansOf",
   "planModel", "taxModel", "codeModel", "priceKeys", "addSummary", "readAdd", "addProblem",
   "capReason", "pillOf", "additionsOf", "hasAdditionFields", "sendBlocked", "drawPlan",
-  "openAdd",
+  "openAdd", "applyEverything", "appliesEverything",
   "drawLadder", "prevOpts", "TYPES", "TYPES_W", "CYCLES", "CYCLES_W", "AFTER", "AFTER_W",
   "YESNO_W", "CHARGE_W", "DUR", "KIND", "ADDOPEN", "MAX_ADD_PER_CARD",
 ].join(", ");
@@ -1258,6 +1265,43 @@ console.log("\n── F2. an addition: a request, never a write ──");
   check(!DB.workbook_answers.some((r) => r.id === gone), "remove: a hard delete, so nothing survives on the staff 'needs creating' list");
   check(page.additionsOf(cardOf("plans")).length === 1, "remove: and the page drops it only because the server said it was gone");
   agree("after a removal", await serverRemaining());
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F3. THE CODES CARD REFUSES CONFIRM UNTIL EVERY CODE STATES ITS TARGETS
+// (D1 Variant A). An empty applies_to means Stripe discounts every line of the
+// first invoice by default - and the mint withholds the fee target in response
+// - so the page refuses the deliberate act until the scope is a choice. The
+// explicit choice is the "Everything, including the joining fee" chip, which
+// MATERIALIZES the full key list rather than storing a sentinel.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F3. a code with no stated targets cannot be confirmed ──");
+{
+  const codesLid = lidOf("codes");
+  // Take the fixture code's list away through the page's own write path.
+  await type("codes", "codes.0.applies_to", []);
+  ALERTS = [];
+  await confirm("codes");
+  check(!dbCard("c-codes").confirmed_at && !cardOf("codes").confirmed_at,
+    "confirm on a named code with nothing ticked is refused - the card stays unconfirmed on both halves");
+  check(ALERTS.length === 1 && /applies to first/.test(ALERTS[0]) && /Everything, including the joining fee/.test(ALERTS[0]),
+    `and the refusal offers the explicit choice ("${ALERTS[0]}")`);
+
+  // The Everything chip: the saved list is the page's whole materialized key
+  // vocabulary, the joining-fee keys included - real keys, not a sentinel.
+  page.applyEverything(codesLid, 0);
+  TIMERS.clear(); await page.flushAll(); await settle();
+  ALERTS = [];
+  await confirm("codes");
+  check(!!dbCard("c-codes").confirmed_at && ALERTS.length === 0,
+    "choosing Everything and confirming succeeds");
+  const savedList = dbAnswer("c-codes", "codes.0.applies_to").answered;
+  const want = page.priceKeys();
+  const sameSet = Array.isArray(savedList) && savedList.length === want.length && want.every((k) => savedList.includes(k));
+  check(sameSet && savedList.some((k) => /\|signup_fee$/.test(k)),
+    `and the saved applies_to equals the page's own key list, fee keys included (${Array.isArray(savedList) ? savedList.length : "?"} keys)`);
+  check(page.appliesEverything((page.MODEL[codesLid] || [])[0] || {}) === true,
+    "which the page reads back as the Everything state, so the chip stays lit");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
