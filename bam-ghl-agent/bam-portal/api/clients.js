@@ -2503,11 +2503,14 @@ async function handler(req, res) {
 
       // ── action=create-academy ──
       // The Plan 7 front door (2026-07-19): ONE call turns "new academy
-      // signed" into a fully initialized V2 account. Steps, each non-fatal,
+      // signed" into a fully initialized portal account. Steps, each non-fatal,
       // reported back as a checklist so staff SEES what worked:
-      //   account  clients row born with v2_access:true (+ owner phone into
-      //            onboarding_setup.owner_phone - texting step collects the
-      //            real numbers later)
+      //   account  clients row born on the tier the caller picked. DEFAULT is
+      //            V1.5 (v2_access:false, v15_access:true); pass v2_access:true
+      //            to open V2 instead. Owner phone goes into
+      //            onboarding_setup.owner_phone - the texting step collects the
+      //            real numbers later. Until 2026-08-06 this hardcoded V2 and
+      //            three academies landed there by accident.
       //   ghl      optional: resolve the picked agency sub-account NAME to a
       //            locationId (GHL_LOCATIONS_JSON blob, same JWT decode as
       //            api/ghl.js getLocationIdSync) → clients.ghl_location_id.
@@ -2537,6 +2540,11 @@ async function handler(req, res) {
         const ownPhone = typeof body.phone === "string" ? body.phone.trim() : "";
         const ghlName = typeof body.ghl_location_name === "string" ? body.ghl_location_name.trim() : "";
         let clientId = typeof body.client_id === "string" ? body.client_id : null;
+        // Portal tier at birth. V1.5 is the default: only a handful of
+        // academies belong on V2, so the caller has to ask for it. Same two
+        // mutually exclusive booleans the staff "Portal tier" selector posts
+        // (see action=update-fields below).
+        const wantsV2 = body.v2_access === true;
         if (!clientId && !bizName) return res.status(400).json({ error: "business name required" });
         if (!clientId && (!ownEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownEmail))) {
           return res.status(400).json({ error: "valid owner email required" });
@@ -2557,21 +2565,30 @@ async function handler(req, res) {
         let row = null;
         try {
           if (clientId) {
-            const rows = await supabaseSelect(`clients?id=eq.${clientId}&select=id,business_name,owner_name,email,slack_channel_id,ghl_location_id,v2_access,onboarding_setup`);
+            const rows = await supabaseSelect(`clients?id=eq.${clientId}&select=id,business_name,owner_name,email,slack_channel_id,ghl_location_id,v2_access,v15_access,onboarding_setup`);
             row = rows?.[0] || null;
             if (!row) return res.status(404).json({ error: "client not found" });
-            if (row.v2_access !== true) { await patchClient({ v2_access: true }); row.v2_access = true; }
-            step("account", true, "already existed, V2 confirmed on");
+            // Never force-upgrade an existing academy. Only move the tier when
+            // the caller explicitly asked for V2; otherwise leave it alone.
+            if (wantsV2 && row.v2_access !== true) {
+              await patchClient({ v2_access: true, v15_access: false });
+              row.v2_access = true; row.v15_access = false;
+              step("account", true, "already existed, moved to V2");
+            } else {
+              const curTier = row.v2_access ? "V2" : row.v15_access ? "V1.5" : "V1";
+              step("account", true, `already existed, tier left on ${curTier}`);
+            }
           } else {
             const ob = ownPhone ? { owner_phone: ownPhone } : {};
             const rows = await supabaseInsert("clients", {
               business_name: bizName, owner_name: ownName || null, email: ownEmail,
-              status: "onboarding", v2_access: true, onboarding_setup: ob,
+              status: "onboarding", v2_access: wantsV2, v15_access: !wantsV2,
+              onboarding_setup: ob,
             });
             row = Array.isArray(rows) ? rows[0] : rows;
             clientId = row?.id;
             if (!clientId) throw new Error("insert returned no id");
-            step("account", true, "created, V2 on");
+            step("account", true, wantsV2 ? "created, V2 on" : "created, V1.5 on");
           }
         } catch (e) {
           step("account", false, e.message);
@@ -2656,7 +2673,7 @@ async function handler(req, res) {
         if (channelId && slackToken) {
           try {
             const lines = [
-              `*${academyName}* is in. V2 on, wizard ready.`,
+              `*${academyName}* is in. ${row.v2_access ? "V2" : row.v15_access ? "V1.5" : "V1"} on, wizard ready.`,
               `Owner: ${row.owner_name || ownName || "-"} · ${row.email || ownEmail || "-"}`,
               row.ghl_location_id ? "GHL: linked (contacts + pipeline migrate; wrap offered on Texting)" : "GHL: none - file-drop import, new number or port on Texting",
               scaffoldOk ? "Site silo: robot dispatched, folder lands in bam-client-sites shortly."

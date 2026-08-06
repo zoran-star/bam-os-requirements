@@ -3634,12 +3634,14 @@ function AuthActions({ client, tokens, session, onChanged }) {
 
 // ─── New client modal ───────────────────────────────────────────────────────
 // The Plan 7 "Add academy" front door (2026-07-19). One card, one Create:
-// the api create-academy action initializes account/V2/GHL/Slack/scaffold,
+// the api create-academy action initializes account/tier/GHL/Slack/scaffold,
 // then setup-account sends the owner invite - and the result renders as a
 // per-step checklist with Retry on anything that failed. The old minimal
 // "plain client row" path stays behind a checkbox for non-academy rows.
+// Portal tier is a choice here and defaults to V1.5; only a few academies
+// belong on V2, so V2 has to be picked on purpose.
 const ACADEMY_STEP_LABELS = {
-  account: "Account created, V2 on",
+  account: "Account created",
   ghl: "GoHighLevel link",
   slack: "Slack channel + wiring",
   scaffold: "Website silo (robot)",
@@ -3656,6 +3658,10 @@ function NewClientModal({ tokens, session, staff = [], onClose, onCreated }) {
   const [ghlName, setGhlName] = useState("");
   const [ghlLocs, setGhlLocs] = useState([]);
   const [plainRow, setPlainRow] = useState(false);
+  // Portal tier for the new academy. V1.5 is the default on purpose: V2 is
+  // reserved for the few academies we run on it, and the old hardcode put
+  // three academies there by accident (2026-07-31).
+  const [tier, setTier] = useState("v15");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [result, setResult] = useState(null); // { id, slug, steps:[{key,ok,detail}] }
@@ -3690,6 +3696,7 @@ function NewClientModal({ tokens, session, staff = [], onClose, onCreated }) {
       email: email.trim(),
       phone: phone.trim() || undefined,
       ghl_location_name: ghlName || undefined,
+      v2_access: tier === "v2",
     });
     if (!ok) throw new Error(j.error || "create-academy failed");
     const steps = [...(j.steps || [])];
@@ -3776,6 +3783,23 @@ function NewClientModal({ tokens, session, staff = [], onClose, onCreated }) {
           options={[{ value: "", label: "Not on our agency (file-drop paths)" }, ...ghlLocs.map(l => ({ value: l.name, label: l.name }))]}
           tokens={t}
         />
+        {!plainRow && (
+          <div style={{ marginTop: -4 }}>
+            <EditSelect
+              label="Portal tier"
+              value={tier}
+              onChange={setTier}
+              options={[
+                { value: "v15", label: "V1.5 (default)" },
+                { value: "v2", label: "V2 (pick only if this academy runs on V2)" },
+              ]}
+              tokens={t}
+            />
+            <div style={{ fontSize: 11, color: t.textMute, marginTop: -10, marginBottom: 14 }}>
+              You can change the tier later on the academy's Overview tab.
+            </div>
+          </div>
+        )}
         <EditSelect
           label="Scaling Manager"
           value={sm}
@@ -3785,7 +3809,7 @@ function NewClientModal({ tokens, session, staff = [], onClose, onCreated }) {
         />
         <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14, cursor: "pointer", fontSize: 12.5, color: t.textMute }}>
           <input type="checkbox" checked={plainRow} onChange={e => setPlainRow(e.target.checked)} />
-          Plain client row only (no V2 setup, no invite)
+          Plain client row only (no portal setup, no invite)
         </label>
         {err && <div style={{ color: t.red, fontSize: 13, marginTop: 10 }}>{err}</div>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
