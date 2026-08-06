@@ -1746,15 +1746,25 @@ async function doApproveCard(req, body) {
   const { user, wb, wbDegraded } = await resolveStaffForWorkbook(req, body);
   assertReviewable(wb);
   const cardKey = String(body.card_key || "").trim();
-  if (!cardKey) throw bad("card_key required");
 
   const { cards, degraded } = await readCardsStaff(wb.id);
   const { answers, degraded: answersDegraded } = await readAnswersStaff(wb.id);
   if (degraded || wbDegraded || answersDegraded) {
     throw bad("this environment has not run the workbook apply migration (20260806T063000), so approvals cannot be recorded here", 409);
   }
+  // THE REFUSAL NAMES THE VOCABULARY (D8). A caller holding review output has
+  // card_id in hand right next to card_key, and a bare "card_key required" /
+  // "not found" sends them guessing which noun this action wants. The
+  // emptiness check moved BELOW the reads so both refusals can list the real
+  // keys - a sentence that names the fix, not just the failure.
+  const keys = cards.map((c) => c.card_key).join(", ");
+  if (!cardKey) {
+    throw bad(`card_key required - this action names the card by its card_key, one of: ${keys}, not by card_id`);
+  }
   const card = cards.find((c) => c.card_key === cardKey);
-  if (!card) throw bad("not found", 404);
+  if (!card) {
+    throw bad(`no card called ${JSON.stringify(cardKey)} - the card_keys on this workbook are: ${keys}`, 404);
+  }
 
   const grouped = byCard(answers);
   // STAFF APPROVE WHAT THE OWNER CONFIRMED, never more - and never less: an

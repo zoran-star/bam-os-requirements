@@ -1518,6 +1518,22 @@ console.log("\n── 19. stale discount_notes are cleared at apply, and the cle
   reset();
 }
 
+console.log("\n── 20. approve-card names its parameter and the valid keys ──");
+{
+  reset();
+  // The mistake a caller holding review output actually makes: card_id, which
+  // sits right next to card_key in every review row.
+  const byId20 = await staffPost({ action: "approve-card", workbook_id: "wb1", card_id: "c-two" });
+  ok(byId20.status === 400 && /card_key/.test(String(byId20.body.error)) && /plan:two/.test(String(byId20.body.error))
+    && /not by card_id/.test(String(byId20.body.error)) && noEmDash(String(byId20.body.error)),
+    `card_id instead of card_key is told which noun this action wants, with the real keys listed ("${byId20.body.error}")`);
+  const bogus = await staffPost({ action: "approve-card", workbook_id: "wb1", card_key: "plan:banana" });
+  ok(bogus.status === 404 && /no card called "plan:banana"/.test(String(bogus.body.error))
+    && /tax, plan:two, plan:ele, plans, codes, notes/.test(String(bogus.body.error)) && noEmDash(String(bogus.body.error)),
+    `an unknown key is refused with the whole vocabulary ("${bogus.body.error}")`);
+  reset();
+}
+
 // ─── report ──────────────────────────────────────────────────────────────────
 cleanup();
 console.log("");
