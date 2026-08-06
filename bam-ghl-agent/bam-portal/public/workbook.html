@@ -1087,9 +1087,15 @@ function planCardHTML(lid){
      ${p.type===3?`<div class="q">Describe how this one works <span class="req">*</span></div>
      <textarea class="bb-input" oninput="${s('other_description','this.value')};recalc('${lid}')">${esc(p.otherDesc)}</textarea>`:''}
 
-     ${T.on===1?`<div class="q">Is this one taxed?</div>
-     <div class="qhint">You told us you charge ${esc(T.pct)||'?'}% ${esc(T.label)}. Say exempt only if this particular price is not taxed.</div>
-     <div class="chiprow">${["Yes, taxed like everything else","No, this one is exempt"].map((c,j)=>`<button class="bchip ${p.tax===j?'sel':''}" onclick="setA('${lid}','taxable',YESNO_W[${j}]);drawPlan('${lid}')">${c}</button>`).join('')}</div>`:''}
+     ${''/* TAX EXEMPTIONS REMOVED (Zoran, 2026-08-06): "everything should always be
+        taxed, and the sign up fee will always have tax applied".
+        There used to be three questions here and on each rung asking whether a
+        particular price was exempt. They are gone rather than hidden, because a
+        question we have decided never to honour is a dead control, and this page
+        has already shipped two of those. Tax is now exactly one decision, asked
+        once, on the tax card: does he charge it, and at what rate.
+        The offer's `taxable` and `signup_fee_taxable` fields still exist and
+        still default to taxed, so nothing downstream changes shape. */}
 
      ${M?`<div class="q">Is there a one-time joining fee?</div>
      <div class="qhint">It is charged once per athlete, never on renewals.</div>
@@ -1101,8 +1107,7 @@ function planCardHTML(lid){
      ${p.fee===1?`<div class="q">Charge it on the ${CYCLES[p.cad]} option?</div>
      <div class="qhint">If you waive it everywhere, the fee is never charged at all.</div>
      <div class="chiprow">${["Charge it","Waive it"].map((c,j)=>`<button class="bchip ${p.feeOnBase===j?'sel':''}" onclick="setA('${lid}','signup_fee_on_base',CHARGE_W[${j}]);drawPlan('${lid}')">${c}</button>`).join('')}</div>
-     ${T.on===1?`<div class="q">Is the joining fee taxed?</div>
-     <div class="chiprow">${["Yes","No, exempt"].map((c,j)=>`<button class="bchip ${p.feeTax===j?'sel':''}" onclick="setA('${lid}','signup_fee_taxable',YESNO_W[${j}]);drawPlan('${lid}')">${c}</button>`).join('')}</div>`:''}`:''}
+`:''}
 
      <div class="q">Can parents pay up front for a discount?</div>
      <div class="qhint" id="lhint_${lid}"></div>
@@ -1205,8 +1210,6 @@ function drawLadder(lid){
       <div class="rmore">
        <div class="mf"><span class="ml">What do they get on this one?</span>
         <input class="rin" value="${esc(r.gets)}" placeholder="same as monthly" oninput="setA('${lid}',${F(i)}whats_included',this.value)"></div>
-       ${T.on===1?`<div class="mf"><span class="ml">Taxed?</span>
-        <span class="chiprow">${["Yes","No, exempt"].map((a,j)=>`<button class="bchip sm ${r.taxable===j?'sel':''}" onclick="setA('${lid}',${F(i)}taxable',YESNO_W[${j}]);drawPlan('${lid}')">${a}</button>`).join('')}</span></div>`:''}
        ${p.fee===1?`<div class="mf"><span class="ml">Joining fee on this one?</span>
         <span class="chiprow">${["Charge it","Waive it"].map((a,j)=>`<button class="bchip sm ${r.fee===j?'sel':''}" onclick="setA('${lid}',${F(i)}signup_fee_charge',CHARGE_W[${j}]);drawPlan('${lid}')">${a}</button>`).join('')}</span></div>`:''}
        <div class="mf"><span class="ml">Notes on this discount</span>
