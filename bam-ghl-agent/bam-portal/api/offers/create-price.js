@@ -110,8 +110,16 @@ async function accountCurrency(clientId) {
   } catch (_) { return FALLBACK_CURRENCY; }
 }
 
-// Map an offer term ("monthly"/"4_weeks"/"3_months"/"6_months") → the catalog
+// Map an offer term ("monthly"/"4_weeks"/"<n>_months") → the catalog
 // interval label we store, plus the Stripe recurring shape (checkout.js intervalFor).
+//
+// OPENED ADDITIVELY (Zoran, 2026-08-06): any bounded <n>_months term mints
+// calendar months. The 3/6 branches stay byte-identical on purpose - they are
+// what GTA's live prices were minted from. An out-of-range <n>_months REFUSES
+// LOUDLY (throws a message a human can act on) rather than falling to the
+// 4_weeks default, because minting a "27_months" commitment as a week x4
+// subscription is a silent wrong charge on a real card.
+const TERM_MAX_MONTHS = 24;
 function termToInterval(term) {
   const t = String(term || "").toLowerCase();
   if (t === "3_months") return { interval: "3_months", recurring: { interval: "month", interval_count: 3 } };
@@ -119,7 +127,49 @@ function termToInterval(term) {
   // Build S: a sign-up fee is a ONE-TIME price (no recurring block at all), so
   // it can only ever be billed as an invoice line, never as a subscription.
   if (t === "one_time" || t === "signup_fee") return { interval: "one_time", recurring: null };
+  const m = /^(\d+)_months$/.exec(t);
+  if (m) {
+    const n = +m[1];
+    if (n >= 1 && n <= TERM_MAX_MONTHS) return { interval: `${n}_months`, recurring: { interval: "month", interval_count: n } };
+    throw Object.assign(new Error(`term "${term}" is ${n} months, outside the 1-${TERM_MAX_MONTHS} month range this build can mint - fix the commitment length on the offer`), { status: 400 });
+  }
   return { interval: "4_weeks", recurring: { interval: "week", interval_count: 4 } }; // monthly / 4_weeks
+}
+
+// Term from a free-text commitment length. Mirror of _termFromLength in
+// offers/match-prices.js (see the vocabulary comment there); needed here so the
+// label lookup below can find the commitment a key was built from.
+function _termFromLength(s) {
+  const t = String(s || "").toLowerCase();
+  const m = t.match(/(\d+)\s*month/);
+  if (m) { const n = +m[1]; return (n >= 1 && n <= TERM_MAX_MONTHS) ? `${n}_months` : null; }
+  const w = t.match(/(\d+)\s*week/);
+  if (w) { const n = +w[1]; return (n % 4 === 0 && n / 4 >= 1 && n / 4 <= TERM_MAX_MONTHS) ? `${n / 4}_months` : null; }
+  const y = t.match(/(\d+)\s*(?:year|yr)/);
+  if (y || /\bannual(?:ly)?\b|\byearly\b/.test(t)) {
+    const n = (y ? +y[1] : 1) * 12;
+    return (n >= 1 && n <= TERM_MAX_MONTHS) ? `${n}_months` : null;
+  }
+  return null;
+}
+
+// The academy's length label as a declaration of billing RHYTHM (Zoran's ruling,
+// 2026-08-06). "3 Months (12 Weeks)" carries an explicit week count, and San
+// Jose's real members bill every 12 weeks - a new price minted on 3 calendar
+// months would put new signups on a different clock than existing members,
+// forever, invisibly. So a label with an explicit week count mints on weeks,
+// PROVIDED that rhythm is in the cadence vocabulary (CADENCES below) - checkout
+// bills and anchors from that vocabulary, so minting a rhythm it cannot name
+// would recreate the exact minted-on-one-clock-billed-on-another failure the
+// cadence build closed. A week count outside it warns loudly and mints the
+// term's calendar shape. A months-only label stays calendar months.
+function cadenceFromLength(len) {
+  const w = String(len || "").toLowerCase().match(/(\d+)\s*week/);
+  if (!w) return null;
+  const cad = `${+w[1]}_weeks`;
+  if (Object.prototype.hasOwnProperty.call(CADENCES, cad)) return cad;
+  console.warn(`[create-price] length "${len}" declares a ${+w[1]}-week billing rhythm, which is not in the cadence vocabulary (${Object.keys(CADENCES).join(", ")}) - minting the term's calendar shape instead. Set billing_cadence on the price row once the vocabulary supports it.`);
+  return null;
 }
 
 // ── Billing CADENCE ─────────────────────────────────────────────────────────
@@ -221,6 +271,7 @@ async function cadenceForCreation(clientId, c) {
   const key = c && c.key;
   const offerId = c && c.offer_id;
   if (!key || !offerId) return null;
+  let rowCadence = null;
   try {
     const rows = await sb(
       `offer_prices?tenant_id=eq.${encodeURIComponent(clientId)}` +
@@ -229,9 +280,39 @@ async function cadenceForCreation(clientId, c) {
       `&is_active=eq.true&is_routable=eq.true&billing_cadence=not.is.null` +
       `&order=sort_order.asc&select=billing_cadence&limit=1`
     );
-    return normCadence(Array.isArray(rows) && rows[0] && rows[0].billing_cadence);
+    rowCadence = normCadence(Array.isArray(rows) && rows[0] && rows[0].billing_cadence);
   } catch (_) {
-    return null;   // column not migrated yet, or the row is unreadable
+    // column not migrated yet, or the row is unreadable - not a cadence, and
+    // not fatal: fall through to the LABEL, which is read-only and still the
+    // academy's own declaration of how this commitment bills
+  }
+  if (rowCadence) return rowCadence;
+  return await cadenceFromOfferLabel(clientId, offerId, key);
+}
+
+// Priority 3 of the cadence decision (after an explicit request cadence and the
+// typed row): the offer's own commitment LENGTH LABEL. See cadenceFromLength for
+// the ruling. Scoped like everything else on this path: the offer named by the
+// request, non-archived offerings only (an archived GTA tier's "12 Weeks
+// (3 Months)" label must never lend its rhythm to anything), and the commitment
+// whose parsed term matches the key's term. Any failure to answer is null,
+// which mints exactly the term's standard shape.
+async function cadenceFromOfferLabel(clientId, offerId, key) {
+  const title = String(key || "").split("|")[0];
+  const term = String(key || "").split("|")[1] || "";
+  if (!title || !term) return null;
+  try {
+    const rows = await sb(
+      `offers?id=eq.${encodeURIComponent(offerId)}&client_id=eq.${encodeURIComponent(clientId)}&select=data&limit=1`
+    );
+    const data = Array.isArray(rows) && rows[0] && rows[0].data;
+    const offerings = (data && data.pricing && data.pricing.pricing_offerings) || [];
+    const off = offerings.find(o => o && !o.archived && String(o.title || "").trim() === title);
+    if (!off) return null;
+    const cm = (off.commitments || []).find(x => x && _termFromLength(x.length) === term);
+    return cm ? cadenceFromLength(cm.length) : null;
+  } catch (_) {
+    return null;   // an unreadable offer is no declaration at all
   }
 }
 
@@ -264,7 +345,7 @@ async function aiRecommend(targets, currency) {
     // about the money path will confidently explain the wrong number to an owner.
     "Unless the price row carries an explicit billing cadence (in which case the server overrides you), " +
     "the recurring shape follows the term: monthly/4_weeks → {interval:'week',interval_count:4}; " +
-    "3_months → {interval:'month',interval_count:3}; 6_months → {interval:'month',interval_count:6}. " +
+    "any <n>_months term → {interval:'month',interval_count:n} (3_months → month x3, 9_months → month x9). " +
     // The schema below requires a `recurring` key on every item, so the model
     // returns one for a sign-up fee too. The server refuses it either way, but a
     // prompt that never asks for the wrong answer is better than one that does.
@@ -337,6 +418,11 @@ async function runPropose(req, res, ctx, body, clientId) {
   }
 
   const recommendations = targets.map(t => {
+    // An out-of-range <n>_months term cannot be minted. Refuse THIS target with
+    // the human-readable reason instead of recommending a shape apply would
+    // refuse anyway (or worse, defaulting it to week x4).
+    try { termToInterval(t.term); }
+    catch (e) { return { key: t.key, error: e.message || String(e) }; }
     const rowCadence = cadenceByKey.get(t.key) || null;
     const fb = fallbackRecommend(t, currency, rowCadence);
     const a = byKey[t.key];
@@ -407,7 +493,12 @@ async function runApply(req, res, ctx, body, clientId) {
     // `recurring`. The key's term is the same truth match-prices.js and
     // offers-sync.ts both derive from, so derive it the same way here.
     const term = c.term || String(c.key || "").split("|")[1] || "";
-    const termIv = termToInterval(term);
+    // An out-of-range <n>_months term throws (see termToInterval): surface it as
+    // THIS creation's error and keep going, so one bad rung cannot take down a
+    // batch that also contains mintable ones.
+    let termIv;
+    try { termIv = termToInterval(term); }
+    catch (e) { created.push({ key, error: e.message || String(e) }); continue; }
     // ⚠️ THE ONE-TIME GATE, and the cadence, in one call. See recurringFor: the
     // term decides one-time and NOTHING the client sends may promote it, which is
     // what stops the sorter UI posting back the model's `recurring` and minting a
@@ -428,6 +519,10 @@ async function runApply(req, res, ctx, body, clientId) {
     else if (cadence) interval = termIv.interval;
     else if (recurring.interval === "month" && recurring.interval_count === 3) interval = "3_months";
     else if (recurring.interval === "month" && recurring.interval_count === 6) interval = "6_months";
+    // Adjustable prepay lengths (2026-08-06): any other multi-month shape labels
+    // as its own <n>_months. month x1 deliberately keeps falling to "4_weeks",
+    // byte-identical to what this wrote before the vocabulary opened.
+    else if (recurring.interval === "month" && recurring.interval_count > 1 && recurring.interval_count <= TERM_MAX_MONTHS) interval = `${recurring.interval_count}_months`;
     const priceName = (c.product_name || (key ? String(key).replace("|", " · ") : "FullControl price")).toString();
 
     // Create the recurring price with an INLINE product on the connected account.
@@ -572,6 +667,8 @@ async function runLink(req, res, ctx, body, clientId) {
   let interval = "4_weeks";
   if (rc.interval === "month" && rc.interval_count === 3) interval = "3_months";
   else if (rc.interval === "month" && rc.interval_count === 6) interval = "6_months";
+  // Adjustable prepay lengths (2026-08-06): same rule as apply's label above.
+  else if (rc.interval === "month" && rc.interval_count > 1 && rc.interval_count <= TERM_MAX_MONTHS) interval = `${rc.interval_count}_months`;
   const row = {
     client_id: clientId, stripe_price_id: price.id,
     stripe_product_id: (typeof price.product === "string" ? price.product : prod && prod.id) || null,

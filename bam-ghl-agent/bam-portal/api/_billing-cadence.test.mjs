@@ -393,8 +393,18 @@ ok(/typedSelectFor\(withCadence\)/.test(CHECKOUT), "the plan select asks for the
 ok(/&is_active=eq\.true&is_routable=eq\.true&limit=1&select=\$\{typedSelect\}`/.test(CHECKOUT),
   "the sign-up fee select deliberately does NOT (plain typedSelect), because its catch drops the fee silently");
 ok(/is not readable yet \(migration pending\)/.test(OFFER), "offer.js falls back to the pre-cadence select rather than an empty list");
-ok(/catch \(_\) \{\n    return null;   \/\/ column not migrated yet/.test(CREATE_PRICE),
-  "create-price.js treats an unreadable cadence as no cadence");
+// RE-STATED (2026-08-06, adjustable prepay lengths). The old pin held the catch
+// to `return null` - "an unreadable row cadence is no cadence". The invariant it
+// protected was never the return statement; it was that an unreadable row can
+// neither THROW on the mint path nor INVENT a clock. Both still hold, but the
+// degradation target moved: an unreadable row now falls through to the offer's
+// own LENGTH LABEL (cadenceFromOfferLabel), which is read-only, scoped to the
+// named offer's non-archived offerings, and returns null on any failure of its
+// own - so the worst case is still exactly the term's standard shape.
+ok(/\} catch \(_\) \{\n(?:\s*\/\/[^\n]*\n)+\s*\}\n  if \(rowCadence\) return rowCadence;\n  return await cadenceFromOfferLabel\(clientId, offerId, key\);/.test(CREATE_PRICE),
+  "create-price.js: an unreadable row cadence degrades to the label derivation, never to a throw");
+ok(/async function cadenceFromOfferLabel\(clientId, offerId, key\) \{[\s\S]*?catch \(_\) \{\n    return null;/.test(CREATE_PRICE),
+  "create-price.js: and the label derivation itself degrades to null, so nothing on this path invents a cadence");
 
 // ─── 6b. THE WIRING, not just the functions ──────────────────────────────────
 //

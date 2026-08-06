@@ -9,6 +9,10 @@ import { randomBytes } from "node:crypto";
 //   POST /api/workbook  { token, action: "save" | "add" | "remove" | "confirm"
 //                                        | "submit", ... }
 //   POST /api/workbook  { action: "create", client_id, kind }   STAFF ONLY
+//   POST /api/workbook  { action: "review" | "approve-card" | "apply"
+//                                 | "publish" | "rollback", workbook_id, ... }
+//                                                                STAFF ONLY
+//                       (the review-and-apply half, further down this file)
 //
 // THREE VALUES, AND CONFLATING ANY PAIR IS THE BUG THIS EXISTS TO PREVENT:
 //   current_value  what the portal stores TODAY          "2 Trainings/Week"
@@ -1087,6 +1091,832 @@ async function doCreate(req) {
   };
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// ── STAFF REVIEW AND APPLY: the machine half of "staff review what the owner
+//    sent, then it becomes live configuration" ────────────────────────────────
+//
+//   POST /api/workbook { action: "review",       workbook_id }            STAFF
+//   POST /api/workbook { action: "approve-card", workbook_id, card_key }  STAFF
+//   POST /api/workbook { action: "apply",        workbook_id, dry_run }   STAFF
+//   POST /api/workbook { action: "publish",      workbook_id }            STAFF
+//   POST /api/workbook { action: "rollback",     workbook_id }            STAFF
+//
+// TWO CONFIRMATIONS, TWO PEOPLE, TWO COLUMNS. The owner's deliberate act is
+// confirmed_at ("this is what I sell"); the staff act is approved_at ("apply
+// this to the live system"). The apply gate reads approved_at exactly the way
+// the submit gate reads confirmed_at, and neither stamp can produce the other.
+//
+// EVERY ONE OF THESE IS STAFF-AUTHED AND NONE OF THEM TAKES A TOKEN. The
+// workbook is named by workbook_id, which the owner's page does see - so the
+// only thing standing between a token-holder and these actions is resolveStaff,
+// and that is asserted by a control (ownertoken) rather than assumed.
+//
+// NONE OF THEM REOPENS OWNER EDITING. Review reads, approve stamps a card
+// column the owner cannot see, apply writes OUTWARD into offers/clients, and
+// rollback lands the workbook back on 'submitted' - which assertEditable
+// refuses. There is no path from here to 'draft' or 'sent'.
+
+const REVIEWABLE = new Set(["submitted", "reviewed"]);
+
+function assertReviewable(wb) {
+  if (REVIEWABLE.has(wb.status)) return;
+  throw bad(
+    `this workbook is not in review (status ${wb.status}) - the owner has to send it before staff can act on it`,
+    409
+  );
+}
+
+const is42703 = (e) => {
+  const msg = String((e && e.message) || "");
+  return /42703/.test(msg) || /does not exist/i.test(msg);
+};
+
+// The staff-side reads carry the columns the owner wire shape deliberately
+// omits. Both degrade on PostgREST's undefined-column code the way readCards
+// does, so an environment that has not run 20260806T063000_workbook_apply.sql
+// still REVIEWS (approved_at simply reads null) - and approve/apply/rollback
+// refuse out loud below instead of 500ing on every call.
+async function readWorkbookStaff(workbookId) {
+  const id = String(workbookId || "").trim();
+  if (!id) throw bad("workbook_id required");
+  const q = (sel) => `workbooks?id=eq.${enc(id)}&select=${sel}&limit=1`;
+  let rows, degraded = false;
+  try {
+    rows = await sb(q(`${WORKBOOK_SELECT},reviewed_at,snapshot`));
+  } catch (e) {
+    if (!is42703(e)) throw e;
+    degraded = true;
+    rows = await sb(q(WORKBOOK_SELECT));
+  }
+  const wb = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  // Void is 404 for staff too: a dead workbook is not a review surface.
+  if (!wb || wb.status === "void") throw bad("not found", 404);
+  return { wb, degraded };
+}
+
+async function readCardsStaff(workbookId) {
+  const q = (sel) =>
+    `workbook_cards?workbook_id=eq.${enc(workbookId)}&select=${sel}`
+    + "&order=sort_order.asc,card_key.asc";
+  const withApproval = `${CARD_SELECT},approved_at,approved_by`;
+  try {
+    return { cards: (await sb(q(`${withApproval},meta`))) || [], degraded: false };
+  } catch (e) {
+    if (!is42703(e)) throw e;
+    try {
+      return { cards: (await sb(q(withApproval))) || [], degraded: false };
+    } catch (e2) {
+      if (!is42703(e2)) throw e2;
+      return { cards: (await sb(q(CARD_SELECT))) || [], degraded: true };
+    }
+  }
+}
+
+const STAFF_ANSWER_SELECT = `${ANSWER_SELECT},apply_error`;
+const readAnswersStaff = async (workbookId) =>
+  (await sb(`workbook_answers?workbook_id=eq.${enc(workbookId)}&select=${STAFF_ANSWER_SELECT}&order=created_at.asc,id.asc`)) || [];
+
+// ONE front door for all five actions, so the auth rule exists in exactly one
+// place: the caller is staff, or the caller is nobody. DO NOT soften this into
+// a try/catch that falls back to the workbook token - the token is the OWNER'S
+// credential for answering questions, and an owner who can call review/apply is
+// an owner who can read staff annotations and write his own prices into the
+// live system. That is MUTATE=ownertoken.
+async function resolveStaffForWorkbook(req, body) {
+  const { user, staff } = await resolveStaff(req);
+  const { wb, degraded } = await readWorkbookStaff(body && body.workbook_id);
+  return { user, staff, wb, wbDegraded: degraded };
+}
+
+// ── THE FIELD MAP, implemented as VALUE translation ──────────────────────────
+//
+// The workbook's target_field names already speak the offer's KEY vocabulary
+// (the seed did the desc->whats_included renames), so what remains at apply
+// time is the VALUE vocabulary: the page answers with its own chip words
+// ("Waive", "every 4 weeks", the number 549 from a number input) and the offer
+// stores exact strings with exact casing. Verified against the live San Jose
+// offer jsonb on 2026-08-06 rather than transcribed from a doc, because the
+// docs disagreed with each other on casing and the offer is the side that
+// charges money:
+//
+//   signup_fee_on_base / signup_fee_charge   "charge" / "waive"   LOWERCASE
+//   billing_cycle                            "Every 4 weeks"      exact string
+//   type                                     "Membership"         capitalised
+//   after                                    "Renews same length" exact string
+//   price / signup_fee / value               "250"                STRING
+//
+// A value that lands uncased ("Waive") is invisible to the eye and real to
+// checkout.js's === - that exact defect shipped this week, which is why every
+// chip translation here matches case-insensitively on the way IN and emits the
+// offer's exact form on the way OUT, and why MUTATE=vocabdrift exists.
+const mkVocab = (canonical, aliases) => {
+  const m = new Map();
+  for (const c of canonical) m.set(c.trim().toLowerCase(), c);
+  for (const [a, c] of Object.entries(aliases || {})) m.set(a.trim().toLowerCase(), c);
+  return m;
+};
+
+const V_TYPE = mkVocab(["Membership", "Package", "Single Session", "Other"], { "something else": "Other" });
+const V_CYCLE = mkVocab(
+  ["Weekly", "Biweekly", "Monthly", "Every 4 weeks", "Quarterly", "Annually", "Other"],
+  {
+    "every week": "Weekly", "every 2 weeks": "Biweekly", "every two weeks": "Biweekly",
+    "every month": "Monthly", "every four weeks": "Every 4 weeks",
+    "every 3 months": "Quarterly", "every three months": "Quarterly",
+    "every year": "Annually", "yearly": "Annually", "annual": "Annually",
+    "something else": "Other",
+  }
+);
+// Lowercase ON PURPOSE: this is the one list where the offer's canonical form
+// is the lowercased word. "Waive" is the page's chip; "waive" is what the offer
+// stores and what checkout.js compares against.
+const V_CHARGE = mkVocab(["charge", "waive"], { "charge it": "charge", "waive it": "waive" });
+const V_YESNO = mkVocab(["Yes", "No"], {
+  "yes, taxed like everything else": "Yes",
+  "no, this one is exempt": "No", "no, exempt": "No",
+  "true": "Yes", "false": "No",
+});
+const V_AFTER = mkVocab(
+  ["Goes back to monthly", "Renews same length", "Ends", "Other"],
+  { "renews for the same length": "Renews same length", "just ends": "Ends", "something else": "Other" }
+);
+const V_KIND = mkVocab(["Percent off", "Dollar off"], { "percent": "Percent off", "dollar": "Dollar off" });
+const V_DUR = mkVocab(
+  ["First payment only", "A set number of months", "Every payment"],
+  { "once": "First payment only", "first payment": "First payment only", "number of months": "A set number of months", "forever": "Every payment" }
+);
+
+// Each translator answers { ok, value } or { ok:false, error } - and an error
+// here is a REFUSAL of the whole apply, never a best guess written to a money
+// field. Free text passes through VERBATIM (no trimming): a difference nobody
+// can see is exactly what staff review exists to surface, and normalizing it
+// away here would hide it from the one comparison that matters.
+const tOk = (value) => ({ ok: true, value });
+const tErr = (error) => ({ ok: false, error });
+const tText = (v) => (typeof v === "string" ? tOk(v) : tErr("expected text"));
+const tBool = (v) => (typeof v === "boolean" ? tOk(v) : tErr("expected true or false"));
+const tChip = (vmap, what) => (v) => {
+  const hit = typeof v === "string" ? vmap.get(v.trim().toLowerCase()) : (typeof v === "boolean" ? vmap.get(String(v)) : undefined);
+  return hit === undefined ? tErr(`not a ${what} this offer understands: ${JSON.stringify(v)}`) : tOk(hit);
+};
+// The offer stores money as STRINGS ("250"). A number input answers a NUMBER,
+// and that is a page fact, not a price change - so a finite number becomes its
+// string, a numeric string passes verbatim, and anything else refuses.
+const tMoneyStr = (v) => {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0) return tOk(String(v));
+  if (typeof v === "string" && /^\d+(\.\d+)?$/.test(v.trim()) && v.trim() === v) return tOk(v);
+  return tErr(`not a price the offer can store: ${JSON.stringify(v)}`);
+};
+// signup_fee is the one currency field where EMPTY is a value ("empty = no
+// fee", per the field map).
+const tMoneyStrOrEmpty = (v) => (v === "" ? tOk("") : tMoneyStr(v));
+const tIntOrNull = (v) => {
+  if (v === "" || v === null) return tOk(null);
+  const n = typeof v === "number" ? v : (typeof v === "string" && /^\d+$/.test(v.trim()) ? parseInt(v, 10) : NaN);
+  return Number.isInteger(n) && n >= 0 ? tOk(n) : tErr(`expected a whole number: ${JSON.stringify(v)}`);
+};
+const tYesNoBool = (v) => {
+  if (typeof v === "boolean") return tOk(v);
+  const s = String(v == null ? "" : v).trim().toLowerCase();
+  if (s === "yes" || s === "true") return tOk(true);
+  if (s === "no" || s === "false") return tOk(false);
+  return tErr(`expected yes or no: ${JSON.stringify(v)}`);
+};
+const tStrArray = (v) =>
+  (Array.isArray(v) && v.every((x) => typeof x === "string") ? tOk(v) : tErr("expected a list of price keys"));
+
+const PLAN_T = {
+  title: tText, type: tChip(V_TYPE, "pricing type"), whats_included: tText,
+  price: tMoneyStr, billing_cycle: tChip(V_CYCLE, "billing cycle"), billing_cycle_other: tText,
+  taxable: tChip(V_YESNO, "taxable answer"),
+  signup_fee: tMoneyStrOrEmpty, signup_fee_taxable: tChip(V_YESNO, "taxable answer"),
+  signup_fee_on_base: tChip(V_CHARGE, "charge-or-waive answer"),
+  sessions_included: tIntOrNull, expires_after: tText, other_description: tText,
+  description: tText, archived: tBool,
+};
+const RUNG_T = {
+  length: tText, whats_included: tText, price: tMoneyStr,
+  taxable: tChip(V_YESNO, "taxable answer"),
+  signup_fee_charge: tChip(V_CHARGE, "charge-or-waive answer"),
+  discount_notes: tText, after: tChip(V_AFTER, "what-happens-after answer"), after_other: tText,
+  archived: tBool,
+};
+const CODE_T = {
+  code: tText, kind: tChip(V_KIND, "discount kind"), value: tMoneyStr,
+  duration: tChip(V_DUR, "duration"), duration_months: tIntOrNull,
+  applies_to: tStrArray, expires_at: tText, max_redemptions: tIntOrNull,
+  once_per_customer: tYesNoBool,
+};
+
+// clients.tax_config, canonical shape { pct, label } EXACTLY as GTA stores it
+// ({ pct: 13, label: "HST" }), or null when he answered no. Extra keys the
+// workbook capture carried (charges_tax, the example sentence, chip indexes)
+// are STRIPPED: resolveFee reads pct and label and nothing else, and a shape
+// with passengers is a shape someone eventually reads a passenger out of.
+function canonicalTax(v) {
+  if (v === false) return tOk(null);
+  if (typeof v !== "object" || v === null || Array.isArray(v)) {
+    return tErr(`not a tax answer this can store: ${JSON.stringify(v)}`);
+  }
+  if (v.charges_tax === false) return tOk(null);
+  const pct = Number(v.pct);
+  if (!Number.isFinite(pct) || pct <= 0) return tErr("a tax rate must be a number above zero");
+  return tOk({ pct, label: String(v.label == null ? "" : v.label).trim() });
+}
+
+// Where in the offer jsonb a target_field lands, and which translator judges
+// its value. FAIL-CLOSED: a field name this table does not know is a refusal,
+// never a write to a guessed path - the whitelist is the difference between
+// "the workbook can adjust pricing" and "a workbook row can aim at any key in
+// the offer".
+function classifyField(field) {
+  const f = String(field || "");
+  if (f === "tax_config") return { kind: "tax" };
+  if (f === "notes") return { kind: "manual" };
+  if (f.startsWith(ADD_PREFIX)) return { kind: "manual" };
+  let m = f.match(/^commitments\.(\d+)\.([a-z_]+)$/);
+  if (m) return RUNG_T[m[2]] ? { kind: "rung", index: +m[1], leaf: m[2], t: RUNG_T[m[2]] } : { kind: "unknown" };
+  m = f.match(/^codes\.(\d+)\.([a-z_]+)$/);
+  if (m) return CODE_T[m[2]] ? { kind: "code", index: +m[1], leaf: m[2], t: CODE_T[m[2]] } : { kind: "unknown" };
+  return PLAN_T[f] ? { kind: "plan", leaf: f, t: PLAN_T[f] } : { kind: "unknown" };
+}
+
+// Which pricing_offerings entry a plan card means. The card's TITLE answer
+// names it: current_value first (the name the offer stores today), then
+// answered/proposed for the rerun case where a previous apply already renamed
+// it. NEVER a fuzzy match and NEVER a create - a plan card whose offering
+// cannot be found is a refusal, because creating offerings is the humans' job
+// (that is what additions are).
+function offeringIndexFor(cardAnswers, offerings) {
+  const t = (cardAnswers || []).find((a) => a.target_field === "title");
+  const names = [t && t.current_value, t && t.answered, t && t.proposed]
+    .filter((s) => typeof s === "string" && s);
+  for (const n of names) {
+    const i = (offerings || []).findIndex((o) => o && o.title === n);
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+// ── review: the full decision set, grouped for a human ───────────────────────
+//
+// ACADEMY SETTINGS FIRST, always, and the ordering is the point: a tax answer
+// re-prices every athlete while a plan row costs one plan, so the blast radius
+// sorts before anything else and a tax change can never hide in a list of
+// renames. Then the cards, then the owner's ADDITIONS (each one a request a
+// human must create by hand), then free text.
+//
+// "IS IT A CHANGE" is jsonEqual(current_value, effective answer) - the same
+// comparison the state rule uses - so a card the owner CONFIRMED WITHOUT
+// EDITING whose proposal differs from what we store reads as a change here.
+// That is San Jose's three renames, and a review that showed them as untouched
+// would have staff approve a rename they never saw.
+// orNull: SQL NULL and an absent key are the same "no value" on the wire.
+const orNull = (x) => (x === undefined ? null : x);
+
+function reviewItem(card, a) {
+  const eff = effective(a);
+  const cls = classifyField(a.target_field);
+  const entry = {
+    answer_id: a.id,
+    card_key: card ? card.card_key : null,
+    target_kind: a.target_kind,
+    target_table: a.target_table,
+    target_id: a.target_id,
+    target_field: a.target_field,
+    current_value: orNull(a.current_value),
+    proposed: orNull(a.proposed),
+    answered: orNull(a.answered),
+    effective: orNull(eff),
+    is_change: !jsonEqual(eff, a.current_value),
+    applied_at: a.applied_at || null,
+    apply_error: a.apply_error || null,
+  };
+  // What apply would actually write, shown to the human BEFORE the write - the
+  // translated value in the offer's own vocabulary, or the refusal it would
+  // produce. Review is where a translation problem should be seen, not the
+  // apply that trips over it.
+  if (!isBlank(eff) && (cls.kind === "plan" || cls.kind === "rung" || cls.kind === "code")) {
+    const out = cls.t(eff);
+    if (out.ok) entry.will_write = out.value;
+    else entry.translation_error = out.error;
+  } else if (!isBlank(eff) && cls.kind === "tax") {
+    const out = canonicalTax(eff);
+    if (out.ok) entry.will_write = out.value;
+    else entry.translation_error = out.error;
+  } else if (cls.kind === "unknown") {
+    entry.translation_error = "this field is not one the apply step knows how to write";
+  }
+  return entry;
+}
+
+function approvalGate(cards, grouped) {
+  const counted = cards.filter((c) => cardCounts(grouped.get(c.id)));
+  const unapproved = counted.filter((c) => !c.approved_at).map((c) => c.card_key);
+  return { counted, unapproved };
+}
+
+async function doReviewStaff(req, body) {
+  const { wb } = await resolveStaffForWorkbook(req, body);
+  assertReviewable(wb);
+  const [{ cards }, answers] = await Promise.all([readCardsStaff(wb.id), readAnswersStaff(wb.id)]);
+  const grouped = byCard(answers);
+
+  const academy = [];
+  const cardGroups = [];
+  const additions = [];
+  const notes = [];
+  for (const card of cards) {
+    const mine = grouped.get(card.id) || [];
+    const items = [];
+    for (const a of mine) {
+      const entry = reviewItem(card, a);
+      if (isAddition(a)) { additions.push(entry); continue; }
+      if (a.target_field === "notes") { notes.push(entry); continue; }
+      if (a.target_kind === "academy_setting") { academy.push(entry); continue; }
+      items.push(entry);
+    }
+    if (!items.length && !cardCounts(mine)) continue;   // nothing to show for an empty card
+    cardGroups.push({
+      card_key: card.card_key,
+      title: card.title,
+      sort_order: card.sort_order,
+      state: card.state,
+      confirmed_at: card.confirmed_at,
+      approved_at: card.approved_at || null,
+      approved_by: card.approved_by || null,
+      counts: cardCounts(mine),
+      changes: items.filter((i) => i.is_change).length
+        + (mine.some(isAddition) ? mine.filter(isAddition).length : 0),
+      items,
+    });
+  }
+
+  const { counted, unapproved } = approvalGate(cards, grouped);
+  const allItems = [...academy, ...cardGroups.flatMap((c) => c.items), ...additions, ...notes];
+  return {
+    ok: true,
+    workbook: {
+      id: wb.id, client_id: wb.client_id, kind: wb.kind, status: wb.status,
+      submitted_at: wb.submitted_at, reviewed_at: wb.reviewed_at || null,
+      snapshot_taken: wb.snapshot != null,
+    },
+    review: {
+      academy_settings: academy,   // FIRST. Blast radius: one answer, every athlete.
+      cards: cardGroups,
+      additions,                   // requests a human creates by hand, never apply
+      notes,
+    },
+    gate: {
+      counted: counted.length,
+      approved: counted.length - unapproved.length,
+      unapproved_card_keys: unapproved,
+      changes: allItems.filter((i) => i.is_change).length,
+      ready_to_apply: unapproved.length === 0,
+    },
+  };
+}
+
+// ── approve-card: the STAFF act, per card, same unit the owner confirmed in ──
+async function doApproveCard(req, body) {
+  const { user, wb, wbDegraded } = await resolveStaffForWorkbook(req, body);
+  assertReviewable(wb);
+  const cardKey = String(body.card_key || "").trim();
+  if (!cardKey) throw bad("card_key required");
+
+  const { cards, degraded } = await readCardsStaff(wb.id);
+  if (degraded || wbDegraded) {
+    throw bad("this environment has not run the workbook apply migration (20260806T063000), so approvals cannot be recorded here", 409);
+  }
+  const card = cards.find((c) => c.card_key === cardKey);
+  if (!card) throw bad("not found", 404);
+
+  const answers = await readAnswersStaff(wb.id);
+  const grouped = byCard(answers);
+  const mine = grouped.get(card.id) || [];
+  if (!cardCounts(mine)) throw bad("there is nothing on this card to approve", 409);
+  // STAFF APPROVE WHAT THE OWNER CONFIRMED, never more. A card he did not
+  // confirm is a card whose answer does not exist yet, and approving it would
+  // stamp the staff act onto a value nobody stands behind.
+  if (!card.confirmed_at) throw bad("the owner has not confirmed this card, so there is nothing to approve yet", 409);
+
+  // Idempotent: the FIRST stamp is the record. Re-approving does not move it,
+  // for the same reason confirm does not restamp confirmed_at.
+  let approvedAt = card.approved_at;
+  if (!approvedAt) {
+    approvedAt = nowIso();
+    await sb(`workbook_cards?id=eq.${enc(card.id)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ approved_at: approvedAt, approved_by: user.id, updated_at: approvedAt }),
+    });
+    card.approved_at = approvedAt;
+    card.approved_by = user.id;
+  }
+
+  // When the LAST counted card is approved the workbook moves to 'reviewed'.
+  // The filter makes it one conditional write: only a submitted workbook can
+  // become reviewed, so two staff approving the last two cards at once cannot
+  // stamp reviewed_at twice.
+  const { counted, unapproved } = approvalGate(cards, grouped);
+  let wbStatus = wb.status;
+  if (!unapproved.length && wb.status === "submitted") {
+    await sb(`workbooks?id=eq.${enc(wb.id)}&status=eq.submitted`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "reviewed", reviewed_at: nowIso(), updated_at: nowIso() }),
+    });
+    wbStatus = "reviewed";
+  }
+
+  return {
+    ok: true,
+    card: { card_key: card.card_key, approved_at: approvedAt, approved_by: card.approved_by },
+    gate: { counted: counted.length, approved: counted.length - unapproved.length, unapproved_card_keys: unapproved },
+    workbook_status: wbStatus,
+  };
+}
+
+// ── apply: THE ORDERED WRITE ─────────────────────────────────────────────────
+//
+// The order is load-bearing, all four steps of it:
+//
+//   a. SNAPSHOT FIRST, and the first apply wins. The photograph is the only way
+//      back once phase 3 (Stripe) exists - a price can be archived, never
+//      deleted - so it is taken before anything is written and NEVER overwritten:
+//      a second apply that re-photographed would capture the post-write state,
+//      which is a picture of the thing it is supposed to undo.
+//   b. TAX BEFORE ANYTHING ELSE. applyFee bakes the academy tax into every
+//      minted amount, so the tax_config write must land before buildOfferTargets
+//      reads it - tax after targets is every price minted pre-tax, the exact
+//      defect the workbook exists to close.
+//   c. OFFER WRITES per approved card, translated into the offer's vocabulary.
+//      Answers stamp applied_at as they land and already-applied answers are
+//      SKIPPED, so a run that dies halfway reruns safely - and a staff edit
+//      made in the wizard after an apply is not clobbered by the rerun.
+//   d. dry_run=true, THE DEFAULT: stop before Stripe and return what phase 3
+//      WOULD do, as data. dry_run=false is refused outright this pass - the
+//      live Stripe write ships only after this rehearsal has been rehearsed,
+//      because building it first is assurance without connection.
+async function doApplyStaff(req, body) {
+  const { user, wb, wbDegraded } = await resolveStaffForWorkbook(req, body);
+  assertReviewable(wb);
+
+  // Refused BEFORE anything happens, so a dry_run:false call leaves not one
+  // mark: no snapshot, no tax, no offer write. Nothing else in this function
+  // may run first.
+  if ((body || {}).dry_run === false) {
+    throw bad("live apply arrives after the rehearsal - run the dry run until it is boring, then the Stripe write ships as its own reviewed step", 409, "live_apply_not_built");
+  }
+
+  const { cards, degraded } = await readCardsStaff(wb.id);
+  if (degraded || wbDegraded) {
+    throw bad("this environment has not run the workbook apply migration (20260806T063000), so apply cannot run here", 409);
+  }
+  const answers = await readAnswersStaff(wb.id);
+  const grouped = byCard(answers);
+
+  // THE GATE: every counted card carries the staff stamp, or nothing moves.
+  const { unapproved } = approvalGate(cards, grouped);
+  if (unapproved.length) {
+    throw bad(
+      `apply is refused: ${unapproved.length} card(s) are not approved yet (${unapproved.join(", ")}). Approve every card first - partial apply does not exist.`,
+      409, "unapproved_cards"
+    );
+  }
+
+  const cardById = new Map(cards.map((c) => [c.id, c]));
+
+  // ── phase 0: classify and translate EVERYTHING before writing ANYTHING ────
+  // Translation is pure, so every refusal it will ever produce is knowable up
+  // front - and a half-applied workbook with one untranslatable answer in the
+  // middle is exactly the state this pass exists to avoid.
+  const skipped = { additions: [], notes: [], already_applied: [], no_answer: [] };
+  const taxPending = [];
+  const offerPending = [];   // { a, cls, value }
+  const failures = [];
+  for (const a of answers) {
+    const eff = effective(a);
+    const cls = classifyField(a.target_field);
+    if (cls.kind === "manual") {
+      (isAddition(a) ? skipped.additions : skipped.notes).push({ answer_id: a.id, target_field: a.target_field, effective: orNull(eff) });
+      continue;
+    }
+    if (isBlank(eff)) { skipped.no_answer.push(a.id); continue; }
+    if (a.applied_at) { skipped.already_applied.push(a.id); continue; }
+    if (cls.kind === "tax") {
+      if (a.target_table !== "clients") { failures.push({ answer_id: a.id, target_field: a.target_field, error: "a tax answer must target clients" }); continue; }
+      const out = canonicalTax(eff);
+      if (!out.ok) { failures.push({ answer_id: a.id, target_field: a.target_field, error: out.error }); continue; }
+      taxPending.push({ a, value: out.value });
+      continue;
+    }
+    if (cls.kind === "unknown" || a.target_table !== "offers") {
+      failures.push({ answer_id: a.id, target_field: a.target_field, error: "this pass only applies offer pricing and the academy tax setting" });
+      continue;
+    }
+    const out = cls.t(eff);
+    if (!out.ok) { failures.push({ answer_id: a.id, target_field: a.target_field, error: out.error }); continue; }
+    offerPending.push({ a, cls, value: out.value });
+  }
+
+  // Read the live offers and resolve every card to its offering BEFORE the
+  // first write, so a card that cannot land refuses the whole apply while the
+  // configuration is still untouched.
+  const offerIds = [...new Set(
+    answers.filter((x) => x.target_table === "offers" && x.target_id && !isAddition(x)).map((x) => String(x.target_id))
+  )];
+  const offerRows = offerIds.length
+    ? (await sb(`offers?id=in.(${offerIds.map(enc).join(",")})&select=id,client_id,data`)) || []
+    : [];
+  const offerById = new Map(offerRows.map((r) => [String(r.id), r]));
+
+  const offeringIdxByCard = new Map();
+  for (const { a, cls } of offerPending) {
+    if (cls.kind !== "plan" && cls.kind !== "rung") continue;
+    if (offeringIdxByCard.has(a.card_id)) continue;
+    const row = offerById.get(String(a.target_id));
+    if (!row) {
+      failures.push({ answer_id: a.id, target_field: a.target_field, error: "the offer this answer targets does not exist" });
+      continue;
+    }
+    const offerings = (((row.data || {}).pricing) || {}).pricing_offerings || [];
+    const idx = offeringIndexFor(grouped.get(a.card_id) || [], offerings);
+    if (idx < 0) {
+      const card = cardById.get(a.card_id);
+      failures.push({
+        answer_id: a.id, target_field: a.target_field,
+        error: `no pricing option in the offer matches the ${card ? card.card_key : "plan"} card - a plan that does not exist yet is created by hand, not by apply`,
+      });
+      continue;
+    }
+    offeringIdxByCard.set(a.card_id, idx);
+  }
+
+  if (failures.length) {
+    // The refusal is recorded ON the rows so review shows it, and nothing was
+    // written: apply is all-or-nothing up to Stripe, which does not exist yet.
+    for (const f of failures) {
+      await sb(`workbook_answers?id=eq.${enc(f.answer_id)}&workbook_id=eq.${enc(wb.id)}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ apply_error: f.error, updated_at: nowIso() }),
+      }).catch(() => {});
+    }
+    return {
+      ok: false,
+      error: `${failures.length} answer(s) could not be translated into the offer's vocabulary, so nothing was applied.`,
+      failures,
+    };
+  }
+
+  // ── a. SNAPSHOT, first apply wins ─────────────────────────────────────────
+  // The `snapshot=is.null` filter is what makes "first wins" true against a
+  // concurrent apply: of two racing PATCHes exactly one matches, and the loser
+  // writes nothing. Never overwrite the photograph with a post-write state.
+  let snapshotState = "already";
+  if (wb.snapshot == null) {
+    const [clientRows, priceRows] = await Promise.all([
+      sb(`clients?id=eq.${enc(wb.client_id)}&select=tax_config&limit=1`),
+      sb(`offer_prices?tenant_id=eq.${enc(wb.client_id)}`).catch(() => []),
+    ]);
+    const photo = {
+      taken_at: nowIso(),
+      taken_by: user.id,
+      offers: offerRows.map((r) => ({ id: r.id, data: orNull(r.data) })),
+      tax_config: (Array.isArray(clientRows) && clientRows[0]) ? orNull(clientRows[0].tax_config) : null,
+      offer_prices: Array.isArray(priceRows) ? priceRows : [],
+    };
+    await sb(`workbooks?id=eq.${enc(wb.id)}&snapshot=is.null`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ snapshot: photo, updated_at: nowIso() }),
+    });
+    snapshotState = "taken";
+  }
+
+  // The answers each write settles; stamped as the write they belong to lands,
+  // and only where applied_at is still null, so a rerun cannot restamp.
+  const stamp = async (ids) => {
+    if (!ids.length) return;
+    await sb(
+      `workbook_answers?workbook_id=eq.${enc(wb.id)}&id=in.(${ids.map(enc).join(",")})&applied_at=is.null`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ applied_at: nowIso(), apply_error: null, updated_at: nowIso() }),
+      }
+    );
+  };
+
+  // ── b. TAX to clients, before any amount is computed ──────────────────────
+  let taxResult = null;
+  for (const { a, value } of taxPending) {
+    await sb(`clients?id=eq.${enc(wb.client_id)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ tax_config: value }),
+    });
+    await stamp([a.id]);
+    taxResult = { answer_id: a.id, tax_config: value };
+  }
+
+  // ── c. OFFER jsonb writes, per offer row, per approved card ───────────────
+  const offerReports = [];
+  const byOffer = new Map();
+  for (const p of offerPending) {
+    const k = String(p.a.target_id);
+    if (!byOffer.has(k)) byOffer.set(k, []);
+    byOffer.get(k).push(p);
+  }
+  for (const [offerId, pendings] of byOffer) {
+    const row = offerById.get(offerId);
+    const data = row.data && typeof row.data === "object" ? row.data : {};
+    data.pricing = data.pricing && typeof data.pricing === "object" ? data.pricing : {};
+    const wrote = [];
+    const agreed = [];
+    for (const { a, cls, value } of pendings) {
+      let holder;
+      if (cls.kind === "code") {
+        const codes = Array.isArray(data.pricing.discount_codes) ? data.pricing.discount_codes : [];
+        data.pricing.discount_codes = codes;
+        while (codes.length <= cls.index) codes.push({});
+        holder = codes[cls.index];
+      } else {
+        const offerings = data.pricing.pricing_offerings || [];
+        const off = offerings[offeringIdxByCard.get(a.card_id)];
+        if (cls.kind === "rung") {
+          const rungs = Array.isArray(off.commitments) ? off.commitments : [];
+          off.commitments = rungs;
+          while (rungs.length <= cls.index) rungs.push({});
+          holder = rungs[cls.index];
+        } else {
+          holder = off;
+        }
+      }
+      if (jsonEqual(holder[cls.leaf], value)) {
+        agreed.push(a.id);        // the offer already says this; the answer lands trivially
+      } else {
+        holder[cls.leaf] = value;
+        wrote.push({ answer_id: a.id, target_field: a.target_field, to: value });
+      }
+    }
+    if (wrote.length) {
+      await sb(`offers?id=eq.${enc(offerId)}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ data, updated_at: nowIso() }),
+      });
+    }
+    await stamp([...wrote.map((w) => w.answer_id), ...agreed]);
+    offerReports.push({ offer_id: offerId, wrote, already_matching: agreed.length });
+  }
+
+  // ── d. THE DRY-RUN REPORT: what phase 3 would do, as data ─────────────────
+  // Built AFTER the tax and offer writes, so the targets carry the amounts a
+  // real mint would use - tax baked in by applyFee inside buildOfferTargets.
+  const phase3 = await phase3Preview(wb.client_id);
+
+  // Status DOES NOT MOVE. apply(dry) leaves the workbook where the review left
+  // it; nothing reaches 'applied' until a live apply exists to earn it.
+  return {
+    ok: true,
+    dry_run: true,
+    status: wb.status,
+    snapshot: snapshotState,
+    tax: taxResult,
+    offers: offerReports,
+    skipped,
+    phase3,
+  };
+}
+
+// What the Stripe phase WOULD do: every mintable target from the offer as it
+// now stands, matched against the catalog snapshot table by amount + interval.
+// PRINTED as data; nothing here talks to Stripe.
+//
+// buildOfferTargets is imported from match-prices.js rather than reimplemented,
+// because it is where tax gets baked into amounts (resolveFee/applyFee) and a
+// second copy of that math is a fork on a money path. Loaded lazily so this
+// route does not drag the matcher's dependency tree into every owner autosave.
+async function phase3Preview(clientId) {
+  let mod;
+  try {
+    mod = await import("./offers/match-prices.js");
+  } catch {
+    throw bad("the phase 3 preview could not load api/offers/match-prices.js in this environment", 503);
+  }
+  if (typeof mod.buildOfferTargets !== "function") {
+    throw bad("the phase 3 preview needs buildOfferTargets exported from api/offers/match-prices.js - it is not exported yet", 503);
+  }
+  const targets = await mod.buildOfferTargets(clientId);
+  const catalog = await sb(
+    `pricing_catalog?client_id=eq.${enc(clientId)}&select=stripe_price_id,offer_price_key,tier,amount_cents,interval,currency,display_name`
+  ).catch(() => []) || [];
+
+  // REPORT-ONLY maps. The live mint (when it exists) goes through
+  // create-price.js recurringFor, which also honors per-row billing_cadence
+  // overrides; these two tables only describe the STANDARD shape so a human
+  // can read the rehearsal.
+  const TERM_INTERVAL = { monthly: "4_weeks", "4_weeks": "4_weeks", "3_months": "3_months", "6_months": "6_months", signup_fee: "one_time", one_time: "one_time" };
+  const RECURRING = {
+    "4_weeks": { interval: "week", interval_count: 4 },
+    "3_months": { interval: "month", interval_count: 3 },
+    "6_months": { interval: "month", interval_count: 6 },
+    one_time: null,
+  };
+  const rows = targets.map((t) => {
+    const interval = TERM_INTERVAL[String(t.term || "").toLowerCase()] || "4_weeks";
+    const hit = (Array.isArray(catalog) ? catalog : []).find(
+      (r) => Number(r.amount_cents) === Number(t.allin_cents) && String(r.interval) === interval
+    ) || null;
+    return {
+      key: t.key,
+      label: t.label,
+      offering: t.offering,
+      term: t.term,
+      base_cents: t.base_cents,
+      allin_cents: t.allin_cents,
+      fee_label: t.fee_label || null,
+      interval,
+      recurring: RECURRING[interval],
+      matched: hit ? { stripe_price_id: hit.stripe_price_id, tier: hit.tier, amount_cents: hit.amount_cents, display_name: hit.display_name || null } : null,
+      needs_mint: !hit,
+    };
+  });
+  return {
+    targets: rows,
+    matched: rows.filter((r) => !r.needs_mint).length,
+    would_mint: rows.filter((r) => r.needs_mint).length,
+  };
+}
+
+// ── publish: refused, deliberately, with the gate in the contract ────────────
+async function doPublishStaff(req, body) {
+  await resolveStaffForWorkbook(req, body);
+  throw bad("publishing to parents is its own deliberate step and is not wired yet - nothing an apply writes reaches the public site until it is", 409, "publish_not_built");
+}
+
+// ── rollback: restore from the photograph ────────────────────────────────────
+async function doRollbackStaff(req, body) {
+  const { wb, wbDegraded } = await resolveStaffForWorkbook(req, body);
+  if (wbDegraded) {
+    throw bad("this environment has not run the workbook apply migration (20260806T063000), so there is no snapshot to restore from", 409);
+  }
+  if (wb.snapshot == null) throw bad("nothing to roll back - no apply has taken a snapshot of this workbook yet", 409);
+
+  const snap = wb.snapshot;
+  const restoredOffers = [];
+  for (const o of Array.isArray(snap.offers) ? snap.offers : []) {
+    if (!o || !o.id) continue;
+    const restoredData = orNull(o.data);
+    await sb(`offers?id=eq.${enc(o.id)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ data: restoredData, updated_at: nowIso() }),
+    });
+    restoredOffers.push(o.id);
+  }
+  const restoredTax = orNull(snap.tax_config);
+  await sb(`clients?id=eq.${enc(wb.client_id)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ tax_config: restoredTax }),
+  });
+
+  // The applied stamps come off so a future apply can land again; the snapshot
+  // STAYS, because after a restore the configuration equals the photograph and
+  // the photograph is still the only way back.
+  await sb(`workbook_answers?workbook_id=eq.${enc(wb.id)}&applied_at=not.is.null`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ applied_at: null, apply_error: null, updated_at: nowIso() }),
+  });
+  await sb(`workbooks?id=eq.${enc(wb.id)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "submitted", updated_at: nowIso() }),
+  });
+
+  return {
+    ok: true,
+    restored: { offers: restoredOffers, tax_config: true },
+    // Honest and currently empty: live apply does not exist, so nothing has
+    // touched Stripe or offer_prices and there is nothing that cannot come
+    // back. The moment phase 3 ships, archived Stripe prices join this list.
+    could_not_restore: [],
+    status: "submitted",
+  };
+}
+
+const STAFF_REVIEW_ACTIONS = {
+  review: doReviewStaff,
+  "approve-card": doApproveCard,
+  apply: doApplyStaff,
+  publish: doPublishStaff,
+  rollback: doRollbackStaff,
+};
+
 // ── HTTP ─────────────────────────────────────────────────────────────────────
 function readBody(req) {
   const b = req && req.body;
@@ -1152,8 +1982,14 @@ async function handler(req, res) {
     const body = readBody(req);
     const action = String(body.action || "").trim();
 
-    // Staff, not an owner: this branch never sees a token.
+    // Staff, not an owner: these branches never see a token. The review-and-
+    // apply actions dispatch BEFORE the token is even read, so the owner's
+    // no-login credential cannot reach them by any route - resolveStaff is the
+    // only door, and it answers 401 to a caller with no staff bearer.
     if (action === "create") return res.status(200).json(await doCreate(req));
+    if (Object.prototype.hasOwnProperty.call(STAFF_REVIEW_ACTIONS, action)) {
+      return res.status(200).json(await STAFF_REVIEW_ACTIONS[action](req, body));
+    }
 
     token = readToken(req, body);
     const wb = await resolveWorkbook(token);

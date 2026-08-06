@@ -260,11 +260,22 @@ function editDistance(a, b, max = 2) {
 
 // Offer-price targets (plan × term) from the academy's Offers — mirrors
 // buildOfferTargets() in offers/match-prices.js (kept lite: label + price only).
+// ALIGNED to _termFromLength in offers/match-prices.js (2026-08-06). The old
+// substring test was wrong in both directions: "12 weeks" hit includes("12")
+// and keyed as 12_months, and "13 months" hit includes("3") and keyed as
+// 3_months. Same parse as everywhere else now, so this file's targets carry
+// the same keys the catalog does.
 function _termFromLength(len) {
   const s = String(len || "").toLowerCase();
-  if (s.includes("3")) return "3_months";
-  if (s.includes("6")) return "6_months";
-  if (s.includes("12") || s.includes("year")) return "12_months";
+  const m = s.match(/(\d+)\s*month/);
+  if (m) { const n = +m[1]; return (n >= 1 && n <= 24) ? `${n}_months` : null; }
+  const w = s.match(/(\d+)\s*week/);
+  if (w) { const n = +w[1]; return (n % 4 === 0 && n / 4 >= 1 && n / 4 <= 24) ? `${n / 4}_months` : null; }
+  const y = s.match(/(\d+)\s*(?:year|yr)/);
+  if (y || /\bannual(?:ly)?\b|\byearly\b/.test(s)) {
+    const n = (y ? +y[1] : 1) * 12;
+    return (n >= 1 && n <= 24) ? `${n}_months` : null;
+  }
   return null;
 }
 async function buildTargetsLite(clientId) {

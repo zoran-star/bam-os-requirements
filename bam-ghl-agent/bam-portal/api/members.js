@@ -641,9 +641,18 @@ async function handler(req, res) {
                 const base = parseFloat(off.price);
                 if (!isNaN(base)) keys.push({ key: `${title}|monthly`, base_cents: cents(base), allin_cents: cents(base * HST) });
                 for (const c of (off.commitments || [])) {
+                  // Mirror of _termFromLength in offers/match-prices.js (opened
+                  // additively 2026-08-06: any whole 1-24 month count, weeks in
+                  // whole-month multiples, years x12; 3/6 byte-identical).
                   const t = String(c.length || "").toLowerCase();
-                  const term = (/3\s*month/.test(t) || /\b12\s*week/.test(t)) ? "3_months"
-                    : ((/6\s*month/.test(t) || /\b24\s*week/.test(t)) ? "6_months" : null);
+                  const tm = t.match(/(\d+)\s*month/);
+                  const tw = t.match(/(\d+)\s*week/);
+                  const ty = t.match(/(\d+)\s*(?:year|yr)/);
+                  const months = tm ? +tm[1]
+                    : (tw && +tw[1] % 4 === 0) ? +tw[1] / 4
+                    : ty ? +ty[1] * 12
+                    : /\bannual(?:ly)?\b|\byearly\b/.test(t) ? 12 : null;
+                  const term = (months != null && months >= 1 && months <= 24) ? `${months}_months` : null;
                   const cb = parseFloat(c.price);
                   if (term && !isNaN(cb)) keys.push({ key: `${title}|${term}`, base_cents: cents(cb), allin_cents: cents(cb * HST) });
                 }

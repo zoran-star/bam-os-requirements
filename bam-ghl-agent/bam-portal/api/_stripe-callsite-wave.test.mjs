@@ -452,8 +452,18 @@ function checkParent(src, onbKey = ONBKEY) {
       && /return onboardingStripeKey\(\) \|\| undefined;/.test(helperCode)
       && /return onboardingStripeKey\(\)\.startsWith\("sk_test"\);/.test(helperCode),
     msg: "parent/_stripe.ts: isTestMode and the credential BOTH derive from the single onboardingStripeKey() read, so they cannot disagree" });
-  out.push({ ok: src.includes('if (term === "3_months") return { interval: "month", interval_count: 3 };'),
-    msg: "parent/_stripe.ts: intervalFor is untouched" });
+  // RE-STATED (2026-08-06, adjustable prepay lengths). "intervalFor is
+  // untouched" stopped being true when the term vocabulary opened. The invariant
+  // is what it always protected: the interval derives from the TERM KEY alone -
+  // the legacy 3/6 month branches are byte-identical to what live members bill
+  // on, any other <n>_months is bounded calendar months that REFUSES loudly out
+  // of range (never the week x4 default), and everything else stays week x4.
+  out.push({ ok: src.includes('if (term === "3_months") return { interval: "month", interval_count: 3 };')
+      && src.includes('if (term === "6_months") return { interval: "month", interval_count: 6 };')
+      && src.includes('const m = /^(\\d+)_months$/.exec(String(term || ""));')
+      && src.includes("if (n >= 1 && n <= 24) return { interval: \"month\", interval_count: n };")
+      && /outside the 1-24 month range[\s\S]{0,120}?return \{ interval: "week", interval_count: 4 \};/.test(src),
+    msg: "parent/_stripe.ts: intervalFor derives from the term key - legacy 3/6 byte-identical, <n>_months bounded 1-24 with a loud refusal, week x4 for everything else" });
   out.push({ ok: src.includes("const confirmationSecret = (latestInvoice as { confirmation_secret?: unknown }).confirmation_secret;"),
     msg: "parent/_stripe.ts: piSecretFromSub is untouched" });
   return out;

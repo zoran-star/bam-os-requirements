@@ -79,7 +79,17 @@ async function stripeFetch(path, { method = "GET", body, stripeAccount, idempote
 async function buildTargets(clientId) {
   const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,data`) || [];
   const out = [];
-  const termOf = (len) => { const s = String(len || "").toLowerCase(); if (/3\s*month|12\s*week/.test(s)) return "3_months"; if (/6\s*month|24\s*week/.test(s)) return "6_months"; if (/12\s*month|year|52\s*week/.test(s)) return "12_months"; return null; };
+  // Mirror of _termFromLength in offers/match-prices.js (opened 2026-08-06).
+  const termOf = (len) => {
+    const s = String(len || "").toLowerCase();
+    const m = s.match(/(\d+)\s*month/);
+    if (m) { const n = +m[1]; return (n >= 1 && n <= 24) ? `${n}_months` : null; }
+    const w = s.match(/(\d+)\s*week/);
+    if (w) { const n = +w[1]; return (n % 4 === 0 && n / 4 >= 1 && n / 4 <= 24) ? `${n / 4}_months` : null; }
+    const y = s.match(/(\d+)\s*(?:year|yr)/);
+    if (y || /\bannual(?:ly)?\b|\byearly\b/.test(s)) { const n = (y ? +y[1] : 1) * 12; return (n >= 1 && n <= 24) ? `${n}_months` : null; }
+    return null;
+  };
   for (const o of offers) {
     const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
     for (const off of offerings) {

@@ -230,16 +230,46 @@ function buildIntakeFields(offer, customDefs) {
 // Mirror _bbTermFromLength / _bbPlanKeys in client-portal.html: a Membership
 // offering yields a "<title>|monthly" base key plus "<title>|<term>" per
 // commitment. We resolve each key to its routable Price-Matched catalog row.
+// OPENED ADDITIVELY (Zoran, 2026-08-06): any whole 1-24 month count is its own
+// `<n>_months` key; the old body collapsed n>=6 to "6_months" (a 12-month rung
+// was sold and labelled as SIX months) and dropped everything under 3. "3
+// months"/"6 months"/"12 weeks"/"24 weeks" still yield byte-identical keys, so
+// nothing existing re-keys; out of range refuses loudly instead of collapsing.
+// Mirror of _termFromLength in offers/match-prices.js.
 function termFromLength(length) {
   const l = String(length || "").toLowerCase();
   const m = l.match(/(\d+)\s*month/);
-  if (m) { const n = +m[1]; if (n >= 6) return "6_months"; if (n >= 3) return "3_months"; }
-  if (/24\s*week/.test(l)) return "6_months";
-  if (/12\s*week/.test(l)) return "3_months";
+  if (m) {
+    const n = +m[1];
+    if (n >= 1 && n <= 24) return `${n}_months`;
+    console.warn(`[website/offer] commitment length "${length}" reads as ${n} months, outside the 1-24 month range this build can sell - this option is NOT shown for sale`);
+    return null;
+  }
+  const w = l.match(/(\d+)\s*week/);
+  if (w) {
+    const n = +w[1];
+    if (n % 4 === 0 && n / 4 >= 1 && n / 4 <= 24) return `${n / 4}_months`;
+    console.warn(`[website/offer] commitment length "${length}" reads as ${n} weeks, which does not map to a whole 1-24 month term - this option is NOT shown for sale`);
+    return null;
+  }
+  const y = l.match(/(\d+)\s*(?:year|yr)/);
+  if (y || /\bannual(?:ly)?\b|\byearly\b/.test(l)) {
+    const n = (y ? +y[1] : 1) * 12;
+    if (n >= 1 && n <= 24) return `${n}_months`;
+    console.warn(`[website/offer] commitment length "${length}" reads as ${n} months, outside the 1-24 month range this build can sell - this option is NOT shown for sale`);
+    return null;
+  }
   return null;
 }
 
 const TERM_LABELS = { monthly: "Monthly (billed every 4 weeks)", "3_months": "3 months", "6_months": "6 months" };
+// Any other bounded <n>_months term labels itself ("9_months" -> "9 months");
+// the three literals above stay byte-identical for the live vocabulary.
+function termLabelOf(term) {
+  if (TERM_LABELS[term]) return TERM_LABELS[term];
+  const m = /^(\d+)_months$/.exec(String(term || ""));
+  return m ? `${m[1]} months` : term;
+}
 
 // ── Billing cadence labels ───────────────────────────────────────────────────
 // offer_prices.billing_cadence says how a price actually re-bills, separately
@@ -264,6 +294,12 @@ const LEGACY_TERM_CADENCE_LABELS = {
   "3_months": "every 3 months",
   "6_months": "every 6 months",
 };
+// Any other bounded <n>_months term bills calendar months when no cadence is
+// set (intervalFor generalized the same way), so its legacy label follows suit.
+function legacyTermCadenceLabel(term) {
+  const m = /^(\d+)_months$/.exec(String(term || ""));
+  return m && +m[1] >= 1 && +m[1] <= 24 ? `every ${m[1]} months` : null;
+}
 function cadenceOf(row) {
   const raw = row && row.billing_cadence != null ? String(row.billing_cadence).trim().toLowerCase() : "";
   return raw && Object.prototype.hasOwnProperty.call(CADENCE_LABELS, raw) ? raw : null;
@@ -324,7 +360,7 @@ function buildPricing(offer, catalogRows, typedRows) {
         offer_price_key: opt.key,
         title,
         term: opt.term,
-        term_label: TERM_LABELS[opt.term] || opt.term,
+        term_label: termLabelOf(opt.term),
         whats_included: opt.included,
         available: !!row,
         amount_cents: row ? row.amount_cents : null,
@@ -337,7 +373,7 @@ function buildPricing(offer, catalogRows, typedRows) {
         // every row today; cadence_label always says how the charge really
         // repeats, so a card can print it without knowing any of this.
         billing_cadence: cadence,
-        cadence_label: CADENCE_LABELS[cadence] || LEGACY_TERM_CADENCE_LABELS[opt.term] || null,
+        cadence_label: CADENCE_LABELS[cadence] || LEGACY_TERM_CADENCE_LABELS[opt.term] || legacyTermCadenceLabel(opt.term) || null,
       });
     }
   }

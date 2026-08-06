@@ -366,7 +366,11 @@ function buildCheckoutModule() {
     cutLine(CHECKOUT_SRC, 'const CADENCE_COL = "billing_cadence";', "website/checkout.js"),
     cutLine(CHECKOUT_SRC, "const STRIPE_TRIAL_MAX_SECS = 729 * 86400;", "website/checkout.js"),
     cutLine(CHECKOUT_SRC, 'const TERM_NOUN = { "4_weeks": "every 4 weeks", "3_months": "every 3 months", "6_months": "every 6 months" };', "website/checkout.js"),
-    cutLine(CHECKOUT_SRC, 'const COMMITMENT_TERMS = new Set(["3_months", "6_months"]);', "website/checkout.js"),
+    // RE-STATED (2026-08-06, adjustable prepay lengths): the closed
+    // COMMITMENT_TERMS Set became the bounded isCommitmentTerm predicate. The
+    // module needs the shipped gate, whatever its shape - the parity claim is
+    // about the envelopes, not the gate's vocabulary.
+    cut(CHECKOUT_SRC, "function isCommitmentTerm(term) {", "website/checkout.js"),
     cut(CHECKOUT_SRC, "function nowIso() {", "website/checkout.js"),
     cut(CHECKOUT_SRC, "function norm(s) {", "website/checkout.js"),
     cut(CHECKOUT_SRC, "function clampStartDate(raw) {", "website/checkout.js"),

@@ -1850,6 +1850,11 @@ async function handlePriceUpserted(event, tenant, res) {
     else if (u === "month" && c === 1) interval = "4_weeks";
     else if (u === "month" && c === 3) interval = "3_months";
     else if (u === "month" && c === 6) interval = "6_months";
+    // Adjustable prepay lengths (2026-08-06): other whole-month shapes speak the
+    // same `<n>_months` vocabulary as the catalog and checkout - the old
+    // `${c}_${u}` fallback wrote "9_month" (no s), a key nothing else reads.
+    else if (u === "month" && c > 1 && c <= 24) interval = `${c}_months`;
+    else if (u === "week" && c % 4 === 0 && c / 4 > 1 && c / 4 <= 24) interval = `${c / 4}_months`;
     else interval = `${c}_${u}`;
   } else if (price.type === "one_time") {
     interval = "one_time";
