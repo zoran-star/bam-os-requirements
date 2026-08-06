@@ -11,6 +11,8 @@ import ActivationTab from "./ActivationTab.jsx";
 import ClientAvatar from "../components/ClientAvatar.jsx";
 import { showToast, uiConfirm, ToastHost, ConfirmHost } from "../components/dialogs.jsx";
 import { SkelRows } from "../components/Skeleton.jsx";
+import MetaError from "../components/MetaError.jsx";
+import { META_NOT_CONNECTED, LOAD_FAILED } from "../lib/metaError.js";
 
 // ─── Tiny stroke icons (design system: SVG stroke icons, no emojis) ────────
 const _ico = (paths, size = 14) => (
@@ -1551,7 +1553,9 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
   const [pickerCampaigns, setPickerCampaigns] = useState([]);
   const [pickerSelected, setPickerSelected] = useState(new Set());
   const [pickerLoading, setPickerLoading] = useState(false);
-  const [pickerError, setPickerError] = useState("");
+  // null | { text } (copy we wrote) | { raw } (whatever Meta said). Matches
+  // every producer below; an "" initial value matched none of them.
+  const [pickerError, setPickerError] = useState(null);
 
   // Inline campaign list (shown right on the page, no modal). Loads the ad
   // account's campaigns once it's saved; checkboxes toggle pickedCampaigns.
@@ -1621,7 +1625,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
     }
     setPickerOpen(true);
     setPickerLoading(true);
-    setPickerError("");
+    setPickerError(null);
     setPickerSelected(new Set(pickedCampaigns));
     try {
       const tok = session?.access_token;
@@ -1630,16 +1634,18 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      // { text } is copy we wrote and it renders as-is. { raw } is whatever Meta
+      // said, which has to be translated before a human sees it.
       if (j.reason === "no_ad_account") {
-        setPickerError("Save the ad account first, then re-open this picker.");
+        setPickerError({ text: "Save the ad account first, then re-open this picker." });
       } else if (j.reason === "no_staff_token") {
-        setPickerError("Meta not connected. Go to Settings → Connect Meta.");
+        setPickerError({ text: META_NOT_CONNECTED });
       } else {
         setPickerCampaigns(j.campaigns || []);
         if (Array.isArray(j.meta_campaign_ids)) setPickerSelected(new Set(j.meta_campaign_ids));
       }
     } catch (e) {
-      setPickerError(e.message || "Failed to load campaigns");
+      setPickerError({ raw: e.message || "" });
     }
     setPickerLoading(false);
   }
@@ -1666,7 +1672,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
         const j = await r.json().catch(() => ({}));
         if (cancelled) return;
         if (!r.ok) { setInlineCampaignsErr(j.error || `HTTP ${r.status}`); setInlineCampaigns([]); return; }
-        if (j.reason === "no_staff_token") { setInlineCampaignsErr("Meta not connected. Go to Settings > Connect Meta."); setInlineCampaigns([]); return; }
+        if (j.reason === "no_staff_token") { setInlineCampaignsErr(META_NOT_CONNECTED); setInlineCampaigns([]); return; }
         setInlineCampaigns(Array.isArray(j.campaigns) ? j.campaigns : []);
       } catch (e) {
         if (!cancelled) { setInlineCampaignsErr(e.message || "Failed to load campaigns"); setInlineCampaigns([]); }
@@ -1970,7 +1976,7 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
             ) : inlineCampaigns === null ? (
               <div style={{ fontSize: 12, color: t.textMute }}>Loading campaigns…</div>
             ) : inlineCampaignsErr ? (
-              <div style={{ fontSize: 12, color: t.red }}>{inlineCampaignsErr}</div>
+              <MetaError tokens={t} raw={inlineCampaignsErr} size={12} />
             ) : inlineCampaigns.length === 0 ? (
               <div style={{ fontSize: 12, color: t.textMute, fontStyle: "italic" }}>No campaigns found in this ad account.</div>
             ) : (
@@ -2032,7 +2038,13 @@ export function MarketingTab({ client, tokens, role, session, onChanged, onNavig
         </div>
       )}
       {client.meta_ad_account_id && campaignsLoading && <div style={{ color: t.textMute, padding: 12 }}>Loading campaigns…</div>}
-      {client.meta_ad_account_id && campaignsErr && <div style={{ color: t.red, padding: 12 }}>Error: {campaignsErr}</div>}
+      {/* unknownText, because campaignsErr can only ever be OURS. Its producer
+          (the campaigns fetch above) has no r.ok check and catches after
+          r.json() has already resolved, so it only fires on a network drop or a
+          parse failure - never on Meta's own text. Without this the site would
+          blame Meta for every one of them, which is the exact thing this
+          component was added to stop. */}
+      {client.meta_ad_account_id && campaignsErr && <MetaError tokens={t} raw={campaignsErr} unknownText={LOAD_FAILED} style={{ padding: 12 }} />}
       {client.meta_ad_account_id && !campaignsLoading && !campaignsErr && campaigns?.length === 0 && (
         <div style={{ color: t.textMute, padding: 12, fontStyle: "italic" }}>No active campaigns.</div>
       )}
@@ -2462,7 +2474,9 @@ function CampaignPickerModal({ campaigns, selected, loading, error, onToggle, on
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
           {loading && <SkelRows n={4} t={t} />}
-          {error && <div style={{ padding: 24, color: t.red }}>{error}</div>}
+          {error && (error.raw !== undefined
+            ? <MetaError tokens={t} raw={error.raw} style={{ padding: 24 }} />
+            : <div style={{ padding: 24, color: t.red }}>{error.text}</div>)}
           {!loading && !error && campaigns.length === 0 && (
             <div style={{ padding: 24, color: t.textMute, textAlign: "center", fontStyle: "italic" }}>No campaigns in this ad account.</div>
           )}

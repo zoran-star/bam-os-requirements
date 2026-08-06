@@ -28,7 +28,7 @@ import { loadCalendars, calendarForClass, freeSlots, summarizeSlots, bookingProv
 import { classIndex, classByName, classForCalendar, ageRoutingReadiness, buildQuestion } from "./agent/_class-slots.js";
 // Does the drafted SENTENCE agree with the slot stamped on the card? Everything
 // else here verifies the timestamp; this reads the words the parent receives.
-import { slotTextConflict } from "./agent/_slot-text.js";
+import { slotTextConflict, slotWhenLabel } from "./agent/_slot-text.js";
 import { resolveClassesForAge } from "./agent/_class-routing.js";
 import { respondedStage, contactStageState, computeQueue, respondedContactIdSetCached, peekRespondedIdSet, interestedStage, nurtureStage, scheduledTrialStage, toIso } from "./agent/_stage.js";
 import { markUnqualified, unmarkUnqualified } from "./agent/_tags.js";
@@ -161,9 +161,9 @@ const REPLY_TOOL = {
       unqualified_reason: { type: "string", description: "If recommend_unqualified: short why - 'Opted out' for any stop/leave-me-alone request." },
       book:            { type: "boolean", description: "True if you are BOOKING the lead into a free trial — ONLY after ALL of: (1) they confirmed a specific day/time, (2) you verified that exact slot is open via check_availability, AND (3) they explicitly said yes to YOU booking it for them (you asked 'want me to book it for you?' and they agreed). Once you have already asked and the lead replies with any clear affirmative to that slot ('sure', 'yes', 'ok', 'sounds good', or thanking you for that day/time), condition (3) is met - set book=true; do NOT ask the book question again. If you have a time but have NOT yet gotten that yes, set book=false and make your reply the confirmation question instead. A human approves before it's created. Your 'reply' is the confirmation you'd send." },
       book_group:      { type: "string", description: "If book: the CLASS the athlete belongs in, written exactly as that class is named in your academy's schedule. Use check_availability to work out which class an athlete's age fits before you book. Never invent a class name and never use a generic label such as 'younger' or 'older'." },
-      book_slot_at:    { type: "string", description: "If book: the EXACT ISO datetime of the open slot the lead confirmed (must be one of the open_slots from check_availability)." },
+      book_slot_at:    { type: "string", description: "If book: the EXACT ISO datetime of the open slot the lead confirmed - copy the `at` value of that slot from check_availability, never a timestamp you composed yourself. When your reply names the day or time out loud, use that same slot's `when` wording verbatim: it is already written in the academy's own timezone, so you never have to work out a weekday or convert a time." },
       propose_group:   { type: "string", description: "If your reply OFFERS or SUGGESTS a specific session day/time to the lead WITHOUT booking yet: the CLASS that time belongs to, written exactly as that class is named in your academy's schedule." },
-      propose_slot_at: { type: "string", description: "If your reply names a specific day/time to the lead (book=false): the EXACT ISO datetime of that open slot - it MUST come from check_availability. NEVER name a time in a reply that you have not verified as an open slot. This MUST be the SAME slot your 'reply' text names to the lead - never name one day/time in the message and put a different one here. When you offer a time, offer the NEAREST open slot from check_availability (the soonest upcoming one) unless the lead asked for a specific day. Empty when your reply names no specific time." },
+      propose_slot_at: { type: "string", description: "If your reply names a specific day/time to the lead (book=false): the EXACT ISO datetime of that open slot - copy the `at` value from check_availability, never a timestamp you composed yourself. NEVER name a time in a reply that you have not verified as an open slot. This MUST be the SAME slot your 'reply' text names to the lead - never name one day/time in the message and put a different one here; a message that says one day while this field says another is REJECTED before it can send. Say the day out loud using that slot's `when` wording verbatim - it is already in the academy's timezone, so never work out the weekday or convert the time yourself. When you offer a time, offer the NEAREST open slot (the soonest upcoming one) unless the lead asked for a specific day. Empty when your reply names no specific time." },
       reignite_at:      { type: "string", description: "YYYY-MM-DD. ONLY when the lead wants to proceed but at a LATER date: the concrete day to re-engage (resolve vague timeframes; bare 'later' = ~30 days out). A human confirms before anything is scheduled." },
       reignite_message: { type: "string", description: "If reignite_at: the exact re-engagement text to open with on that date - warm, references what they told us, moves toward booking." },
     },
@@ -177,7 +177,7 @@ const REPLY_TOOL = {
 // ever shown. Naming a class is optional and only needed to settle a tie.
 const CHECK_AVAILABILITY = {
   name: "check_availability",
-  description: "Check open free-trial slots before you book, for THIS athlete. Give the athlete's age and you get back only the times that belong to a class that athlete can actually join, plus which class each of them is. If more than one class fits, you also get back the ONE question to ask to tell them apart - ask it, then call this again with class_name.",
+  description: "Check open free-trial slots before you book, for THIS athlete. Give the athlete's age and you get back only the times that belong to a class that athlete can actually join, plus which class each of them is. If more than one class fits, you also get back the ONE question to ask to tell them apart - ask it, then call this again with class_name. Every slot comes back as { at, when }: `at` is the machine timestamp to put in book_slot_at / propose_slot_at, and `when` is that same moment already written out in the academy's own timezone (\"Tuesday, August 18th at 7:00 PM\") - say the day to the parent using `when`, word for word. Do not work out a weekday or convert a timezone yourself; that is what `when` is for, and a message whose day disagrees with its slot is rejected before it can send.",
   input_schema: {
     type: "object",
     properties: {
@@ -246,10 +246,19 @@ async function runCheckAvailability(input, bookingCtx) {
       clientId: bookingCtx.clientId, calLabel: cal.label,
       athleteAge: input.athlete_age, classes,
     });
+    // Each slot arrives as BOTH the machine value and the human wording, in the
+    // ACADEMY's timezone. This used to be a bare ISO list, which quietly made the
+    // model do timezone conversion and weekday arithmetic in its head every time
+    // it wanted to say a day out loud - and on 2026-08-04 it said "Monday the
+    // 18th" about 2026-08-18T23:00Z, which is a Tuesday in Toronto (Julie
+    // Boulton, GTA). Handing over `when` removes that arithmetic instead of
+    // checking it afterwards. slotTextConflict is now the backstop, not the fix.
+    const tz = bookingCtx.timezone || "America/Toronto";
     return {
       class_name: chosen ? chosen.title : null,
       calendar_id: cal.key,
-      open_slots: summarizeSlots(res.days),
+      timezone: tz,
+      open_slots: summarizeSlots(res.days).map(iso => ({ at: iso, when: slotWhenLabel(iso, tz) || iso })),
     };
   } catch (e) { return { error: `availability check failed: ${e.message}` }; }
 }
@@ -463,9 +472,12 @@ async function normalizeProposal(out, book, calendars, verifyCtx) {
 
 // Draft a cold OPENER for a Responded lead that entered with context but hasn't
 // messaged (no thread). Returns the structured proposal or throws.
-async function draftOpener(token, locationId, clientId, contactId, cfg, calendars, classes) {
+async function draftOpener(token, locationId, clientId, contactId, cfg, calendars, classes, timezone) {
   const system = buildOpenerSystem(cfg) + await loadContactMemory(sb, clientId, contactId, { ghl, token, locationId });
-  const out = await runOpener(system, { calendars: calendars || [], classes: classes || [], token, timezone: "America/Toronto", clientId });
+  // The academy's timezone, not a hardcoded Toronto: this is what renders the
+  // `when` wording the agent reads a slot time off, so a non-Toronto academy
+  // hardcoded here would have its openers naming times in the wrong zone.
+  const out = await runOpener(system, { calendars: calendars || [], classes: classes || [], token, timezone: timezone || "America/Toronto", clientId });
   const bookCal = (out.book && out.book_slot_at && out.book_group) ? calendarForClass(calendars || [], out.book_group, classes || []) : null;
   const book = !!(out.book && out.book_slot_at && bookCal);
   const prop = await normalizeProposal(out, book, calendars, { token, clientId, classes: classes || [] });
@@ -1040,7 +1052,7 @@ async function detectForClient(client) {
         let d;
         // Phase C: a fresh cold-open lead = the "new_lead" booking entry point. Use
         // the academy's scripted opener when it's live+approved; else the AI opener.
-        try { d = scriptedBookingOpener(client, "new_lead", firstName) || await draftOpener(token, locationId, client.id, contactId, cfg, calendars, classes); }
+        try { d = scriptedBookingOpener(client, "new_lead", firstName) || await draftOpener(token, locationId, client.id, contactId, cfg, calendars, classes, (client.time_zone || "").trim() || null); }
         catch (e) { reasons.push(`opener ${contactId}: draft threw - ${e.message}`); continue; }
         if (!d.reply || !String(d.reply).trim()) { if (d.escalate) escalated++; continue; }
         const isBook = !!(d.book && d.book_slot_at && d.book_calendar_id);
@@ -1836,7 +1848,7 @@ async function handler(req, res) {
         // template's Location line still arrives via the same-day 9am check-in.)
         if (confirmationSent) {
           try {
-            const info = await resolveContactInfo(token, contactId);
+            const info = await resolveContactInfo(token, contactId, new Map(), clientId);
             if (info && info.email) await sendOn({ channel: "email", clientId, toEmail: info.email, subject: "Your free trial is booked!", body: confirmMsg, vars: {} });
           } catch (_) {}
         }

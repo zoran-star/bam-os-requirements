@@ -3469,6 +3469,7 @@ async function handleMetaOverview(req, res) {
   //   (no ticket) = never sent → grey dot (falls back to "none")
   const budgetStatusById = {};
   const confirmedBudgetById = {}; // newest budget-review ticket → client-confirmed total + per-campaign breakdown
+  const pendingRequestAtById = {}; // newest ticket is still waiting on the client → when it was sent
   try {
     const bt = await sb(`marketing_tickets?type=eq.budget-review&select=client_id,client_action_status,status,submitted_at,fields&order=submitted_at.desc`);
     for (const t of (bt || [])) {
@@ -3477,6 +3478,11 @@ async function handleMetaOverview(req, res) {
         budgetStatusById[t.client_id] = t.status === "completed" ? "complete"
           : t.client_action_status === "responded" ? "confirmed"
           : "requested";
+        // A fresh request out for reply is why the amount below can look stale:
+        // the displayed number is the LAST budget the client agreed to, and a
+        // newer ask is already sitting in their portal. Staff had no way to see
+        // that, so they re-sent requests or tried to edit the number by hand.
+        if (budgetStatusById[t.client_id] === "requested") pendingRequestAtById[t.client_id] = t.submitted_at || null;
       }
       // Amount = newest ticket that ACTUALLY carries a budget breakdown wins.
       // Decoupled from status: a newer "completed" ticket may not carry
@@ -3515,8 +3521,19 @@ async function handleMetaOverview(req, res) {
     const goal_cpl = c.meta_cpl_goal != null ? Number(c.meta_cpl_goal) : null;
     const monthly_budget = c.meta_monthly_budget != null ? Number(c.meta_monthly_budget) : null;
     const cbInfo = confirmedBudgetById[c.id] || null;
-    const baseRow = { id: c.id, business_name: c.business_name, goal_cpl, monthly_budget, budget_status: budgetStatusById[c.id] || "none", confirmed_budget: cbInfo?.total ?? null, confirmed_budgets: cbInfo?.campaigns ?? null };
-    if (!c.meta_ad_account_id || !staffToken) return { ...baseRow, connected: false };
+    const baseRow = {
+      id: c.id, business_name: c.business_name, goal_cpl, monthly_budget,
+      budget_status: budgetStatusById[c.id] || "none",
+      confirmed_budget: cbInfo?.total ?? null, confirmed_budgets: cbInfo?.campaigns ?? null,
+      budget_request_sent_at: pendingRequestAtById[c.id] || null,
+    };
+    // Two different stories used to share one shape. "This client has no ad
+    // account" is a client-level gap. "Nobody has connected Meta at all" is a
+    // team-level outage that takes EVERY client's numbers out at once, and
+    // shipping it as a plain not-connected row let the roster read like a room
+    // full of clients who spent nothing. Flag it so the UI can say so.
+    if (!c.meta_ad_account_id) return { ...baseRow, connected: false };
+    if (!staffToken) return { ...baseRow, connected: false, no_staff_token: true };
     try {
       const adAcct = c.meta_ad_account_id.startsWith("act_") ? c.meta_ad_account_id : `act_${c.meta_ad_account_id}`;
       // No campaign filter on a shared ad account = would blend every academy's
@@ -3579,6 +3596,10 @@ async function handleMetaOverview(req, res) {
     as_of: now.toISOString(),
     month_label: `${MONTH_NAMES[now.getUTCMonth()]} ${now.getUTCFullYear()}`,
     month_pct: monthPct,
+    // False = we hold no Meta connection at all, so not one number on this
+    // payload came from Meta. Distinct from a connection that exists and
+    // failed: nothing to reconnect here, it has to be connected first.
+    meta_connected: !!staffToken,
     rollup, clients: rows, benchmarks: bm,
   });
 }
