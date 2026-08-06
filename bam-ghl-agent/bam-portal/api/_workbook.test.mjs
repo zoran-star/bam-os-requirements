@@ -147,10 +147,11 @@
 //       rightly refuses " 9" - a refusal manufactured by our own seed. This
 //       control pins scripts/seed-sj-age-rows.mjs, not api/workbook.js.
 //
-// TWENTY-FOUR controls: twenty-three over the route in three families, plus the
+// TWENTY-FIVE controls: twenty-four over the route in three families, plus the
 // seed-side seeduntrimmed above. The route's: PRODUCT rules (partialsubmit,
 // confirmblind, confirmnomaterialize, submittededitable, echoacts, orphanmint,
-// metawritable, dropnulls, addconfirmed, ghostremove, blankadd), DISCLOSURE AND
+// metawritable, dropnulls, addconfirmed, ghostremove, blankadd,
+// serverconfirmsuntargeted), DISCLOSURE AND
 // BLAST RADIUS (tokenecho, voidreadable, crosscard, rawcredential, noguard,
 // addforeign, payloadtarget, addcap, addsubmitted, codesunmintable,
 // codesmintany) and ORDERING (latewrite,
@@ -173,6 +174,8 @@
 //   codesmintany  -> 4 failures (measured 2026-08-06, D1 fix pass: the five
 //                    byte-for-byte refusals minus the plan-card one, which
 //                    mintableOn still refuses on its own)
+//   serverconfirmsuntargeted -> 2 failures (measured 2026-08-06, D3 fix pass:
+//                    the verbatim 400 refusal and the no-half-stamped-card pin)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -440,6 +443,13 @@ const CODESMINTANY = [[
   `    return cls.kind === "code" && !!cls.t;`,
   `    return true; // (control codesmintany) the allowlist is gutted`]];
 
+// MUTATE=serverconfirmsuntargeted  the server-side codes confirm guard is gone,
+// so a direct POST confirms a named code with no applies-to list - exactly what
+// the dress rehearsal found succeeding while the page promised a refusal.
+const SERVERCONFIRMSUNTARGETED = [[
+  `      if (loose.length) throw bad('Say what ' + loose[0].code + ' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');`,
+  `      if (false && loose.length) throw bad("unreachable");   // (control serverconfirmsuntargeted) the server confirms it anyway`]];
+
 // MUTATE=typingisapproving  puts the gate back on the STATE STRING instead of on
 // the deliberate act. This is the defect exactly as it shipped: a card the owner
 // typed into and never confirmed satisfied "every row has to be confirmed", and
@@ -513,6 +523,7 @@ const EDITS = {
   emptycardsdontcount: EMPTYCARDSDONTCOUNT, countsflag: COUNTSFLAG, addkeepsconfirm: ADDKEEPSCONFIRM,
   othernofollowup: OTHERNOFOLLOWUP,
   codesunmintable: CODESUNMINTABLE, codesmintany: CODESMINTANY,
+  serverconfirmsuntargeted: SERVERCONFIRMSUNTARGETED,
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
   seeduntrimmed: [],   // pins scripts/seed-sj-age-rows.mjs, not workbook.js - see below
@@ -1680,6 +1691,51 @@ console.log("\n── the mint whitelist, codes cards: every CODE_T leaf can gro
     ok(r.status === 404 && r.body.error === "that answer does not belong to this card",
       `a null-id save of ${field} on the ${key} card still refuses byte-for-byte ("${r.body.error}")`);
   }
+  reset();
+}
+
+console.log("\n── the codes confirm guard: a named code must say what it applies to ──");
+{
+  reset();
+  // D3: the page refuses this confirm at the moment of the deliberate act, and
+  // the server must refuse it too - in the SAME sentence - or a direct POST
+  // walks straight past a rule the page promises. SJ-shaped fixture again: a
+  // named code, no applies_to row at all.
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  let seedAt = 0;
+  const codeRow = (field, proposed) => DB.workbook_answers.push({
+    id: "a-code-" + (++seedAt), workbook_id: "wb1", card_id: "c-codes", client_id: "sj",
+    target_kind: "price_row", target_table: "offers", target_id: "off1",
+    target_field: field, current_value: null, proposed: proposed === undefined ? null : proposed,
+    answered: null, applied_at: null, created_at: `2026-08-04T00:01:0${seedAt}Z`,
+  });
+  codeRow("codes.0.code", "SIBLING10");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  codeRow("codes.0.duration", "Every payment");
+  codeRow("codes.0.once_per_customer", "yes");
+
+  const WANT = 'Say what SIBLING10 applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".';
+  const r1 = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(r1.status === 400 && r1.body.ok === false && r1.body.error === WANT,
+    `confirming a named code with a blank applies-to refuses 400, sentence verbatim ("${r1.body.error}")`);
+  ok(row("workbook_cards", "c-codes").confirmed_at === null && DB.workbook_answers.every((a) => a.card_id !== "c-codes" || a.answered === null),
+    "and the refusal left no half-stamped card behind - nothing was materialized, nothing confirmed");
+
+  // With the list filled (through the D1 mint door, the way the live page
+  // does), the same confirm succeeds.
+  const fill = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.applies_to", answered: ["Academy 2x/week|monthly"] }] });
+  const r2 = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(fill.body.ok === true && r2.status === 200 && r2.body.ok === true && !!row("workbook_cards", "c-codes").confirmed_at,
+    "with the applies-to list filled the same confirm succeeds");
+
+  // A codes card with NO named code is "confirm it empty": there is nothing
+  // loose, so the deliberate act goes through.
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  const r3 = await post({ token: TOKEN, action: "confirm", card_key: "codes" });
+  ok(r3.status === 200 && r3.body.ok === true && !!row("workbook_cards", "c-codes").confirmed_at,
+    "a codes card with no named code still confirms - 'no codes' is an answer");
   reset();
 }
 

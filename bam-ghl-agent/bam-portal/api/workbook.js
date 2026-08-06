@@ -165,6 +165,30 @@ function jsonEqual(a, b) {
 // time - is what makes the San Jose rename record as a change.
 const effective = (a) => (isBlank(a.answered) ? a.proposed : a.answered);
 
+// A CODE WITH A NAME AND NO APPLIES-TO LIST, read from one card's own
+// effective answers. ONE extraction feeds BOTH the owner-side confirm refusal
+// (doConfirm, D3) and the staff review warning below, so the rule that blocks
+// the deliberate act and the warning staff read can never drift apart. An
+// empty applies_to is not a smaller discount: Stripe discounts every line of
+// the first invoice BY DEFAULT under it, the joining fee included, which is
+// why the apply-side mint withholds the fee target in self-defence.
+function looseCodesIn(mine) {
+  const byIdx = new Map();
+  for (const a of mine) {
+    const m = /^codes\.(\d+)\.(code|applies_to)$/.exec(String(a.target_field || ""));
+    if (!m) continue;
+    if (!byIdx.has(m[1])) byIdx.set(m[1], {});
+    byIdx.get(m[1])[m[2]] = effective(a);
+  }
+  const out = [];
+  for (const [i, c] of byIdx) {
+    const code = String(c.code == null ? "" : c.code).trim();
+    const applies = Array.isArray(c.applies_to) ? c.applies_to.filter(Boolean) : [];
+    if (code && !applies.length) out.push({ index: +i, code });
+  }
+  return out;
+}
+
 // ── OWNER ADDITIONS: a REQUEST, never a write to configuration ───────────────
 //
 // Zoran's ruling, 2026-08-05: the three "+ Add" buttons stay, and what they
@@ -967,6 +991,22 @@ async function doConfirm(wb, body) {
   const all = await readAnswers(wb.id);
   let mine = byCard(all).get(card.id) || [];
 
+  // ── A NAMED CODE WITH NO APPLIES-TO LIST CANNOT BE CONFIRMED (D3) ─────────
+  // The page refuses this at the moment of the deliberate act, and the server
+  // must refuse it too, in the SAME sentence, or a direct POST walks past a
+  // rule the page promises. Checked BEFORE the materialize loop, and that is
+  // equivalent rather than early: the loop only copies `proposed` into
+  // `answered`, and `effective` already reads `proposed`, so nothing the loop
+  // writes could change this answer - and refusing here leaves no
+  // half-stamped card behind. MUTATE=serverconfirmsuntargeted.
+  {
+    const k = String(card.card_key || "");
+    if (k === "codes" || k.startsWith("codes:")) {
+      const loose = looseCodesIn(mine);
+      if (loose.length) throw bad('Say what ' + loose[0].code + ' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');
+    }
+  }
+
   // ── MATERIALIZE THE ANSWER HE JUST GAVE ───────────────────────────────────
   // He confirmed the card AS SHOWN, so what was shown IS his answer, and it is
   // written down rather than inferred later. DO NOT DELETE THIS LOOP AS
@@ -1733,18 +1773,10 @@ async function doReviewStaff(req, body) {
       const mine = grouped.get(card.id) || [];
       const k = String(card.card_key || "");
       if (k === "codes" || k.startsWith("codes:")) {
-        const byIdx = new Map();
-        for (const a of mine) {
-          const m = /^codes\.(\d+)\.(code|applies_to)$/.exec(String(a.target_field || ""));
-          if (!m) continue;
-          if (!byIdx.has(m[1])) byIdx.set(m[1], {});
-          byIdx.get(m[1])[m[2]] = effective(a);
-        }
-        for (const [, c] of byIdx) {
-          const codeName = String(c.code == null ? "" : c.code).trim();
-          const applies = Array.isArray(c.applies_to) ? c.applies_to.filter(Boolean) : [];
-          if (codeName && !applies.length) looseCodes.push({ card_key: card.card_key, code: codeName });
-        }
+        // Same extraction the confirm refusal runs (looseCodesIn), so the
+        // warning staff read and the rule that blocks the owner's confirm can
+        // never disagree about which codes are loose.
+        for (const lc of looseCodesIn(mine)) looseCodes.push({ card_key: card.card_key, code: lc.code });
       }
       if (k.startsWith("plan:")) {
         const eff = (f) => { const a = mine.find((x) => x.target_field === f); return a ? effective(a) : undefined; };

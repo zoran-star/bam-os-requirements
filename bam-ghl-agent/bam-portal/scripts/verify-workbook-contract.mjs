@@ -187,7 +187,15 @@
  * reviewshowsuntranslated -> 1, staffgateoff -> 5, refusalnamescount -> 1,
  * applyreopensediting -> 3, rollbackleavesoffers -> 1,
  * rollbackclearsanswers -> 2, taxneverlands -> 5, feewithheldsilently -> 1,
- * confirmuntargetedcode -> 2, noisnull -> 3, taxregnowhere -> 16,
+ * confirmuntargetedcode -> 1 (RE-MEASURED 2026-08-06, D3 fix pass: was 2;
+ * with the server guard in place a page whose own guard is deleted now has
+ * its confirm REFUSED by the server in the same sentence, so F3's original
+ * two checks pass and the catch is F5's byte-identity assertion - the page
+ * relays the server sentence prefixed with "We could not save that
+ * confirmation.", which is not the page's own promised alert),
+ * serverconfirmsuntargeted -> 2 (measured 2026-08-06, D3 fix pass: F5's
+ * direct-API refusal and byte-identity pins; the same pin catches 2 in
+ * api/_workbook.test.mjs), noisnull -> 3, taxregnowhere -> 16,
  * firstbillalways -> 1, feelineflat -> 4, othernofollowup -> 3,
  * agesunknownfield -> 19, agenotegone -> 1 (taxregnowhere and
  * agesunknownfield each gained one catch on 2026-08-06 when the remediation
@@ -483,6 +491,13 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   codesmintany: [[
     `    return cls.kind === "code" && !!cls.t;`,
     `    return true; // (control codesmintany) the allowlist is gutted`]],
+  // The server-side codes confirm guard is gone, so a direct POST confirms a
+  // named code with no applies-to list - exactly what the dress rehearsal
+  // found succeeding while the page promised a refusal. F5's direct-confirm
+  // refusal and the byte-identity assertion have to catch it.
+  serverconfirmsuntargeted: [[
+    `      if (loose.length) throw bad('Say what ' + loose[0].code + ' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');`,
+    `      if (false && loose.length) throw bad("unreachable");   // (control serverconfirmsuntargeted) the server confirms it anyway`]],
   // The server drops the Other-cycle follow-up requirement, so the two halves
   // stop refusing in the same sentence - the page refuses, the API stores the
   // riddle.
@@ -1611,6 +1626,21 @@ console.log("\n── F5. the SJ-shaped codes card grows its missing rows throug
   await sjPage.boot();
   await settle();
   const codesLid = (sjPage.CARDS.find((c) => c.card_key === "codes") || {}).lid;
+
+  // ── D3 first, on the untargeted state: the server refuses the confirm ─────
+  // A direct POST - no page in the middle - is exactly what the dress
+  // rehearsal found SUCCEEDING while the page promised a refusal.
+  // MUTATE=serverconfirmsuntargeted.
+  const refusedConfirm = await callApi({ action: "confirm", card_key: "codes" });
+  check(refusedConfirm.ok === false && !dbCard("c-codes").confirmed_at,
+    `a direct API confirm of the untargeted code is refused ("${refusedConfirm.error}")`);
+  // And the sentence is the PAGE's OWN, byte for byte: the page promises the
+  // API's sentences, so the two refusals must be one wording.
+  ALERTS = [];
+  await sjPage.confirmCard(codesLid);
+  await settle();
+  check(ALERTS.length === 1 && ALERTS[0] === refusedConfirm.error,
+    `and the page's alert is BYTE-IDENTICAL to the server's refusal ("${ALERTS[0]}")`);
 
   // The exact call that 404'd in production: the owner ticks the Everything
   // chip, the page saves codes.0.applies_to with a null id.

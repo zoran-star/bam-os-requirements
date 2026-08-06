@@ -892,8 +892,11 @@ async function confirmCard(lid){
        the mint then withholds the fee target in self-defence. The refusal
        lives here, at the moment of the deliberate act, so the everything-scope
        is something the owner CHOSE (the explicit chip) rather than inherited.
-       The server stays permissive on confirm; the Step 1 withhold report is
-       the backstop for a code that somehow arrives untargeted anyway. */
+       The server refuses the same confirm too (doConfirm, D3), in THIS EXACT
+       SENTENCE - the sentence below is byte-identical to the API's, and the
+       contract harness asserts it - so a direct POST cannot walk past the
+       rule this page promises. The Step 1 withhold report stays as the
+       backstop for a code that somehow arrives untargeted anyway. */
     const untargeted=(MODEL[lid]||[]).find(x=>String(x.code).trim()&&!(x.applies&&x.applies.length));
     if(untargeted){alert('Say what '+untargeted.code+' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');return}
   }
