@@ -166,6 +166,11 @@
 // their proof in CI, which runs every name and greps for the banner):
 //   agesanythinggoes -> 18 failures (all 16 MUST-REFUSE assertions in the
 //                       section 22 table, plus both "012"-normalisation pins)
+//   vocabdrift       -> 8 failures (re-pointed: Step 12's blank-age skip landed
+//                       inside the old three-line anchor and the control
+//                       ERRORED instead of tripping; the pin is now the one
+//                       moving push line, and it catches the casing, typing,
+//                       rung-creation and age-string assertions on its own)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -266,10 +271,16 @@ const REAPPLY = [[
   `    if (a.applied_at) { skipped.already_applied.push(a.id); continue; }`,
   `    // (control reapply) already-applied answers are written again`]];
 
+// Re-pointed 2026-08-06: Step 12's blank-age skip landed inside the old
+// three-line anchor, so the pin stopped applying and the control ERRORED
+// instead of tripping - a decorative control, the exact thing the measured
+// block exists to prevent. The push line is unique in api/workbook.js, so the
+// pin is now the ONE moving line. The translation and its refusal above it
+// stay: tChip translates case-insensitively, so a page-cased "Waive" still
+// translates ok and the mutant pushes the RAW value - the same drift this
+// control always reintroduced.
 const VOCABDRIFT = [[
-  `    const out = cls.t(eff);
-    if (!out.ok) { refuse(a, out.error); continue; }
-    offerPending.push({ a, cls, value: out.value });`,
+  `    offerPending.push({ a, cls, value: out.value });`,
   `    offerPending.push({ a, cls, value: eff });   // (control vocabdrift) the page's own casing lands`]];
 
 const OWNERTOKEN = [[
