@@ -155,6 +155,13 @@
 //       a boolean - becomes an age the offer stores verbatim. Section 22's
 //       table is what has to catch it; before that table, this mutation
 //       passed every gate.
+//   MUTATE=onepagestripe      node api/_workbook-apply.test.mjs
+//       the live-Stripe price read stops paginating (`page < 10` -> `page < 1`),
+//       so in production every price past #100 reads exists:false and the
+//       mint duplicates real prices. The fixture serves the real hits on
+//       PAGE TWO, so section 18 catches the missed matches and the missing
+//       starting_after request. Before the paginated fixture, this mutation
+//       passed every gate.
 //
 // A pin that no longer matches api/workbook.js reports NEGATIVE CONTROL FAILED
 // rather than passing quietly. A control run exits ZERO when the mutation IS
@@ -171,6 +178,11 @@
 //                       ERRORED instead of tripping; the pin is now the one
 //                       moving push line, and it catches the casing, typing,
 //                       rung-creation and age-string assertions on its own)
+//   onepagestripe    -> 4 failures (the starting_after read-pattern pin, the
+//                       exists/mint counts, the page-two 12-week match and its
+//                       product name; also pinned in
+//                       scripts/verify-workbook-contract.mjs, where it catches
+//                       the read-pattern assertion -> 1)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -453,6 +465,16 @@ const AGEBANDUNCHECKED = [[
   "        refuse(lo.a, `age_min ${lo.value} is above age_max ${hi.value}, so no athlete could ever fit this plan. Fix the ages first.`);",
   "        // (control agebandunchecked) the inverted band sails through"]];
 
+// The live-Stripe read stops paginating: one page of 100 and the loop ends,
+// so every price past #100 reads exists:false and the rehearsal says "mint
+// them all" against real cards. The fixture serves the real hits on PAGE TWO
+// on purpose, so this control must trip the match assertions AND the
+// read-pattern assertion. The non-GET "STRIPE WAS WRITTEN TO" throw is
+// untouched.
+const ONEPAGESTRIPE = [[
+  `      for (let page = 0; page < 10; page++) {   // cap ~1000 prices; an academy past that is a conversation`,
+  `      for (let page = 0; page < 1; page++) {    // (control onepagestripe) the first page is the whole truth`]];
+
 // The translator body becomes the tester's mutation: any value stringifies
 // into an age. The early `""` return above it stays, which changes nothing -
 // String("") is "" - so this is ONE moving line and the whole anything-goes
@@ -479,6 +501,7 @@ const EDITS = {
   agebandunchecked: AGEBANDUNCHECKED,
   agenotegone: AGENOTEGONE,
   agesanythinggoes: AGESANYTHINGGOES,
+  onepagestripe: ONEPAGESTRIPE,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -708,6 +731,17 @@ const STRIPE_PRODUCTS = [
   { id: "prod_two", name: "Academy 2x/week" },
   { id: "prod_fee", name: "Joining fee" },
 ];
+// PAGE ONE, on purpose (R3): 100 fillers whose amounts (1-100 cents) match no
+// target, served with has_more:true. The REAL hits above live on PAGE TWO,
+// behind a starting_after cursor - so a read that stops paginating
+// (`page < 10` -> `page < 1`) reads every real price as missing and the
+// rehearsal says "mint them all" against real cards. That regression survived
+// every gate while the fixture was one page deep.
+const STRIPE_FILLERS = Array.from({ length: 100 }, (_, i) => ({
+  id: `price_filler_${i + 1}`, object: "price", unit_amount: i + 1, currency: "usd",
+  product: "prod_filler", recurring: { interval: "week", interval_count: 4 },
+}));
+const STRIPE_CURSOR = STRIPE_FILLERS[STRIPE_FILLERS.length - 1].id;
 const STRIPE_READS = [];           // every GET, with its headers, for the right-account assertion
 const STRIPE_FAIL = new Set();     // "prices" -> GET /v1/prices answers 503
 
@@ -723,7 +757,10 @@ globalThis.fetch = async (url, init = {}) => {
     STRIPE_READS.push({ url: u, headers: init.headers || {} });
     if (u.includes("/v1/prices")) {
       if (STRIPE_FAIL.has("prices")) return json({ error: { message: "the stub database went away mid-read" } }, 503);
-      return json({ object: "list", data: STRIPE_PRICES, has_more: false });
+      const after = new URL(u).searchParams.get("starting_after");
+      if (!after) return json({ object: "list", data: STRIPE_FILLERS, has_more: true });
+      if (after === STRIPE_CURSOR) return json({ object: "list", data: STRIPE_PRICES, has_more: false });
+      return json({ object: "list", data: [], has_more: false });
     }
     if (u.includes("/v1/products")) return json({ object: "list", data: STRIPE_PRODUCTS, has_more: false });
     return json({ object: "list", data: [], has_more: false });
@@ -1521,6 +1558,15 @@ console.log("\n── 18. the dry run answers match-vs-mint from LIVE Stripe, re
   ok(p3.stripe_check === "read", `the live read happened (stripe_check ${JSON.stringify(p3.stripe_check)})`);
   ok(STRIPE_READS.length > 0 && STRIPE_READS.every((c) => (c.headers || {})["Stripe-Account"] === "acct_1RDtSMK6ZS1cqefu"),
     `every Stripe call was a GET carrying the Stripe-Account header for the right account (${STRIPE_READS.length} reads, saw ${JSON.stringify(((STRIPE_READS[0] || {}).headers || {})["Stripe-Account"])})`);
+  // THE READ PATTERN, not just the result: the fixture's real hits live on
+  // PAGE TWO, so the harness must have RECORDED a request carrying the
+  // starting_after cursor - a read that never asks for page two can only get
+  // the right answer by luck. MUTATE=onepagestripe.
+  const pagedRead = STRIPE_READS.find((c) => c.url.includes("/v1/prices") && c.url.includes(`starting_after=${STRIPE_CURSOR}`));
+  ok(!!pagedRead,
+    `the read PAGINATED: a request with starting_after=${STRIPE_CURSOR} arrived (saw ${JSON.stringify(STRIPE_READS.filter((c) => c.url.includes("/v1/prices")).map((c) => c.url.split("?")[1]))})`);
+  // The counts are UNCHANGED by the 100 page-one fillers - they match nothing,
+  // so 4-exist / 2-mint is the same answer the one-page fixture gave.
   ok(p3.exists_in_stripe === 4 && p3.would_mint_new === 2,
     `4 of the 6 targets already exist live, 2 would mint new (saw ${JSON.stringify(p3.exists_in_stripe)}/${JSON.stringify(p3.would_mint_new)})`);
   const byKey = Object.fromEntries(p3.targets.map((t) => [t.key, t]));

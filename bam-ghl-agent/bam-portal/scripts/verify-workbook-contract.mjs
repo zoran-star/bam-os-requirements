@@ -162,13 +162,18 @@
  *       amount the rehearsal prints is PRE-TAX while his own page told him what a
  *       parent pays with tax on. The defect the tax card exists to close, one
  *       write later.
+ *   MUTATE=onepagestripe            API. The live-Stripe price read stops
+ *       paginating, so it reads only the fixture's 100 page-one fillers and
+ *       never sends the starting_after cursor - in production, exists:false
+ *       past price #100 and the mint duplicates real prices.
  *
  * Measured 2026-08-06, after the full rehearsal-round-1 build (Steps 1-12:
  * withheld fee report, Variant A codes guard, confirmed-no tax, registration
  * number, duration scope sentence, every-card-counts, live-Stripe dry run,
  * fee-line truth, Other-cadence follow-up, stale-note clear, approve-card
- * vocabulary, per-plan age bands). Unmutated ALL PASS (161 assertions;
- * was 148 before the Step 12 age sections D3/G/H4 joined).
+ * vocabulary, per-plan age bands). Unmutated ALL PASS (162 assertions;
+ * was 148 before the Step 12 age sections D3/G/H4 joined, 161 before the
+ * R3 pagination pin).
  * typingisapproving -> 18 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 10, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -178,7 +183,10 @@
  * rollbackclearsanswers -> 2, taxneverlands -> 5, feewithheldsilently -> 1,
  * confirmuntargetedcode -> 2, noisnull -> 3, taxregnowhere -> 15,
  * firstbillalways -> 1, feelineflat -> 4, othernofollowup -> 3,
- * agesunknownfield -> 18, agenotegone -> 1.
+ * agesunknownfield -> 18, agenotegone -> 1, onepagestripe -> 1 (measured
+ * 2026-08-06, R3: the H5 read-pattern assertion; the existence assertions it
+ * also breaks live in api/_workbook-apply.test.mjs, where the same pin
+ * catches 4).
  * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
  * flow never submits an inverted band because the page guard refuses it in
  * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
@@ -435,6 +443,13 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   agenotegone: [[
     `    ...(wroteAges ? { age_note: "Plan ages were stored on the offer for later use. Nothing reads plan ages yet: class age routing still reads the class list, so no routing changed." } : {}),`,
     `    // (control agenotegone) the note is gone`]],
+  // The live-Stripe price read stops paginating, so it reads only the fixture's
+  // 100 fillers and never sends the starting_after cursor - which H5's
+  // read-pattern assertion has to catch (the existence assertions live in
+  // api/_workbook-apply.test.mjs, whose fixture keeps its real hits on page two).
+  onepagestripe: [[
+    `      for (let page = 0; page < 10; page++) {   // cap ~1000 prices; an academy past that is a conversation`,
+    `      for (let page = 0; page < 1; page++) {    // (control onepagestripe) the first page is the whole truth`]],
   // The server drops the Other-cycle follow-up requirement, so the two halves
   // stop refusing in the same sentence - the page refuses, the API stores the
   // riddle.
@@ -900,6 +915,16 @@ function project(table, rows, params) {
 // ═════════════════════════════════════════════════════════════════════════════
 let HANDLER = null;
 const API_CALLS = [];
+// The Stripe fixture (R3): page one of the price list is 100 fillers whose
+// amounts (1-100 cents) can match no target, page two - reachable only through
+// the starting_after cursor - is the empty end of the list. STRIPE_GETS records
+// every Stripe GET so H5 can assert the cursor request really happened.
+const STRIPE_FILLERS = Array.from({ length: 100 }, (_, i) => ({
+  id: `price_filler_${i + 1}`, object: "price", unit_amount: i + 1, currency: "usd",
+  product: "prod_filler", recurring: { interval: "week", interval_count: 4 },
+}));
+const STRIPE_CURSOR = STRIPE_FILLERS[STRIPE_FILLERS.length - 1].id;
+const STRIPE_GETS = [];
 async function router(url, init = {}) {
   const u = String(url);
   const method = String(init.method || "GET").toUpperCase();
@@ -927,12 +952,23 @@ async function router(url, init = {}) {
       : json({ msg: "invalid" }, 401);
   }
   // The rehearsal may READ Stripe (D7); anything else still throws, so the
-  // no-writes gate survives, sharper. This harness serves an empty price list
-  // - existence assertions live in api/_workbook-apply.test.mjs, whose fixture
-  // carries live prices; here the claim is only that the read happens, is a
-  // GET, and fails loud when it cannot.
+  // no-writes gate survives, sharper. This harness serves NO real hits -
+  // existence assertions live in api/_workbook-apply.test.mjs, whose fixture
+  // carries live prices; here the claim is that the read happens, is a GET,
+  // fails loud when it cannot - and PAGINATES (R3): page one is 100 fillers
+  // whose 1-100 cent amounts match no target, has_more:true, and page two
+  // (behind the starting_after cursor) is the empty end of the list. Every
+  // GET is recorded so H5 can assert the cursor request really arrived.
+  // MUTATE=onepagestripe.
   if (u.startsWith("https://api.stripe.com/")) {
     if (method !== "GET") throw new Error(`STRIPE WAS WRITTEN TO: ${method} ${u} - the rehearsal may READ Stripe, never write it`);
+    STRIPE_GETS.push(u);
+    if (u.includes("/v1/prices")) {
+      const after = new URL(u).searchParams.get("starting_after");
+      if (!after) return json({ object: "list", data: STRIPE_FILLERS, has_more: true });
+      if (after === STRIPE_CURSOR) return json({ object: "list", data: [], has_more: false });
+      return json({ object: "list", data: [], has_more: false });
+    }
     return json({ object: "list", data: [], has_more: false });
   }
   if (!u.startsWith(`${SB_BASE}/rest/v1/`)) throw new Error(`UNSTUBBED CALL: ${method} ${u}`);
@@ -2020,6 +2056,13 @@ console.log("\n── H5. the rehearsal describes work in the page's own key voc
   // empty account every target honestly reads as would-mint.
   check(PH3.stripe_check === "read" && PH3.exists_in_stripe === 0 && PH3.would_mint_new === (PH3.targets || []).length,
     `the rehearsal read LIVE Stripe (stripe_check ${JSON.stringify(PH3.stripe_check)}, ${PH3.exists_in_stripe} exist, ${PH3.would_mint_new} to mint of ${(PH3.targets || []).length})`);
+  // R3: and the read PAGINATED. The fixture's first page is 100 fillers with
+  // has_more:true, so a read that never sends the starting_after cursor never
+  // saw the whole account - in production that reports exists:false past
+  // price #100 and the mint duplicates real prices. MUTATE=onepagestripe.
+  const cursorReq = STRIPE_GETS.find((g) => g.includes("/v1/prices") && g.includes(`starting_after=${STRIPE_CURSOR}`));
+  check(!!cursorReq,
+    `the price read paginated: a request carried starting_after=${STRIPE_CURSOR} (${STRIPE_GETS.filter((g) => g.includes("/v1/prices")).length} price GETs recorded)`);
   check((PH3.targets || []).length > 0 && (PH3.targets || []).every((t) => t.billing_rhythm && typeof t.billing_rhythm.sentence === "string" && t.billing_rhythm.recurring !== undefined),
     "and every target states its real billing rhythm with a source, no hedge");
 }
