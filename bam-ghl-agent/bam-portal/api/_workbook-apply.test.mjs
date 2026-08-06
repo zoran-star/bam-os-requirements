@@ -177,11 +177,13 @@
 // their proof in CI, which runs every name and greps for the banner):
 //   agesanythinggoes -> 18 failures (all 16 MUST-REFUSE assertions in the
 //                       section 22 table, plus both "012"-normalisation pins)
-//   vocabdrift       -> 8 failures (re-pointed: Step 12's blank-age skip landed
+//   vocabdrift       -> 9 failures (re-pointed: Step 12's blank-age skip landed
 //                       inside the old three-line anchor and the control
 //                       ERRORED instead of tripping; the pin is now the one
 //                       moving push line, and it catches the casing, typing,
-//                       rung-creation and age-string assertions on its own)
+//                       rung-creation and age-string assertions on its own;
+//                       8 when re-pointed, 9 since section 23's blank-months
+//                       pin joined)
 //   onepagestripe    -> 4 failures (the starting_after read-pattern pin, the
 //                       exists/mint counts, the page-two 12-week match and its
 //                       product name; also pinned in

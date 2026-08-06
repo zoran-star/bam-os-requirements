@@ -185,9 +185,12 @@
  * reviewshowsuntranslated -> 1, staffgateoff -> 5, refusalnamescount -> 1,
  * applyreopensediting -> 3, rollbackleavesoffers -> 1,
  * rollbackclearsanswers -> 2, taxneverlands -> 5, feewithheldsilently -> 1,
- * confirmuntargetedcode -> 2, noisnull -> 3, taxregnowhere -> 15,
+ * confirmuntargetedcode -> 2, noisnull -> 3, taxregnowhere -> 16,
  * firstbillalways -> 1, feelineflat -> 4, othernofollowup -> 3,
- * agesunknownfield -> 18, agenotegone -> 1, onepagestripe -> 1 (measured
+ * agesunknownfield -> 19, agenotegone -> 1 (taxregnowhere and
+ * agesunknownfield each gained one catch on 2026-08-06 when the remediation
+ * sections joined; re-measured in the full sweep that date),
+ * onepagestripe -> 1 (measured
  * 2026-08-06, R3: the H5 read-pattern assertion; the existence assertions it
  * also breaks live in api/_workbook-apply.test.mjs, where the same pin
  * catches 4), monthsunbounded -> 3 (measured 2026-08-06, R4: section J's
