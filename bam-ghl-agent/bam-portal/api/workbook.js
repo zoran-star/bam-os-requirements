@@ -1809,27 +1809,68 @@ async function phase3Preview(clientId) {
   if (typeof mod.buildOfferTargets !== "function") {
     throw bad("the phase 3 preview needs buildOfferTargets exported from api/offers/match-prices.js - it is not exported yet", 503);
   }
-  const targets = await mod.buildOfferTargets(clientId);
-  const catalog = await sb(
-    `pricing_catalog?client_id=eq.${enc(clientId)}&select=stripe_price_id,offer_price_key,tier,amount_cents,interval,currency,display_name`
-  ).catch(() => []) || [];
+  // The term vocabulary is OPEN now (any 1-24 whole-month term), and the
+  // machinery refuses loudly rather than collapsing an out-of-range length. A
+  // refusal from target-building is a fact the rehearsal must SHOW, never a
+  // crash: it comes back as data, and the writes that already landed stand.
+  let targets;
+  try {
+    targets = await mod.buildOfferTargets(clientId);
+  } catch (e) {
+    // A sentence our own machinery wrote (see create-price.js termToInterval),
+    // about a commitment length - no credential material travels this path.
+    return { targets: [], matched: 0, would_mint: 0, refused: String((e && e.message) || "the price machinery refused to build targets") };
+  }
+  const [catalog, previewOffers] = await Promise.all([
+    sb(`pricing_catalog?client_id=eq.${enc(clientId)}&select=stripe_price_id,offer_price_key,tier,amount_cents,interval,currency,display_name`).catch(() => []),
+    sb(`offers?client_id=eq.${enc(clientId)}&status=neq.archived&select=id,data`).catch(() => []),
+  ]);
 
-  // REPORT-ONLY maps. The live mint (when it exists) goes through
-  // create-price.js recurringFor, which also honors per-row billing_cadence
-  // overrides; these two tables only describe the STANDARD shape so a human
-  // can read the rehearsal.
-  const TERM_INTERVAL = { monthly: "4_weeks", "4_weeks": "4_weeks", "3_months": "3_months", "6_months": "6_months", signup_fee: "one_time", one_time: "one_time" };
-  const RECURRING = {
-    "4_weeks": { interval: "week", interval_count: 4 },
-    "3_months": { interval: "month", interval_count: 3 },
-    "6_months": { interval: "month", interval_count: 6 },
-    one_time: null,
+  // REPORT-ONLY shape. The live mint (when it exists) goes through
+  // create-price.js recurringFor, which also honors declared week rhythms and
+  // per-row billing_cadence overrides; this only describes the STANDARD shape
+  // so a human can read the rehearsal. `<n>_months` is handled generically -
+  // the vocabulary is open, so a closed map here would misfile a 12-month term
+  // as the 4-week default, which is a lie about a real clock.
+  const shapeFor = (term) => {
+    const t = String(term || "").toLowerCase();
+    if (t === "one_time" || t === "signup_fee") return { interval: "one_time", recurring: null };
+    const m = /^(\d+)_months$/.exec(t);
+    if (m) return { interval: t, recurring: { interval: "month", interval_count: +m[1] } };
+    if (t === "monthly" || t === "4_weeks") return { interval: "4_weeks", recurring: { interval: "week", interval_count: 4 } };
+    return { interval: null, recurring: null };   // render whatever arrived; match nothing
   };
+
+  // THE DECLARED RHYTHM, best effort, so staff SEE it in the rehearsal: San
+  // Jose's "3 Months (12 Weeks)" bills his real members every 12 weeks, and a
+  // mint on 3 calendar months would put new signups on a different clock
+  // forever. The authoritative resolution lives in create-price.js
+  // (cadenceFromLength + the CADENCES vocabulary) and is not exported, so this
+  // is a NOTE, not a promise: the commitment is joined back by its price and
+  // its week count is read off the label only when that join is unambiguous.
+  const declaredWeeksFor = (t) => {
+    if (!/^\d+_months$/.test(String(t.term || ""))) return null;
+    for (const o of Array.isArray(previewOffers) ? previewOffers : []) {
+      const offerings = (((o.data || {}).pricing) || {}).pricing_offerings || [];
+      for (const off of offerings) {
+        if (!off || String(off.title || "") !== String(t.offering || "")) continue;
+        const hits = (off.commitments || []).filter(
+          (c) => c && Math.round(parseFloat(c.price) * 100) === Number(t.base_cents)
+        );
+        if (hits.length !== 1) return null;
+        const w = String(hits[0].length || "").toLowerCase().match(/(\d+)\s*week/);
+        return w ? +w[1] : null;
+      }
+    }
+    return null;
+  };
+
   const rows = targets.map((t) => {
-    const interval = TERM_INTERVAL[String(t.term || "").toLowerCase()] || "4_weeks";
-    const hit = (Array.isArray(catalog) ? catalog : []).find(
-      (r) => Number(r.amount_cents) === Number(t.allin_cents) && String(r.interval) === interval
-    ) || null;
+    const shape = shapeFor(t.term);
+    const hit = shape.interval == null ? null : ((Array.isArray(catalog) ? catalog : []).find(
+      (r) => Number(r.amount_cents) === Number(t.allin_cents) && String(r.interval) === shape.interval
+    ) || null);
+    const weeks = declaredWeeksFor(t);
     return {
       key: t.key,
       label: t.label,
@@ -1838,8 +1879,12 @@ async function phase3Preview(clientId) {
       base_cents: t.base_cents,
       allin_cents: t.allin_cents,
       fee_label: t.fee_label || null,
-      interval,
-      recurring: RECURRING[interval],
+      interval: shape.interval,
+      recurring: shape.recurring,
+      ...(weeks == null ? {} : {
+        declared_weeks: weeks,
+        rhythm_note: `the commitment length declares a ${weeks}-week billing rhythm; the mint resolves it through create-price.js cadence rules`,
+      }),
       matched: hit ? { stripe_price_id: hit.stripe_price_id, tier: hit.tier, amount_cents: hit.amount_cents, display_name: hit.display_name || null } : null,
       needs_mint: !hit,
     };

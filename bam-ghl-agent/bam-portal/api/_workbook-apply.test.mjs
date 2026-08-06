@@ -293,6 +293,13 @@ function reset() {
       // The MOCKUP's long phrase; the offer stores "Renews same length".
       { id: "a-ele-c0-after", workbook_id: "wb1", card_id: "c-ele", client_id: "sj", target_kind: "price_row", target_table: "offers", target_id: "off1", target_field: "commitments.0.after", current_value: null, proposed: "Renews same length", answered: "Renews for the same length", applied_at: null, apply_error: null, created_at: "2026-08-06T00:00:10Z" },
       { id: "a-ele-c0-fee", workbook_id: "wb1", card_id: "c-ele", client_id: "sj", target_kind: "price_row", target_table: "offers", target_id: "off1", target_field: "commitments.0.signup_fee_charge", current_value: null, proposed: "waive", answered: "waive", applied_at: null, apply_error: null, created_at: "2026-08-06T00:00:11Z" },
+      // A TWELVE month rung - the term vocabulary is open now (any 1-24 whole
+      // months yields a <n>_months key), and the old closed map would have
+      // misfiled this as the 4-week default. No week count in the label, so no
+      // declared rhythm either.
+      { id: "a-ele-c1-len", workbook_id: "wb1", card_id: "c-ele", client_id: "sj", target_kind: "price_row", target_table: "offers", target_id: "off1", target_field: "commitments.1.length", current_value: null, proposed: "12 Months", answered: "12 Months", applied_at: null, apply_error: null, created_at: "2026-08-06T00:00:11.2Z" },
+      { id: "a-ele-c1-price", workbook_id: "wb1", card_id: "c-ele", client_id: "sj", target_kind: "price_row", target_table: "offers", target_id: "off1", target_field: "commitments.1.price", current_value: null, proposed: "1999", answered: "1999", applied_at: null, apply_error: null, created_at: "2026-08-06T00:00:11.4Z" },
+      { id: "a-ele-c1-after", workbook_id: "wb1", card_id: "c-ele", client_id: "sj", target_kind: "price_row", target_table: "offers", target_id: "off1", target_field: "commitments.1.after", current_value: null, proposed: "Renews same length", answered: "Renews same length", applied_at: null, apply_error: null, created_at: "2026-08-06T00:00:11.6Z" },
       // An owner ADDITION: a request a human creates by hand. Apply must not
       // touch it.
       { id: "a-add", workbook_id: "wb1", card_id: "c-plans", client_id: "sj", target_kind: "price_row", target_table: "offers", target_id: null, target_field: "add:plan", current_value: null, proposed: null, answered: { title: "Summer 1x/week", price: 150 }, applied_at: null, apply_error: null, created_at: "2026-08-06T00:00:12Z" },
@@ -609,6 +616,19 @@ console.log("\n── 4. apply: gated, ordered, dry by default ──");
   const two3 = byKey["Academy 2x/week|3_months"];
   ok(!!two3 && two3.allin_cents === 60047 && JSON.stringify(two3.recurring) === JSON.stringify({ interval: "month", interval_count: 3 }),
     "the 3-month rung previews on the 3-month clock with the NEW 549 price, taxed");
+  // THE RHYTHM San Jose actually bills on. "3 Months (12 Weeks)" declares a
+  // 12-week clock; his real members ride it, and the rehearsal must show it.
+  ok(!!two3 && two3.declared_weeks === 12 && /12-week billing rhythm/.test(String(two3.rhythm_note)),
+    `the declared 12-week rhythm is visible on the 3-month rung ("${two3 && two3.rhythm_note}")`);
+  ok(!!twoM && twoM.declared_weeks === undefined,
+    "while the monthly target carries no declared rhythm - its label has no week count");
+  // The OPEN term vocabulary: a 12-month rung previews on a 12-month calendar
+  // clock, not collapsed to the 4-week default and not to 6_months.
+  const ele12 = byKey["Elementary Academy|12_months"];
+  ok(!!ele12 && ele12.interval === "12_months"
+    && JSON.stringify(ele12.recurring) === JSON.stringify({ interval: "month", interval_count: 12 })
+    && ele12.allin_cents === Math.round(199900 * 1.09375),
+    `a 12-month term previews as month x12 at the taxed amount (saw ${ele12 && ele12.interval}, ${ele12 && ele12.allin_cents})`);
   const eleFee = byKey["Elementary Academy|signup_fee"];
   ok(!!eleFee && eleFee.recurring === null && eleFee.interval === "one_time" && eleFee.allin_cents === 4375,
     "the sign-up fee previews as ONE-TIME - recurring null, never a subscription");
@@ -690,8 +710,11 @@ console.log("\n── 6. translation refuses what it cannot say, before anything
   const r = await staffPost({ action: "apply", workbook_id: "wb1" });
   ok(r.status === 200 && r.body.ok === false && Array.isArray(r.body.failures) && r.body.failures.length === 1,
     "one untranslatable answer refuses the apply with ok:false and names the failure");
-  ok(/billing cycle/.test(r.body.failures[0].error) && noEmDash(r.body.failures[0].error),
-    `in a sentence about the vocabulary ("${r.body.failures[0].error}")`);
+  // Read defensively: under MUTATE=vocabdrift there IS no failures array, and a
+  // control that crashes the harness exits without its banner.
+  const f0 = (Array.isArray(r.body.failures) && r.body.failures[0]) || {};
+  ok(/billing cycle/.test(String(f0.error)) && noEmDash(String(f0.error)),
+    `in a sentence about the vocabulary ("${f0.error}")`);
   ok(JSON.stringify(DB.offers) + JSON.stringify(DB.clients) === before && wbRow().snapshot == null,
     "and NOTHING was written - not the snapshot, not the tax, not the other 17 answers");
   ok(row("workbook_answers", "a-two-cycle").apply_error != null,
