@@ -149,10 +149,23 @@
 //       the age_note is dropped from the apply response, so an apply that
 //       stored plan ages stops saying that nothing reads them yet - and the
 //       person who typed 9-12 reasonably believes routing just moved.
+//   MUTATE=agesanythinggoes   node api/_workbook-apply.test.mjs
+//       the body of tAgeStrOrEmpty becomes `return tOk(String(v))`, so every
+//       value - an injection shape, a negative, a fraction, a padded string,
+//       a boolean - becomes an age the offer stores verbatim. Section 22's
+//       table is what has to catch it; before that table, this mutation
+//       passed every gate.
 //
 // A pin that no longer matches api/workbook.js reports NEGATIVE CONTROL FAILED
 // rather than passing quietly. A control run exits ZERO when the mutation IS
 // caught; CI greps for the banner and the MUTATE= names above.
+//
+// MEASURED CATCH COUNTS - controls added or re-pointed in the 2026-08-06
+// remediation pass, each run and counted on that date (re-measure and update
+// this block whenever one of THESE pins moves; the older controls above keep
+// their proof in CI, which runs every name and greps for the banner):
+//   agesanythinggoes -> 18 failures (all 16 MUST-REFUSE assertions in the
+//                       section 22 table, plus both "012"-normalisation pins)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -429,6 +442,14 @@ const AGEBANDUNCHECKED = [[
   "        refuse(lo.a, `age_min ${lo.value} is above age_max ${hi.value}, so no athlete could ever fit this plan. Fix the ages first.`);",
   "        // (control agebandunchecked) the inverted band sails through"]];
 
+// The translator body becomes the tester's mutation: any value stringifies
+// into an age. The early `""` return above it stays, which changes nothing -
+// String("") is "" - so this is ONE moving line and the whole anything-goes
+// behaviour. Section 22's table is what has to catch it.
+const AGESANYTHINGGOES = [[
+  "  return Number.isInteger(n) && n >= 1 && n <= 99 ? tOk(String(n)) : tErr(`not an age this can store: ${JSON.stringify(v)}`);",
+  "  return tOk(String(v));   // (control agesanythinggoes) anything goes"]];
+
 // The stored-for-later note is dropped from the response, so an apply that
 // wrote plan ages stops saying that nothing consumes them yet.
 const AGENOTEGONE = [[
@@ -446,6 +467,7 @@ const EDITS = {
   agesunknownfield: AGESUNKNOWNFIELD,
   agebandunchecked: AGEBANDUNCHECKED,
   agenotegone: AGENOTEGONE,
+  agesanythinggoes: AGESANYTHINGGOES,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -1609,6 +1631,86 @@ console.log("\n── 21. per-plan age bands: strings on the offering, said out 
     `age_min 14 over age_max 9 refuses the apply with the sentence ("${(f21 || {}).error}")`);
   ok(worldState() === before21,
     "and NOTHING was written - not the snapshot, not the tax, not the other answers");
+  reset();
+}
+
+console.log("\n── 22. tAgeStrOrEmpty is PINNED: the exact vocabulary of an age answer ──");
+{
+  // The translator refused every one of these correctly the day Step 12
+  // shipped, and NOTHING held it: replacing its body with `return
+  // tOk(String(v))` passed every gate. This table is the pin, driven through
+  // the REAL handler - the review translation_error and the apply refusal are
+  // the same surfaces staff read. MUTATE=agesanythinggoes.
+  const refusalRe = /not an age this can store/;
+  const itemFor = (rev, field) => (((rev.body || {}).review || {}).cards || [])
+    .flatMap((c) => c.items || []).find((i) => i.target_field === field) || {};
+  const failFor = (ap, field) => (Array.isArray((ap.body || {}).failures) ? ap.body.failures : [])
+    .find((f) => f.target_field === field) || {};
+
+  const MUST_REFUSE = [
+    ["12; drop table", "an injection shape"],
+    [-3, "a negative number"],
+    [4.5, "a fraction"],
+    ["٩", "a unicode digit (Arabic-Indic nine)"],
+    ["0", "below the 1-99 range"],
+    ["100", "above the 1-99 range"],
+    [" 9", "padded - a value nobody typed must not silently normalise"],
+    [true, "a boolean"],
+  ];
+  for (const [value, why] of MUST_REFUSE) {
+    reset(); approveAll();
+    addAnswer("c-two", "age_min", value);
+    const rev = await staffPost({ action: "review", workbook_id: "wb1" });
+    const it = itemFor(rev, "age_min");
+    const ap = await staffPost({ action: "apply", workbook_id: "wb1" });
+    const f = failFor(ap, "age_min");
+    ok(it.will_write === undefined && refusalRe.test(String(it.translation_error)),
+      `MUST REFUSE ${JSON.stringify(value)} (${why}): review carries the refusal ("${it.translation_error}")`);
+    ok((ap.body || {}).ok === false && refusalRe.test(String(f.error)) && noEmDash(String(f.error))
+      && !("age_min" in offering(0)),
+      `MUST REFUSE ${JSON.stringify(value)}: apply refuses with the sentence ("${f.error}") and the offering grew no age key`);
+    reset();
+  }
+
+  // "012" -> "12": the normalisation is pinned as DELIBERATE, not accidental.
+  reset(); approveAll();
+  addAnswer("c-two", "age_min", "012");
+  const revN = await staffPost({ action: "review", workbook_id: "wb1" });
+  ok(itemFor(revN, "age_min").will_write === "12",
+    `MUST ACCEPT "012": review previews will_write "12" (saw ${JSON.stringify(itemFor(revN, "age_min").will_write)})`);
+  const apN = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok((apN.body || {}).ok === true && offering(0).age_min === "12",
+    `and apply stores "12" (saw ${JSON.stringify(offering(0).age_min)})`);
+  reset();
+
+  // The range is 1-99 per the Step 12 spec: both bottom and top edges accept
+  // ("100" refuses above, so the ceiling really is 99).
+  for (const edge of ["1", "99"]) {
+    reset(); approveAll();
+    addAnswer("c-two", "age_min", edge);
+    const apE = await staffPost({ action: "apply", workbook_id: "wb1" });
+    ok((apE.body || {}).ok === true && offering(0).age_min === edge,
+      `MUST ACCEPT ${JSON.stringify(edge)} (range edge): stored ${JSON.stringify(offering(0).age_min)}`);
+    reset();
+  }
+
+  // "" is ok and writes NOTHING - the no-bound answer on a plan with no bound.
+  reset(); approveAll();
+  addAnswer("c-two", "age_min", "");
+  const apB = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok((apB.body || {}).ok === true && !("age_min" in offering(0)),
+    `MUST ACCEPT "": apply is ok and writes nothing (offering keys: ${Object.keys(offering(0)).join(", ")})`);
+  reset();
+
+  // min === max is a one-age band, not an inversion: it applies. (The page's
+  // own confirm guard shares the strict `>` shape; the contract suite holds
+  // that half.)
+  reset(); approveAll();
+  addAnswer("c-two", "age_min", "9");
+  addAnswer("c-two", "age_max", "9");
+  const apEq = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok((apEq.body || {}).ok === true && offering(0).age_min === "9" && offering(0).age_max === "9",
+    `MUST ACCEPT min === max ("9"/"9"): a one-age band applies (stored ${JSON.stringify(offering(0).age_min)}/${JSON.stringify(offering(0).age_max)})`);
   reset();
 }
 
