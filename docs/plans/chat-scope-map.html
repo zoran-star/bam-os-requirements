@@ -52,9 +52,9 @@
   .chain .n{background:#1e2733;border:1px solid #33404f;border-radius:7px;padding:4px 10px;font-weight:700;color:#CBD6E2;font-size:12.5px}
   .chain .ar{color:#4a5866;font-weight:800}
 
-  .nowbox{background:#1a0f0c;border:2px solid #FF6A4D;border-radius:14px;padding:15px 18px;margin-top:22px}
-  .nowbox h3{margin:0 0 8px;font-size:15px;color:#FF6A4D}
-  .nowbox ol{margin:0;padding-left:20px;font-size:13.5px;color:#F0A997}
+  .nowbox{background:#0c141a;border:2px solid #6FA8DC;border-radius:14px;padding:15px 18px;margin-top:22px}
+  .nowbox h3{margin:0 0 8px;font-size:15px;color:#6FA8DC}
+  .nowbox ol{margin:0;padding-left:20px;font-size:13.5px;color:#A9C6E0}
   .nowbox li{margin-bottom:6px} .nowbox li b{color:#fff}
   @media(max-width:760px){.strip{grid-template-columns:1fr 1fr}}
 </style>
@@ -66,153 +66,120 @@
     <h1>Everything for Lij, in one place</h1>
     <div class="clock" id="clock"></div>
   </div>
-  <p class="sub">All rooms closing. Everything runs from the member management chat from here.</p>
+  <p class="sub">Member management IV. Updated 2026-08-06: rehearsal ran against real Postgres, production restored clean, fix loop running.</p>
 
   <div class="strip">
-    <div class="kpi g"><div class="v">6</div><div class="l">done</div></div>
-    <div class="kpi b"><div class="v">1</div><div class="l">in flight</div></div>
-    <div class="kpi y"><div class="v">4</div><div class="l">still to build</div></div>
-    <div class="kpi r"><div class="v">1</div><div class="l">waiting on you</div></div>
+    <div class="kpi g"><div class="v">6</div><div class="l">of 9 steps built</div></div>
+    <div class="kpi r"><div class="v">1</div><div class="l">critical bug caught</div></div>
+    <div class="kpi b"><div class="v">9</div><div class="l">defects to fix loop</div></div>
+    <div class="kpi g"><div class="v">3</div><div class="l">rulings answered</div></div>
+  </div>
+
+  <!-- ══ NOW ══ -->
+  <h2 class="sec">Happening right now</h2>
+
+  <div class="item now">
+    <div class="ih"><h3>The dress rehearsal: ran, caught real things, world restored</h3><span class="pill p-done">round 1 done</span></div>
+    <p>A subagent played Lij through the <b>real page against the real database</b>, submitted, then ran the staff half end to end with <b>dry run at your Stripe ruling</b>. His account was never touched, and production was <b>restored to blank and verified clean by read-back</b>.</p>
+    <p class="where"><b>The catch that pays for the whole rehearsal:</b> his one discount code, left with nothing ticked under "applies to" (which the page says is fine), <b>silently deletes the $40 joining fee from every plan</b>. No warning on the page, none in staff review, none in the apply result. $40 per new athlete, gone invisibly.</p>
+    <p class="where"><b>Also passed a lot:</b> the plan renames record as real changes on an untouched confirm, adds are requests not writes, send gating is honest, the page locks after submit, and with no prices connected the sales agent refuses to quote instead of guessing.</p>
+  </div>
+
+  <div class="item now">
+    <div class="ih"><h3>The fix loop</h3><span class="pill p-now">build DONE, tester attacking it</span></div>
+    <p>All 12 fixes are built and committed: codes must state targets before confirm, the fee suppression is loud data, the preview tells the fee truth, No-to-tax is a stored answer, every card counts from the start, the dry run reads his real Stripe (read-only) and answers match-vs-mint, plus the ages question on every plan card. Gates: <b>180 + 173 + 161 checks green</b>.</p>
+    <p class="where"><b>Full loop cycle complete.</b> Round 1 tester failed the build on pinning grounds (two fixes had no test holding them). Planner planned 5 remediation steps, a fresh builder landed them, and the tester re-ran its own exact break attempts: <b>all dead, PASS</b>. Checks grew 514 to 556; all 87 safety controls fire.</p>
+    <p class="where"><b>Round 2 verdict: the question set is COMPLETE.</b> Nothing left we would have to ask Lij twice. All 10 round-1 fixes confirmed on the real page, and the first live read of his Stripe proved <b>12 of 12 of his prices already exist</b> - match, not mint, exactly as predicted. Only mints: the four $40 joining fees.</p>
+    <p class="where"><b>The blocker it caught is now FIXED and committed:</b> the codes card can store its mandatory answers (for any academy, not just SJ), the server enforces your targets ruling too, a refused add keeps his typing, and error banners name the actual field. Checks grew to <b>605</b>. A fresh tester is attacking those four fixes now; round 3 (a ten-minute live smoke of the codes card) runs when it passes.</p>
   </div>
 
   <!-- ══ DONE ══ -->
-  <h2 class="sec">Done and live</h2>
+  <h2 class="sec">Done and on main (PR #1728 merged this morning)</h2>
 
   <div class="item done">
-    <div class="ih"><h3>Reaching Lij's Stripe at all</h3><span class="pill p-done">live</span></div>
-    <p>His Stripe is locked by CoachIQ, so the normal connect button can never work. We built a second way in that uses his own key. <b>Deployed, every existing academy verified untouched.</b></p>
-  </div>
-
-  <div class="item done">
-    <div class="ih"><h3>His 147 customers matched to contacts</h3><span class="pill p-done">done</span></div>
-    <p>Every Stripe customer now points at a person in the portal. 142 linked, 5 were duplicates. <b>You approved every judgement call.</b></p>
-  </div>
-
-  <div class="item done">
-    <div class="ih"><h3>His real prices worked out</h3><span class="pill p-done">done</span></div>
-    <p>4 plans, $40 signup fee waived on prepay. 13 of his 14 live prices mapped, 19 of 20 members covered.</p>
-  </div>
-
-  <div class="item done">
-    <div class="ih"><h3>A key leak, found and fixed</h3><span class="pill p-done">fixed</span></div>
-    <p>A key pasted with a line break in it could be shown back on screen in full. Found by a deliberate hunt, fixed before anyone used the page.</p>
-  </div>
-
-  <div class="item done">
-    <div class="ih"><h3>A contact bug across every academy</h3><span class="pill p-done">fixed + live</span></div>
-    <p>Contact syncing was silently dropping batches for all V1.5 academies. Repaired on the way past.</p>
-  </div>
-
-  <!-- ══ IN FLIGHT ══ -->
-  <h2 class="sec">In flight right now</h2>
-
-  <div class="item now">
-    <div class="ih"><h3>Where San Jose actually is</h3><span class="pill p-now">step 3 of 9</span></div>
+    <div class="ih"><h3>Steps 1 to 6 of 9, all built</h3><span class="pill p-done">on main</span></div>
     <p style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.9">
-      1. Connect his Stripe &nbsp;<b style="color:#2e7d32">DONE, proven</b><br>
-      2. Match his prices &nbsp;<b style="color:#2e7d32">DONE</b><br>
-      3. Send him a PRICE workbook &nbsp;<b style="color:#8a6d1f">BUILT, not sent &#8592; here</b><br>
-      4. He confirms his prices<br>
-      5. <b>STAFF REVIEW</b> &nbsp;<b style="color:#b3261e">NOT BUILT</b><br>
-      6. Apply it to live pricing &nbsp;<b style="color:#b3261e">NOT BUILT</b><br>
-      7. Send him a MEMBER workbook &nbsp;designed, not built<br>
-      8. Seed his 20 members<br>
-      9. Write the 3 skills &nbsp;last, from the real run
+      1. Connect his Stripe &nbsp;<b style="color:#5CC98A">DONE, proven in production</b><br>
+      2. Match his prices &nbsp;<b style="color:#5CC98A">DONE, 4 plans</b><br>
+      3. Price workbook &nbsp;<b style="color:#5CC98A">BUILT + DEPLOYED, not sent</b><br>
+      4. He confirms &nbsp;waiting on 3<br>
+      5. Staff review &nbsp;<b style="color:#5CC98A">BUILT</b> (review + approve per card)<br>
+      6. Apply to live pricing &nbsp;<b style="color:#5CC98A">BUILT, dry-run only by ruling</b><br>
+      7. Member workbook &nbsp;designed + locked, zero code<br>
+      8. Seed his 20 members &nbsp;not started<br>
+      9. The three skills &nbsp;last, from the real run logs
     </p>
-    <p class="where"><b>What staff review is:</b> your rule is that nothing Lij touches goes live by itself. He confirms, a human checks, then it applies. That check is step 5, and it does not exist yet - so today his answers would land in a table nobody can see without writing SQL.</p>
-    <p class="where"><b>Why it earns its place:</b> his tax answer re-prices EVERY athlete while a plan change costs one plan, so they cannot sit in one flat list. Confirming a card he never edits RENAMES three of his four plans, because his names and ours differ. And anything he adds is a request someone has to actually create.</p>
-  </div>
-
-
-  <div class="item done">
-    <div class="ih"><h3>Production can read his key back</h3><span class="pill p-done">PROVEN, live</span></div>
-    <p>The last unproven link is now proven. Production decrypted Lij's key and used it against his real Stripe: <b>checked 1, ok 1, outcome ready</b>. <b>San Jose is connected end to end</b>, not connected on paper.</p>
-    <p class="where">It had failed once on <b>our bug, not his key</b>: our check refused any key with a line break, and our own Supabase key has a stray one on the end. That fix is live.</p>
   </div>
 
   <div class="item done">
-    <div class="ih"><h3>Main and production are back in step</h3><span class="pill p-done">resolved</span></div>
-    <p>For part of today the fix was live in production but <b>existed nowhere on main</b>, because it had been pushed straight from a laptop. The next merge would have wiped it out.</p>
-    <p class="where"><b>PR #1719 merged and closed that gap.</b> The fix is on main, production redeployed from it, and <b>San Jose was re-checked afterwards and still reads ready</b> - so the redeploy did not break it.</p>
-  </div>
-
-  <div class="item now">
-    <div class="ih"><h3>Attacking the fixes before they ship</h3><span class="pill p-done">stream 1 CLEARED</span></div>
-    <p>Nothing was trusted because it was written carefully. Every build was attacked by a different agent, and the attacks kept paying.</p>
-    <p class="where"><b>Stream 1, the key fix: DONE and banked.</b> The attacker deleted a line of the fix and watched everything still pass, which meant part of it had <b>no test holding it at all</b>. Now <b>105 checks and 11 safety controls</b>, every one of which can only pass if the thing it guards actually works.</p>
-  </div>
-
-  <div class="item next">
-    <div class="ih"><h3>Stream 2, the key-leak sweep</h3><span class="pill p-you">PR #1721, needs your merge</span></div>
-    <p>The leak we set out to fix was open in <b>six more files</b>, one a <b>public checkout page any parent can reach</b>, and there it leaked the <b>master database key</b>. All closed, proven by running the real files: <b>76 attempts across 11 pages, zero leaks</b>.</p>
-    <p class="where"><b>It took four rounds, and every single round found the fix had broken something else</b> - worst of all, a test sandbox quietly spending <b>real money</b>. That one was created by the fix and its own test said it was fine.</p>
-    <p class="where">There is now a <b>counted list of every place we handle a key</b>: 610 of them. 590 are old and unchanged and honestly labelled as such. The point is that <b>a new one cannot appear unnoticed</b>. Getting that honest took three tries: at one point a code formatter could make a hazard vanish from the count and the tool would call it fixed.</p>
-    <p class="where"><b><a href="https://github.com/zoran-star/bam-os-requirements/pull/1721">PR #1721</a> is open and waiting on you.</b> Merging it deploys.</p>
+    <div class="ih"><h3>Ten defects caught before Lij saw any of them</h3><span class="pill p-done">fixed</span></div>
+    <p>Every one was a confident answer where the honest answer was "I could not tell". The worst: a rename could have landed on an <b>archived</b> plan sharing the old name while the live plan 9 members pay on kept its old price, reporting success. Also: prepay said "no saving" on a deal saving $151, the $40 fee read "charge" where it is waived, and a discount code we showed him <b>never existed - we invented the name ourselves</b>.</p>
   </div>
 
   <div class="item done">
-    <div class="ih"><h3>Handovers from all three rooms</h3><span class="pill p-done">all received</span></div>
-    <p>All three confirmed released: everything committed, pushed and handed over, including traps written nowhere else. <b>Every room is closed.</b></p>
+    <div class="ih"><h3>Prepay lengths freed up</h3><span class="pill p-done">on main</span></div>
+    <p>The system used to only understand 3 and 6 months; 12 silently collapsed to 6. Now any 1 to 24 months works, out-of-range refuses loudly, and a "3 Months (12 Weeks)" deal bills as <b>12 weeks</b>, matching how his gym actually charges.</p>
   </div>
 
-  <!-- ══ TO BUILD ══ -->
-  <h2 class="sec">Still to build, in order</h2>
-
-  <div class="item next">
-    <div class="ih"><h3>1 &#183; Price workbook</h3><span class="pill p-now">approved, being built</span></div>
-    <p>The page Lij uses to confirm his prices. <b>You approved the design</b> at 7 cards, down from 9: special deals moved to the member workbook, add-ons cut because he sells none.</p>
-    <p class="where"><b>Somewhere to save his answers: DONE and live.</b> The page and the part that saves are both built and are now being wired together, then attacked by fresh agents before you or Lij see anything.</p>
-    <p class="where"><b>Three real defects found while building</b>, and one of them was mine: I added a message explaining why the Send button was greyed out, tested it, and reported it working. My test clicked the button from code. <b>A real finger cannot click a greyed-out button at all</b>, so the message never once appeared. Found by testing with a real mouse. Fixed.</p>
-    <p class="where">The other two: the "you save $151" comparison row <b>kept showing the old price</b> while he typed a new one, and removing the $40 fee would have <b>silently put it back</b>.</p>
+  <div class="item done">
+    <div class="ih"><h3>Your wizard ruling, banked</h3><span class="pill p-done">recorded</span></div>
+    <p>You confirmed this morning: future clients skip the <b>training offer pricing section</b> of the onboarding wizard, and the replacement is <b>workbooks plus staff setup</b>. The skill will assume a staff member is present at every step and never assume the wizard typed anything in.</p>
   </div>
 
-  <div class="item next">
-    <div class="ih"><h3>2 &#183; Member workbook</h3><span class="pill p-next">design locked</span></div>
-    <p>The page where he confirms his 20 members. Design finished, all six questions answered by you. <b>Needs building.</b></p>
-    <p class="where"><b>Blocked by:</b> his prices coming back first.</p>
+  <!-- ══ AFTER ══ -->
+  <h2 class="sec">After the rehearsal, in order</h2>
+
+  <div class="item done">
+    <div class="ih"><h3>1 &#183; Coupons: CONFIRMED</h3><span class="pill p-done">ruled today</span></div>
+    <p>Your ruling: <b>link to his existing coupon, never copy it</b>. Storage on the offer (exists), push-live through the review skill with a staff yes (July code), targets always ticked first. Only new code: the adopt-by-id link. No staff screens: staff work in Claude.</p>
   </div>
 
   <div class="item next">
-    <div class="ih"><h3>3 &#183; Seeding his 20 members</h3><span class="pill p-next">not started</span></div>
-    <p>One screen per member, you confirm each. Includes the <b>stop-charging list</b>: anyone Lij marks as gone gets their billing cancelled, and that list has to be cleared, not admired.</p>
-    <p class="where"><b>Blocked by:</b> his member workbook coming back.</p>
+    <div class="ih"><h3>2 &#183; The safety pass you parked</h3><span class="pill p-next">next up</span></div>
+    <p>Token guessing, cross-academy access, and whether text an owner types could run inside our staff portal. <b>The workbook page is publicly reachable now</b>, so this stops being theoretical the moment a link is shared.</p>
+  </div>
+
+  <div class="item next">
+    <div class="ih"><h3>3 &#183; Send to Lij</h3><span class="pill p-next">through you only</span></div>
+    <p>Once the rehearsal says the workbook asks everything it needs to, you forward the link personally in your Lij thread. Nothing reaches him except through you.</p>
   </div>
 
   <div class="item later">
-    <div class="ih"><h3>4 &#183; The three skills</h3><span class="pill p-later">written last</span></div>
-    <p>Written from what actually happened with San Jose, not from a plan. One for matching, one for the member workbook, one for seeding. <b>This is what makes academy #4 a repeat instead of a rebuild.</b></p>
+    <div class="ih"><h3>Then: member workbook &#8594; seed 20 members &#8594; three skills</h3><span class="pill p-later">sequenced</span></div>
+    <p>Skills get written from what actually happened, not from a plan. That is what makes academy #4 a repeat instead of a rebuild.</p>
   </div>
 
   <!-- ══ CHAIN ══ -->
   <h2 class="sec">How it ties together</h2>
   <div class="chain">
     <div class="row">
-      <span class="n">key saved</span><span class="ar">&#8594;</span>
-      <span class="n">SJ connected</span><span class="ar">&#8594;</span>
-      <span class="n">prices apply for real</span><span class="ar">&#8594;</span>
-      <span class="n">price workbook to Lij</span>
+      <span class="n">rehearsal passes</span><span class="ar">&#8594;</span>
+      <span class="n">you send Lij the link</span><span class="ar">&#8594;</span>
+      <span class="n">he confirms prices</span><span class="ar">&#8594;</span>
+      <span class="n">staff review + apply</span>
     </div>
     <div class="row" style="margin-top:8px">
       <span class="ar">&#8627;</span>
-      <span class="n">he confirms prices</span><span class="ar">&#8594;</span>
       <span class="n">member workbook to Lij</span><span class="ar">&#8594;</span>
       <span class="n">he confirms members</span><span class="ar">&#8594;</span>
-      <span class="n">we seed all 20</span>
+      <span class="n">we seed all 20</span><span class="ar">&#8594;</span>
+      <span class="n">SJ fully live</span>
     </div>
     <div class="row" style="margin-top:8px">
       <span class="ar">&#8627;</span>
-      <span class="n">SJ fully live</span><span class="ar">&#8594;</span>
       <span class="n">3 skills written from the run</span><span class="ar">&#8594;</span>
       <span class="n">academy #4 is a repeat</span>
     </div>
   </div>
 
   <div class="nowbox">
-    <h3>The only thing waiting on you</h3>
+    <h3>Your 3 rulings, banked. Nothing waiting on you.</h3>
     <ol>
-      <li><b><a href="sj-price-workbook-mockup-v1.html">Approve the price workbook</a></b> so it can be built for real. Two defects already fixed, so this is yes or name a change.</li>
+      <li><b>Codes must state their targets.</b> The codes card will not confirm until every code says what it applies to; "everything, including the joining fee" is an explicit choice, never a default. Kills the fee-deletion bug at the source.</li>
+      <li><b>Policy confirmation = a separate workbook, later.</b> The price workbook stays price-only.</li>
+      <li><b>Ages only.</b> Each plan card asks who it is for; staff pick the lead plan themselves.</li>
     </ol>
-    <p class="where" style="margin-top:10px"><b>Answered today:</b> Elementary keeps its $40 sign-up fee, same as the other three plans. That was a silent default until you ruled on it, so the workbook now ships it prefilled instead of asking Lij.</p>
+    <p class="where" style="margin-top:10px">The build starts once the ages step is planned. Then a separate tester, then the rehearsal runs again from the top. Next thing you see: the round-2 verdict, or the coupons proposal if it comes back clean.</p>
   </div>
 
 </div>
