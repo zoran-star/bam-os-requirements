@@ -326,3 +326,12 @@ Lesson for the skill: a fix that OPENS a path (mint) must inherit the caps of th
 
 ### Sequencing ruling (Zoran, 2026-08-06): member workbook builds DURING the price wait
 "In step 5 we should also have build the member workbook and confirm it together." While Lij has the price workbook (the wait between our send and his submit), the member workbook gets BUILT and mockup-confirmed with Zoran, so link 2 is ready to go the moment his prices come back. The member workbook build is no longer blocked behind step 5; only its SEND stays sequenced after prices land. Carry into the skills: the two workbook builds pipeline, the two sends stay ordered.
+
+### Rehearsal round 3 (2026-08-06): CLEAN. The workbook is send-ready.
+Full flow on the real page against real Postgres, codes card as centerpiece, security-fixed code. Lij reached "Sent to BAM", all 8 cards confirmed, count never grew past 8. The codes-card save that 404'd in round 2 now returns 200; untargeted confirm refuses (ruling enforced), targeted confirm saves; club stored with applies_to = 16 explicit targets including all 4 signup_fee entries, so ZERO fees silently withheld. No regression in the other 7 cards (tax No -> confirmed_no academy_setting; renames visible; price edit persisted; Elementary ages 9-12 carried, others blank; "something else" cadence follow-up parked the camp in skipped.additions; empty cards required deliberate confirm). Live-Stripe dry run: 11 exist / 5 mint (4 fees + the one price the agent edited to $260; without the edit it is the predicted 12 exist / 4 fees mint). withheld_signup_fees: []. Sales agent fails closed (offer_prices 0 after dry-run). Restore verified clean by read-back.
+
+TWO NON-BLOCKING NOTES for later polish (Zoran's call, not gating the send):
+1. UX: an untargeted-codes-card confirm refuses correctly but the only cue is the standing header pill; no fresh feedback near the button. A non-technical owner with a long card scrolled past the pill could press and see "nothing happen". Low reach (recoverable by ticking a target).
+2. Could-not-tell: whether the "Everything, including the joining fee" chip toggles OFF on re-click was not verified (deselected via an individual chip instead). Worth one check if we touch that card again.
+
+MILESTONE: steps 1-6 of the 9-step sequence are DONE and proven end to end. Next: Zoran sends Lij link 1 (price workbook); member workbook builds during the wait.

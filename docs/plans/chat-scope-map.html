@@ -78,19 +78,12 @@
   <!-- ══ NOW ══ -->
   <h2 class="sec">Happening right now</h2>
 
-  <div class="item now">
-    <div class="ih"><h3>The dress rehearsal: ran, caught real things, world restored</h3><span class="pill p-done">round 1 done</span></div>
-    <p>A subagent played Lij through the <b>real page against the real database</b>, submitted, then ran the staff half end to end with <b>dry run at your Stripe ruling</b>. His account was never touched, and production was <b>restored to blank and verified clean by read-back</b>.</p>
-    <p class="where"><b>The catch that pays for the whole rehearsal:</b> his one discount code, left with nothing ticked under "applies to" (which the page says is fine), <b>silently deletes the $40 joining fee from every plan</b>. No warning on the page, none in staff review, none in the apply result. $40 per new athlete, gone invisibly.</p>
-    <p class="where"><b>Also passed a lot:</b> the plan renames record as real changes on an untouched confirm, adds are requests not writes, send gating is honest, the page locks after submit, and with no prices connected the sales agent refuses to quote instead of guessing.</p>
-  </div>
-
-  <div class="item now">
-    <div class="ih"><h3>The fix loop</h3><span class="pill p-now">build DONE, tester attacking it</span></div>
-    <p>All 12 fixes are built and committed: codes must state targets before confirm, the fee suppression is loud data, the preview tells the fee truth, No-to-tax is a stored answer, every card counts from the start, the dry run reads his real Stripe (read-only) and answers match-vs-mint, plus the ages question on every plan card. Gates: <b>180 + 173 + 161 checks green</b>.</p>
-    <p class="where"><b>Full loop cycle complete.</b> Round 1 tester failed the build on pinning grounds (two fixes had no test holding them). Planner planned 5 remediation steps, a fresh builder landed them, and the tester re-ran its own exact break attempts: <b>all dead, PASS</b>. Checks grew 514 to 556; all 87 safety controls fire.</p>
-    <p class="where"><b>Round 2 verdict: the question set is COMPLETE.</b> Nothing left we would have to ask Lij twice. All 10 round-1 fixes confirmed on the real page, and the first live read of his Stripe proved <b>12 of 12 of his prices already exist</b> - match, not mint, exactly as predicted. Only mints: the four $40 joining fees.</p>
-    <p class="where"><b>The blocker it caught is now FIXED and committed:</b> the codes card can store its mandatory answers (for any academy, not just SJ), the server enforces your targets ruling too, a refused add keeps his typing, and error banners name the actual field. Checks grew to <b>605</b>. A fresh tester is attacking those four fixes now; round 3 (a ten-minute live smoke of the codes card) runs when it passes.</p>
+  <div class="item done">
+    <div class="ih"><h3>The rehearsal loop: 3 rounds, DONE and clean</h3><span class="pill p-done">passed, ready to send</span></div>
+    <p>An agent played Lij on the <b>real page against the real database</b> three times over, staff half and all, <b>dry run at your Stripe ruling</b> - his account never touched, production restored clean by read-back every time.</p>
+    <p class="where"><b>What the loop caught and fixed, none shipped:</b> a discount code that silently deleted the $40 joining fee; a preview claiming a fee on prepay where it is waived; a No-to-tax stored as nothing; a codes card that dead-ended the owner; a whitespace trick that could discount the fee; an uncapped no-login link. <b>14 defects + 1 blocker + 2 security gaps.</b></p>
+    <p class="where"><b>Round 3 was clean end to end:</b> Lij reached "Sent to BAM", all 8 cards, codes card included. The first live read of his Stripe confirmed <b>his 12 prices already exist</b> (match, not mint); only the four $40 fees are new. Two independent testers passed every fix; all 7 suites green.</p>
+    <p class="where"><b>One tiny optional polish</b> (your call, not a blocker): when the codes card is left with no target and the owner presses confirm, it refuses correctly but the only cue is a pill that may be scrolled off. A louder cue near the button is a 2-minute fix.</p>
   </div>
 
   <!-- ══ DONE ══ -->
