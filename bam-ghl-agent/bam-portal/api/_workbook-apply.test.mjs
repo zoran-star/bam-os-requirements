@@ -400,6 +400,12 @@ const STRIPEWRITE = [[
   "        const r = await mod.stripe.stripeFetch(`/prices?${qs.toString()}`, { stripeAccount: acct });",
   "        await mod.stripe.stripeFetch(\"/prices\", { method: \"POST\", body: { unit_amount: 1 }, stripeAccount: acct });   // (control stripewrite)\n        const r = await mod.stripe.stripeFetch(`/prices?${qs.toString()}`, { stripeAccount: acct });"]];
 
+// The stale-note clear is skipped, so BAM-authored prose about prices the
+// apply just changed survives inside the offer jsonb, wrong forever.
+const STALENOTESKEPT = [[
+  `        rung.discount_notes = "";`,
+  `        return;   // (control stalenoteskept) the stale note survives the apply`]];
+
 const EDITS = {
   applybeforereview: APPLYBEFOREREVIEW,
   feewithheldsilently: FEEWITHHELDSILENTLY,
@@ -407,6 +413,7 @@ const EDITS = {
   taxregnowhere: TAXREGNOWHERE,
   stripequietfail: STRIPEQUIETFAIL,
   stripewrite: STRIPEWRITE,
+  stalenoteskept: STALENOTESKEPT,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -1486,6 +1493,28 @@ console.log("\n── 18. the dry run answers match-vs-mint from LIVE Stripe, re
   const nc = await staffPost({ action: "apply", workbook_id: "wb1" });
   ok(nc.body.phase3.stripe_check === "not_connected" && nc.body.phase3.exists_in_stripe === null,
     `a missing account id reports not_connected with counts null (saw ${JSON.stringify(nc.body.phase3.stripe_check)})`);
+  reset();
+}
+
+console.log("\n── 19. stale discount_notes are cleared at apply, and the clear is reported ──");
+{
+  reset();
+  approveAll();
+  // A BAM-authored note about the old price, stored on the rung the apply is
+  // about to re-price from 599 to 549. Nobody edited it in this workbook, so
+  // after the apply it is prose about a price that no longer exists.
+  offerings()[0].commitments[0].discount_notes = "was $599, early-bird promo from March";
+  // And a note the OWNER typed this workbook, on the Elementary rung the apply
+  // creates: an owner edit, so it must survive verbatim.
+  addAnswer("c-ele", "commitments.0.discount_notes", "bring a friend month");
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r.body.ok === true && offerings()[0].commitments[0].discount_notes === "",
+    `the stale BAM-authored note is CLEARED, not left describing a dead price (saw ${JSON.stringify(offerings()[0].commitments[0].discount_notes)})`);
+  const report = (r.body.offers.find((o) => o.offer_id === "off1") || {}).wrote || [];
+  ok(report.some((w) => w.target_field === "commitments.0.discount_notes" && w.to === ""),
+    `and the apply response REPORTS the clear - nothing silent (${JSON.stringify(report.filter((w) => /discount_notes/.test(w.target_field)))})`);
+  ok(offerings()[1].commitments[0].discount_notes === "bring a friend month",
+    `while the note the owner typed survives verbatim (saw ${JSON.stringify(offerings()[1].commitments[0].discount_notes)})`);
   reset();
 }
 

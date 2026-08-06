@@ -2135,6 +2135,39 @@ async function doApplyStaff(req, body) {
         wrote.push({ answer_id: a.id, target_field: a.target_field, to: value });
       }
     }
+
+    // ── D4: STALE discount_notes ARE CLEARED, not regenerated ────────────────
+    // These are internal team notes never quoted to anyone (pinned by
+    // api/_discount-notes-never-quoted.test.mjs), and a note regenerated from
+    // the numbers is a second copy of the numbers that will go stale again. So
+    // for every rung of every LIVE offering an approved plan card in this
+    // workbook touched: if the workbook carries NO owner edit for that rung's
+    // note (owner edit = effective differs from current_value), a stored
+    // non-blank note is BAM-authored prose about prices that may have just
+    // changed - it is cleared to "". A note the owner actually typed survives
+    // verbatim through the ordinary write path above; a rung with no note is a
+    // no-op, never grown a key. Every clear is reported in `wrote` so the
+    // apply response says it happened - nothing silent. MUTATE=stalenoteskept.
+    for (const [cardId, ix] of offeringIdxByCard) {
+      const card = cardById.get(cardId);
+      if (!card || !String(card.card_key || "").startsWith("plan:")) continue;
+      const cardAnswers = grouped.get(cardId) || [];
+      // Only offerings living on THIS offer row.
+      const aims = cardAnswers.find((x) => x.target_table === "offers" && x.target_id);
+      if (!aims || String(aims.target_id) !== offerId) continue;
+      const off = (data.pricing.pricing_offerings || [])[ix];
+      if (!off || off.archived) continue;
+      (off.commitments || []).forEach((rung, i) => {
+        const note = rung && rung.discount_notes;
+        if (typeof note !== "string" || !note.trim()) return;
+        const field = `commitments.${i}.discount_notes`;
+        const ownerEdited = cardAnswers.some((x) => x.target_field === field && !jsonEqual(effective(x), x.current_value));
+        if (ownerEdited) return;
+        rung.discount_notes = "";
+        wrote.push({ answer_id: null, target_field: field, to: "" });
+      });
+    }
+
     if (wrote.length) {
       await sb(`offers?id=eq.${enc(offerId)}`, {
         method: "PATCH",
@@ -2142,7 +2175,9 @@ async function doApplyStaff(req, body) {
         body: JSON.stringify({ data, updated_at: nowIso() }),
       });
     }
-    await stamp([...wrote.map((w) => w.answer_id), ...agreed]);
+    // A cleared stale note has no answer row behind it (answer_id null), so it
+    // is reported but never stamped - there is nothing to stamp.
+    await stamp([...wrote.map((w) => w.answer_id).filter(Boolean), ...agreed]);
     offerReports.push({ offer_id: offerId, wrote, already_matching: agreed.length });
   }
 
