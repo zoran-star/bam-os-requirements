@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+import { notifyTicketStaff } from "./_v2-ticket-notify.js";
 // Vercel Serverless Function - V2 ticket rail (Track 2 / P3).
 // Every mutation on v2_tickets / v2_ticket_messages flows through here, so the
 // P6 notification hooks (Slack function channels + client SMS) get ONE place to
@@ -106,10 +107,24 @@ async function systemMessage(ticketId, clientId, body) {
   });
 }
 
-// Notify hook (P6 fills this in: Slack function channels + client SMS). Stubbed
-// as a no-op log so every call site is already wired.
-function notifyTicketEvent(event, ticket) {
-  try { console.log(`[v2-tickets] ${event}`, ticket?.id, ticket?.type, ticket?.status); } catch (_) {}
+// Notify hook. Logs the event (unchanged) and then DMs the staff member the
+// work belongs to - the owner in assigned_to, else the lane's fallback. All of
+// the routing, copy and Slack plumbing lives in _v2-ticket-notify.js, which is
+// guaranteed non-throwing, so this can never fail a ticket mutation. It is
+// awaited (not floated) because a serverless function may freeze the moment it
+// responds; the Slack call has its own hard timeout so the await is bounded.
+//
+// `opts` is optional, so the (event, ticket) shape still works everywhere.
+async function notifyTicketEvent(event, ticket, opts = {}) {
+  let outcome = "not_attempted";
+  try { outcome = JSON.stringify(await notifyTicketStaff(event, ticket, opts)); } catch (_) { outcome = "threw"; }
+  // LOG THE OUTCOME, not just the event. notifyTicketStaff returns
+  // {sent:false, reason} for every silent path - no Slack token, no recipient
+  // for this lane, recipient has no slack_user_id - and discarding that made a
+  // notifier that sends nothing look identical in the logs to one that works.
+  // That is the exact failure this hook was written to end, so it must not be
+  // reintroduced one level up.
+  try { console.log(`[v2-tickets] ${event}`, ticket?.id, ticket?.type, ticket?.status, outcome); } catch (_) {}
 }
 
 async function resolveUser(req) {
@@ -228,7 +243,7 @@ async function create(req, res, ctx) {
       }),
     });
   }
-  notifyTicketEvent("created", ticket);
+  await notifyTicketEvent("created", ticket, { req, actorStaffId: ctx.isStaff ? ctx.staff.id : null });
   return res.status(200).json({ ok: true, ticket });
 }
 
@@ -292,7 +307,14 @@ async function reply(req, res, ctx) {
     }
     await sb(`v2_tickets?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(patch) });
   }
-  notifyTicketEvent("reply", ticket);
+  // Only a CLIENT reply means somebody is waiting on us; a staff reply is the
+  // owner answering, and an internal note is not client-visible at all.
+  await notifyTicketEvent("reply", ticket, {
+    req,
+    actorKind: ctx.isStaff ? "staff" : "client",
+    actorStaffId: ctx.isStaff ? ctx.staff.id : null,
+    preview: body,
+  });
   return res.status(200).json({ ok: true });
 }
 
@@ -317,7 +339,9 @@ async function setStatus(req, res, ctx) {
       author_name: "System", body: `Status: ${status}`,
     }),
   });
-  notifyTicketEvent("status", { ...ticket, status });
+  // NOT notified: staff changed the status themselves, and the thread already
+  // carries a system row. See NOTIFY_EVENTS in _v2-ticket-notify.js.
+  await notifyTicketEvent("status", { ...ticket, status });
   return res.status(200).json({ ok: true });
 }
 
@@ -344,7 +368,9 @@ async function uploadFinal(req, res, ctx) {
   intake.final_files = [...(Array.isArray(intake.final_files) ? intake.final_files : []), ...files];
   await sb(`v2_tickets?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ intake }) });
   await systemMessage(id, ticket.client_id, `Uploaded finished creative (${files.length} file${files.length === 1 ? "" : "s"})`);
-  notifyTicketEvent("final-upload", ticket);
+  // NOT notified: the uploader is the content owner, and the next step
+  // (send-to-marketing) is theirs too. The handoff is where a person changes.
+  await notifyTicketEvent("final-upload", ticket);
   return res.status(200).json({ ok: true, final_files: intake.final_files });
 }
 
@@ -366,7 +392,9 @@ async function sendToMarketing(req, res, ctx) {
     intake.pending_request = { kind: "approval", message: "Sent for client review", requested_at: new Date().toISOString() };
     await sb(`v2_tickets?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ status: "waiting_client", intake }) });
     await systemMessage(id, ticket.client_id, "Sent for client review");
-    notifyTicketEvent("client-action-requested", { ...ticket, status: "waiting_client" });
+    // NOT notified to staff: this event is aimed at the CLIENT. A staff DM here
+    // would tell the owner about a request they just made.
+    await notifyTicketEvent("client-action-requested", { ...ticket, status: "waiting_client" });
     return res.status(200).json({ ok: true, spawned_ticket: null });
   }
 
@@ -416,7 +444,7 @@ async function sendToMarketing(req, res, ctx) {
     }),
   });
   const spawned = Array.isArray(inserted) ? inserted[0] : inserted;
-  notifyTicketEvent("handoff", spawned);
+  await notifyTicketEvent("handoff", spawned, { req, actorStaffId: ctx.staff.id });
   return res.status(200).json({ ok: true, spawned_ticket: spawned });
 }
 
@@ -451,7 +479,9 @@ async function markLive(req, res, ctx) {
     console.error("[v2-tickets] mark-live archive failed:", e?.message || e);
   }
 
-  notifyTicketEvent("live", { ...ticket, status: "resolved" });
+  // NOT notified: the person marking it live IS the marketing owner, and the
+  // ticket resolves here. Nobody downstream has to act.
+  await notifyTicketEvent("live", { ...ticket, status: "resolved" });
   return res.status(200).json({ ok: true, archived_asset_ids: archivedIds });
 }
 
@@ -521,7 +551,8 @@ async function requestClientAction(req, res, ctx) {
     }),
   });
 
-  notifyTicketEvent("client-action-requested", { ...ticket, status: "waiting_client" });
+  // NOT notified to staff: aimed at the CLIENT, same as the review gate above.
+  await notifyTicketEvent("client-action-requested", { ...ticket, status: "waiting_client" });
   return res.status(200).json({ ok: true });
 }
 
@@ -572,7 +603,15 @@ async function reassign(req, res, ctx) {
 
   await sb(`v2_tickets?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(patch) });
   await systemMessage(id, ticket.client_id, `Reassigned: ${notes.join(", ")}`);
-  notifyTicketEvent("reassigned", { ...ticket, ...patch });
+  // Only DM when the work actually landed on someone new: a different owner,
+  // or a lane move (which changes who the unowned-fallback is). A type change
+  // inside the same lane with the same owner is a relabel, not a handover.
+  const ownerChanged =
+    ("assigned_to" in patch && String(patch.assigned_to || "") !== String(ticket.assigned_to || "")) ||
+    (!!patch.assignee_role && patch.assignee_role !== ticket.assignee_role);
+  await notifyTicketEvent("reassigned", { ...ticket, ...patch }, {
+    req, actorStaffId: ctx.staff.id, ownerChanged,
+  });
   return res.status(200).json({ ok: true });
 }
 
