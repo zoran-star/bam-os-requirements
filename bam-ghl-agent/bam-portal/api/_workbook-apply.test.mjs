@@ -357,8 +357,17 @@ const ANSWERCOLUMN = [[
     return { answers: (await sb(q(ANSWER_SELECT))) || [], degraded: true };`,
   `    throw e;   // (control answercolumn) a missing apply_error column 500s the review surface`]];
 
+// The withhold goes back to being stdout: the report key is dropped from the
+// phase3 return, so a plan's joining fee silently vanishes from the rehearsal
+// with only a server-side console.warn to show for it - the exact shape Step 1
+// (D1 groundwork) closed.
+const FEEWITHHELDSILENTLY = [[
+  `    withheld_signup_fees: withheld,`,
+  `    // (control feewithheldsilently) the withhold is dropped from the response`]];
+
 const EDITS = {
   applybeforereview: APPLYBEFOREREVIEW,
+  feewithheldsilently: FEEWITHHELDSILENTLY,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -1215,6 +1224,59 @@ console.log("\n── 14. the snapshot filter decides the race the branch guard 
     `the FIRST photograph stands - the loser's PATCH matched nothing (saw taken_by ${JSON.stringify(wbRow().snapshot && wbRow().snapshot.taken_by)})`);
   ok(r.body.snapshot === "already",
     `and the loser SAYS it did not take one, rather than claiming a photograph it never wrote (saw ${JSON.stringify(r.body.snapshot)})`);
+  reset();
+}
+
+console.log("\n── 15. a withheld joining fee is DATA in the response, not a console.warn ──");
+{
+  // ── an unrestricted code + a charged fee: the withhold is reported ────────
+  reset();
+  approveAll();
+  // The code loses its applies-to list, so it discounts every line on the
+  // first invoice - the fee included. Elementary charges its fee on base in
+  // the offer, so its fee target must be WITHHELD, and the response must say
+  // which plan and which code, because a console.warn in a server log is not
+  // something a reviewer reads.
+  row("workbook_answers", "a-code-applies").answered = [];
+  // The review side works from the workbook's own answers, so the ele card
+  // carries its fee facts the way a real capture would.
+  addAnswer("c-ele", "signup_fee", "40", { current_value: "40" });
+  addAnswer("c-ele", "signup_fee_on_base", "charge", { current_value: "charge" });
+
+  const rev = await staffPost({ action: "review", workbook_id: "wb1" });
+  const w0 = (Array.isArray(rev.body.warnings) && rev.body.warnings[0]) || {};
+  ok(Array.isArray(rev.body.warnings) && rev.body.warnings.length === 1
+    && w0.plan_card_key === "plan:ele" && w0.card_key === "codes",
+    `review WARNS before apply, naming the plan card and the codes card (${JSON.stringify({ plan: w0.plan_card_key, codes: w0.card_key })})`);
+  ok(/joining fee/.test(String(w0.sentence)) && /"club"/.test(String(w0.sentence)) && noEmDash(String(w0.sentence)),
+    `in a sentence that names the code ("${w0.sentence}")`);
+
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const wh = r.body.phase3 && r.body.phase3.withheld_signup_fees;
+  const wh0 = (Array.isArray(wh) && wh[0]) || {};
+  ok(r.body.ok === true && Array.isArray(wh) && wh.length === 1
+    && wh0.offering === "Elementary Academy" && Array.isArray(wh0.because_codes) && wh0.because_codes.includes("club"),
+    `the withheld fee rides the apply response, naming plan and code (${JSON.stringify(wh)})`);
+  ok(/"club"/.test(String(wh0.reason)) && /applies-to/.test(String(wh0.reason)) && noEmDash(String(wh0.reason)),
+    `with a reason a human can act on ("${wh0.reason}")`);
+  ok(Array.isArray(r.body.phase3.targets) && !r.body.phase3.targets.some((t) => String(t.key).endsWith("|signup_fee")),
+    `and NO |signup_fee key is in the targets - the withhold is real, not just reported (${r.body.phase3.targets.length} targets)`);
+  ok(r.body.phase3.withheld_fees === 1,
+    `the counts area carries it too (withheld_fees ${JSON.stringify(r.body.phase3.withheld_fees)})`);
+  reset();
+
+  // ── the positive control: a restricted code withholds nothing ─────────────
+  reset();
+  approveAll();
+  const rev2 = await staffPost({ action: "review", workbook_id: "wb1" });
+  ok(Array.isArray(rev2.body.warnings) && rev2.body.warnings.length === 0,
+    "a code WITH an applies-to list raises no review warning");
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const wh2 = r2.body.phase3 && r2.body.phase3.withheld_signup_fees;
+  ok(Array.isArray(wh2) && wh2.length === 0,
+    `and withholds nothing - the EMPTY ARRAY, never null, because "nothing withheld" is a claim this run actually checked (saw ${JSON.stringify(wh2)})`);
+  ok(r2.body.phase3.targets.some((t) => t.key === "Elementary Academy|signup_fee"),
+    "while the fee target is present in the targets");
   reset();
 }
 

@@ -161,13 +161,15 @@
  *       parent pays with tax on. The defect the tax card exists to close, one
  *       write later.
  *
- * Measured 2026-08-06, unmutated ALL PASS (111 assertions).
+ * Measured 2026-08-06 (after the D1 withheld-fee build), unmutated ALL PASS
+ * (113 assertions).
  * typingisapproving -> 9 failures, pagecountsall -> 13, feecasing -> 5,
  * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 5,
  * staffcountsanswered -> 4, renameisnotachange -> 2, reviewdropscards -> 1,
  * reviewshowsuntranslated -> 1, staffgateoff -> 4, refusalnamescount -> 1,
  * applyreopensediting -> 3, rollbackleavesoffers -> 1,
- * rollbackclearsanswers -> 2, taxneverlands -> 2.
+ * rollbackclearsanswers -> 2, taxneverlands -> 2, feewithheldsilently -> 1
+ * (and 3 more in api/_workbook-apply.test.mjs, which pins the same line).
  *
  * EVERY MULTI-LINE PIN IN THIS FILE WAS SPLIT AND EACH HALF RUN ON ITS OWN
  * (2026-08-06), because a control that patches two lines otherwise reports one
@@ -346,6 +348,13 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   taxneverlands: [[
     `      body: JSON.stringify({ tax_config: value }),`,
     `      body: JSON.stringify({ tax_config: null }),   // (control taxneverlands)`]],
+  // The withheld-fee report is dropped from the apply response, so a joining
+  // fee the RISK 4 gate leaves out of the mint targets goes back to being a
+  // console.warn in a server log - invisible to the reviewer whose rehearsal
+  // just lost a target the page still promises.
+  feewithheldsilently: [[
+    `    withheld_signup_fees: withheld,`,
+    `    // (control feewithheldsilently) the withhold is dropped from the response`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -1616,6 +1625,22 @@ console.log("\n── H5. the rehearsal describes work in the page's own key voc
     if (his !== mint) money.push(`${c.card_key}: his page says a parent pays ${his} for ${JSON.stringify(m.title)} and the mint would charge ${mint} ("${said}")`);
   }
   check(priced > 0 && money.length === 0, `the parent price on his screen is the amount the mint would charge, tax and all (${priced} plans${money.length ? " - " + money[0] : ""})`);
+
+  // THE WITHHELD-FEE REPORT AGREES WITH THE PAGE'S OWN CODES MODEL. The page
+  // computes "loose" (a named code with nothing ticked, while some plan charges
+  // a joining fee) to warn the owner; the apply response computes the same state
+  // off the offer as it really landed and WITHHOLDS the fee target when it
+  // holds. The two halves must agree on WHEN that state exists, or the owner is
+  // warned about a withhold that never happens - or worse, not warned about one
+  // that does. MUTATE=feewithheldsilently.
+  const whs = applied.body.phase3.withheld_signup_fees;
+  const codesModel = page.MODEL[lidOf("codes")] || [];
+  const anyFee = page.CARDS.filter((c) => c.type === "plan")
+    .some((c) => page.MODEL[c.lid] && !page.MODEL[c.lid].archived && page.MODEL[c.lid].fee === 1);
+  const pageLoose = codesModel.some((c) => String(c.code).trim() && !(c.applies && c.applies.length)) && anyFee;
+  check(Array.isArray(whs), `the apply response carries withheld_signup_fees as DATA (saw ${JSON.stringify(whs)})`);
+  check((Array.isArray(whs) && whs.length > 0) === pageLoose,
+    `and its presence matches the page's own loose-code state (page loose ${pageLoose}, withheld ${Array.isArray(whs) ? whs.length : "MISSING"})`);
 }
 
 console.log("\n── H6. rollback puts back exactly what he was looking at ──");

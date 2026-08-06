@@ -1562,10 +1562,67 @@ async function doReviewStaff(req, body) {
     });
   }
 
+  // ── THE WITHHELD-FEE WARNING, said BEFORE apply ────────────────────────────
+  // A discount code with no applies-to list discounts every line on the first
+  // invoice, the fee included, so at apply time the mint targets WITHHOLD the
+  // joining fee of every plan that charges one (match-prices.js, RISK 4 gate).
+  // That used to surface only as a console.warn during the rehearsal - after
+  // the approvals, in a server log. Staff read it here instead, while the code
+  // is still fixable in review. Computed from the workbook's own EFFECTIVE
+  // answers - no offers read - because review is about what the owner sent,
+  // and the apply-side report (phase3.withheld_signup_fees) stays the backstop
+  // that reads the offer as it really lands.
+  const warnings = [];
+  {
+    const isCharge = (v) => V_CHARGE.get(String(v == null ? "" : v).trim().toLowerCase()) === "charge";
+    const looseCodes = [];   // a code with a name and no applies-to list
+    const chargedPlans = []; // a plan whose fee somebody actually pays
+    for (const card of cards) {
+      const mine = grouped.get(card.id) || [];
+      const k = String(card.card_key || "");
+      if (k === "codes" || k.startsWith("codes:")) {
+        const byIdx = new Map();
+        for (const a of mine) {
+          const m = /^codes\.(\d+)\.(code|applies_to)$/.exec(String(a.target_field || ""));
+          if (!m) continue;
+          if (!byIdx.has(m[1])) byIdx.set(m[1], {});
+          byIdx.get(m[1])[m[2]] = effective(a);
+        }
+        for (const [, c] of byIdx) {
+          const codeName = String(c.code == null ? "" : c.code).trim();
+          const applies = Array.isArray(c.applies_to) ? c.applies_to.filter(Boolean) : [];
+          if (codeName && !applies.length) looseCodes.push({ card_key: card.card_key, code: codeName });
+        }
+      }
+      if (k.startsWith("plan:")) {
+        const eff = (f) => { const a = mine.find((x) => x.target_field === f); return a ? effective(a) : undefined; };
+        const fee = parseFloat(eff("signup_fee"));
+        if (!(fee > 0)) continue;
+        const charges = isCharge(eff("signup_fee_on_base"))
+          || mine.some((a) => /^commitments\.\d+\.signup_fee_charge$/.test(String(a.target_field || "")) && isCharge(effective(a)));
+        if (!charges) continue;
+        const title = eff("title");
+        chargedPlans.push({ card_key: card.card_key, offering: (typeof title === "string" && title.trim()) ? title : card.title });
+      }
+    }
+    // Same sentence the apply-side withhold carries, so staff read ONE wording
+    // in both places rather than two descriptions of one decision.
+    for (const lc of looseCodes) {
+      for (const p of chargedPlans) {
+        warnings.push({
+          card_key: lc.card_key,
+          plan_card_key: p.card_key,
+          sentence: `The ${p.offering} joining fee was left out of the mint targets: discount code "${lc.code}" has no applies-to list, and an unrestricted code discounts every line on the first invoice, the fee included. Set what the code applies to, then rerun.`,
+        });
+      }
+    }
+  }
+
   const { counted, unapproved } = approvalGate(cards, grouped);
   const allItems = [...academy, ...cardGroups.flatMap((c) => c.items), ...additions, ...notes];
   return {
     ok: true,
+    warnings,
     workbook: {
       id: wb.id, client_id: wb.client_id, kind: wb.kind, status: wb.status,
       submitted_at: wb.submitted_at, reviewed_at: wb.reviewed_at || null,
@@ -2005,10 +2062,33 @@ async function loadPriceMachinery() {
   } catch {
     throw bad("the phase 3 preview could not load api/offers/match-prices.js in this environment, so apply stopped before writing anything", 503, "price_machinery_unavailable");
   }
-  if (typeof mod.buildOfferTargets !== "function") {
+  if (typeof mod.buildOfferTargets !== "function" && typeof mod.buildOfferTargetsReport !== "function") {
     throw bad("the phase 3 preview needs buildOfferTargets exported from api/offers/match-prices.js - it is not exported yet, so apply stopped before writing anything", 503, "price_machinery_unavailable");
   }
   return mod;
+}
+
+// The targets plus the WITHHELD joining fees, from one build. The report export
+// is preferred because the withhold used to be a console.warn: a plan's fee
+// silently missing from the rehearsal, with the reason living in a server log
+// nobody reviewing a workbook reads. On a deployment whose match-prices.js
+// predates the report export this degrades to the bare array and SAYS SO -
+// `withheld_signup_fees: null` means "this deployment cannot say", which is a
+// different answer from "nothing was withheld" and must never collapse into it.
+async function buildTargetsWithReport(mod, clientId) {
+  if (typeof mod.buildOfferTargetsReport === "function") {
+    const rep = await mod.buildOfferTargetsReport(clientId);
+    return {
+      targets: (rep && rep.targets) || [],
+      withheld: (rep && Array.isArray(rep.withheld_signup_fees)) ? rep.withheld_signup_fees : [],
+      withheldNote: null,
+    };
+  }
+  return {
+    targets: await mod.buildOfferTargets(clientId),
+    withheld: null,
+    withheldNote: "this deployment's price machinery does not report withheld joining fees, so this run cannot say whether any were left out of the targets.",
+  };
 }
 
 // A READ THAT FAILED IS NOT A READ THAT RETURNED NOTHING. Three outcomes, the
@@ -2045,15 +2125,18 @@ async function phase3Preview(clientId, mod) {
   // staff. The preview detects them itself now (unsellable_rungs, below); this
   // catch stays for an UNEXPECTED refusal, which comes back as data rather than
   // a crash, and the writes that already landed stand.
-  let targets;
+  let targets, withheld, withheldNote;
   try {
-    targets = await mod.buildOfferTargets(clientId);
+    ({ targets, withheld, withheldNote } = await buildTargetsWithReport(mod, clientId));
   } catch (e) {
     // A sentence our own machinery wrote, about a commitment length - no
     // credential material travels this path. Counts are NULL rather than zero:
     // "no targets" and "we could not build the targets" are different answers.
+    // withheld_signup_fees is null for the same reason: a build that refused
+    // cannot claim nothing was withheld.
     return {
       targets: [], matched: null, would_mint: null, unsellable_rungs: null,
+      withheld_signup_fees: null,
       refused: String((e && e.message) || "the price machinery refused to build targets"),
     };
   }
@@ -2245,11 +2328,17 @@ async function phase3Preview(clientId, mod) {
 
   return {
     targets: rows,
+    // THE FEES THE BUILD DELIBERATELY LEFT OUT, as data a reviewer reads.
+    // Empty array = nothing withheld; null = this deployment cannot say
+    // (report export missing, or the build refused). MUTATE=feewithheldsilently.
+    withheld_signup_fees: withheld,
+    ...(withheldNote ? { withheld_note: withheldNote } : {}),
     // COUNTS ARE NULL WHEN THE COMPARISON DID NOT HAPPEN. A zero here reads as
     // "we checked and nothing matched", which is the exact false confidence the
     // catalog's swallowed failure produced.
     matched: canCompare ? rows.filter((r) => r.needs_mint === false).length : null,
     would_mint: canCompare ? rows.filter((r) => r.needs_mint === true).length : null,
+    withheld_fees: withheld ? withheld.length : null,
     catalog: catalogRead.state === "read" ? (catalog.length ? "read" : "empty") : catalogRead.state,
     ...(canCompare ? {} : {
       could_not_compare: "the price catalog could not be read, so nothing here says whether these prices already exist. Do NOT mint from this run: minting against an unread catalog is how duplicate Stripe prices get made.",
