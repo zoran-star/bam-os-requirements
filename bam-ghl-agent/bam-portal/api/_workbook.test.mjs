@@ -1473,6 +1473,39 @@ console.log("\n── 15. the shapes the page is built against, pinned ──");
   reset();
 }
 
+console.log("\n── the mint whitelist: a question added after seeding can grow its row ──");
+{
+  reset();
+  // The page's setA creates { id: null } rows for fields the seed never made,
+  // and doSave refuses unknown ids - so the live San Jose workbook could not
+  // store a tax registration number at all. mintableOn() is the narrow
+  // exception: the tax card may grow exactly that one row.
+  const before = DB.workbook_answers.length;
+  const r1 = await post({ token: TOKEN, action: "save", card_key: "tax", answers: [{ id: null, target_field: "tax_registration_number", answered: "123-456-789" }] });
+  ok(r1.status === 200 && r1.body.ok === true, "a null-id save of tax_registration_number on the tax card is accepted");
+  const minted = DB.workbook_answers.filter((a) => a.card_id === "c-tax" && a.target_field === "tax_registration_number");
+  ok(minted.length === 1 && DB.workbook_answers.length === before + 1 && minted[0].answered === "123-456-789",
+    `exactly ONE row is minted, carrying the answer (id ${minted[0] && minted[0].id})`);
+  ok(minted.length === 1 && minted[0].target_kind === "academy_setting" && minted[0].target_table === "clients" && minted[0].target_id === "sj",
+    "aimed by the card's own tax_config sibling - academy_setting on clients - never by the payload");
+
+  // The save reply carries no answer ids, so the page's next autosave sends
+  // null again: it must land on the SAME row, never mint a twin.
+  const r2 = await post({ token: TOKEN, action: "save", card_key: "tax", answers: [{ id: null, target_field: "tax_registration_number", answered: "987-654" }] });
+  const again = DB.workbook_answers.filter((a) => a.card_id === "c-tax" && a.target_field === "tax_registration_number");
+  ok(r2.body.ok === true && again.length === 1 && again[0].id === minted[0].id && again[0].answered === "987-654",
+    `a second null-id save updates the SAME row (${again[0] && again[0].id}), not a twin`);
+
+  // Everything else keeps today's refusal, byte for byte - the whitelist is
+  // the whole of the exception and it fails closed.
+  for (const [key, field] of [["tax", "sneaky_field"], ["plan:p1", "tax_registration_number"], ["plan:p1", "price"]]) {
+    const r = await post({ token: TOKEN, action: "save", card_key: key, answers: [{ id: null, target_field: field, answered: "x" }] });
+    ok(r.status === 404 && /does not belong to this card/.test(String(r.body.error)),
+      `a null-id save of ${field} on the ${key} card still refuses with the existing sentence ("${r.body.error}")`);
+  }
+  reset();
+}
+
 // ─── report ──────────────────────────────────────────────────────────────────
 cleanup();
 console.log("");

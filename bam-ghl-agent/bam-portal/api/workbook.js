@@ -203,6 +203,23 @@ function addableOn(cardKey) {
   return [];
 }
 
+// WHICH ANSWER ROWS A SAVE MAY MINT, per card - the same fail-closed shape as
+// addableOn, for a different door. The page's setA creates { id: null } rows
+// for fields the seed never made, and doSave refuses unknown ids - correctly,
+// because an id is a bearer of nothing. But a QUESTION added after a workbook
+// was seeded (the tax registration number; later the per-plan ages) has no row
+// for its answer to live in, so the live San Jose workbook literally could not
+// store one. This whitelist is the narrow exception: a null-id save whose
+// target_field is named here, on this card, with no row for the field yet,
+// MINTS the row (target derived from the card's own siblings, never the
+// payload) and then behaves as an ordinary save. Everything else keeps
+// today's refusal, byte for byte.
+function mintableOn(cardKey) {
+  const k = String(cardKey || "");
+  if (k === "tax") return ["tax_registration_number"];
+  return [];
+}
+
 // ── THE CAPS, and why these numbers ─────────────────────────────────────────
 // A no-login link that can create unlimited rows is a denial of service on our
 // own database, written by us, reachable by anyone who ever sees the URL.
@@ -645,7 +662,55 @@ async function doSave(wb, body) {
   let actedNow = false;
   const undo = [];
   for (const item of incoming) {
-    const row = byId.get(String((item || {}).id || ""));
+    let row = byId.get(String((item || {}).id || ""));
+    // ── THE MINT PATH, whitelisted per card (see mintableOn) ─────────────────
+    // A null-id save for a field the card is allowed to grow, where no row for
+    // that field exists yet, creates the row and then saves into it like any
+    // other. A SECOND save of the same field finds the existing row instead of
+    // minting a twin - the page never learns the minted id (the save reply
+    // carries no answers), so it sends null again and must land on the SAME
+    // row. The target is derived from the card's own sibling answers, never
+    // from the payload, for the same reason doAdd derives it: a token that can
+    // name its own target can aim a write at any row in the database.
+    if (!row && (item || {}).id == null) {
+      const field = String((item || {}).target_field || "");
+      if (mintableOn(card.card_key).includes(field)) {
+        row = mine.find((a) => a.target_field === field) || null;
+        if (!row) {
+          const sib = mine.find((a) => !isAddition(a) && a.target_table);
+          if (sib) {
+            const created = await sb(`workbook_answers?select=${ANSWER_SELECT}`, {
+              method: "POST",
+              headers: { Prefer: "return=representation" },
+              body: JSON.stringify([{
+                workbook_id: wb.id,
+                card_id: card.id,
+                client_id: wb.client_id,
+                target_kind: sib.target_kind,
+                target_table: sib.target_table,
+                target_id: sib.target_id,
+                target_field: field,
+                current_value: null,
+                proposed: null,
+                answered: null,
+              }]),
+            });
+            row = Array.isArray(created) && created[0] ? created[0] : null;
+            if (row) {
+              // If the workbook closed while this was in flight, the minted
+              // row is a value appearing under a reviewer: the undo is a
+              // DELETE, same shape doAdd uses.
+              undo.push({ id: row.id, remove: true });
+              mine.push(row);
+              byId.set(String(row.id), row);
+            }
+          }
+          // No sibling to derive a target from: fall through to the ordinary
+          // refusal. A guessed target_table on a money row is worse than a
+          // refusal, because it looks like a fact.
+        }
+      }
+    }
     // AN ANSWER ID FROM ANOTHER CARD - OR ANOTHER ACADEMY'S WORKBOOK - IS
     // REFUSED, not quietly skipped. The token authorizes ONE workbook; an id is
     // a bearer of nothing. A silent skip would let a caller probe which ids
@@ -1412,6 +1477,14 @@ function classifyIndexed(kind, table, m, what) {
 function classifyField(field) {
   const f = String(field || "");
   if (f === "tax_config") return { kind: "tax" };
+  // The registration number rides the tax card but is its own kind: it lands
+  // on clients.tax_registration_number (printed on parent receipts by
+  // api/_member-receipts.js), not inside the tax_config jsonb, and it is free
+  // text - no vocabulary to translate. MUTATE=taxregnowhere removes this
+  // branch, and the row must then REFUSE (unknown field), never write to a
+  // guessed place. That refusal-under-mutation is the proof the whitelist is
+  // still fail-closed.
+  if (f === "tax_registration_number") return { kind: "taxreg" };
   if (f === "notes") return { kind: "manual" };
   if (f.startsWith(ADD_PREFIX)) return { kind: "manual" };
   let m = f.match(/^commitments\.(\d+)\.([a-z_]+)$/);
@@ -1516,6 +1589,10 @@ function reviewItem(card, a) {
     else entry.translation_error = refusalReason(out.error, a.target_field);
   } else if (!isBlank(eff) && cls.kind === "tax") {
     const out = canonicalTax(eff);
+    if (out.ok) entry.will_write = out.value;
+    else entry.translation_error = refusalReason(out.error, a.target_field);
+  } else if (!isBlank(eff) && cls.kind === "taxreg") {
+    const out = tText(eff);
     if (out.ok) entry.will_write = out.value;
     else entry.translation_error = refusalReason(out.error, a.target_field);
   } else if (cls.kind === "unknown") {
@@ -1772,6 +1849,7 @@ async function doApplyStaff(req, body) {
   // middle is exactly the state this pass exists to avoid.
   const skipped = { additions: [], notes: [], already_applied: [], no_answer: [] };
   const taxPending = [];
+  const taxRegPending = [];  // { a, value } -> clients.tax_registration_number
   const offerPending = [];   // { a, cls, value }
   const failures = [];
   // ONE door for every refusal, so a failure without a sentence a human can act
@@ -1794,6 +1872,18 @@ async function doApplyStaff(req, body) {
       const out = canonicalTax(eff);
       if (!out.ok) { refuse(a, out.error); continue; }
       taxPending.push({ a, value: out.value });
+      continue;
+    }
+    if (cls.kind === "taxreg") {
+      if (a.target_table !== "clients") { refuse(a, "the tax registration number must target clients"); continue; }
+      const out = tText(eff);
+      if (!out.ok) { refuse(a, out.error); continue; }
+      // An EMPTY string is "he left the optional box blank", not "erase what
+      // is stored": the question is optional and the page sends "" for an
+      // untouched input, so writing it would blank a number somebody typed
+      // into the portal earlier. Skipped, the same bucket as no answer.
+      if (!out.value.trim()) { skipped.no_answer.push(a.id); continue; }
+      taxRegPending.push({ a, value: out.value });
       continue;
     }
     // TWO DIFFERENT REFUSALS, said differently. A field the whitelist does not
@@ -1912,7 +2002,7 @@ async function doApplyStaff(req, body) {
     // here, before the first write, rather than being taken with a hole in it.
     // MUTATE=snapshotblind.
     const [clientRows, priceRead] = await Promise.all([
-      sb(`clients?id=eq.${enc(wb.client_id)}&select=tax_config&limit=1`),
+      sb(`clients?id=eq.${enc(wb.client_id)}&select=tax_config,tax_registration_number&limit=1`),
       sb(`offer_prices?tenant_id=eq.${enc(wb.client_id)}`).then(
         (rows) => ({ ok: true, rows: Array.isArray(rows) ? rows : [] }),
         (e) => ({ ok: false, why: String((e && e.message) || e) })
@@ -1934,6 +2024,7 @@ async function doApplyStaff(req, body) {
       taken_by: user.id,
       offers: offerRows.map((r) => ({ id: r.id, data: orNull(r.data) })),
       tax_config: (Array.isArray(clientRows) && clientRows[0]) ? orNull(clientRows[0].tax_config) : null,
+      tax_registration_number: (Array.isArray(clientRows) && clientRows[0]) ? orNull(clientRows[0].tax_registration_number) : null,
       offer_prices: Array.isArray(priceRows) ? priceRows : [],
     };
     const landedSnap = await sb(`workbooks?id=eq.${enc(wb.id)}&snapshot=is.null&select=id`, {
@@ -1976,6 +2067,19 @@ async function doApplyStaff(req, body) {
     });
     await stamp([a.id]);
     taxResult = { answer_id: a.id, tax_config: value };
+  }
+  // The registration number rides the same phase: an academy setting, one
+  // PATCH, printed on parent receipts by _member-receipts.js. It affects no
+  // amount, but it belongs with the tax write it was asked alongside.
+  let taxRegResult = null;
+  for (const { a, value } of taxRegPending) {
+    await sb(`clients?id=eq.${enc(wb.client_id)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ tax_registration_number: value }),
+    });
+    await stamp([a.id]);
+    taxRegResult = { answer_id: a.id, tax_registration_number: value };
   }
 
   // ── c. OFFER jsonb writes, per offer row, per approved card ───────────────
@@ -2042,6 +2146,7 @@ async function doApplyStaff(req, body) {
     status: wb.status,
     snapshot: snapshotState,
     tax: taxResult,
+    tax_registration: taxRegResult,
     offers: offerReports,
     skipped,
     phase3,
@@ -2415,7 +2520,13 @@ async function doRollbackStaff(req, body) {
   await sb(`clients?id=eq.${enc(wb.client_id)}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ tax_config: restoredTax }),
+    body: JSON.stringify({
+      tax_config: restoredTax,
+      // Only restored when the photograph actually CARRIES the key: a snapshot
+      // taken before the registration number was photographed would otherwise
+      // null a column it never looked at, which is a restore inventing state.
+      ...("tax_registration_number" in snap ? { tax_registration_number: orNull(snap.tax_registration_number) } : {}),
+    }),
   });
 
   // The applied stamps come off so a future apply can land again; the snapshot

@@ -162,8 +162,9 @@
  *       write later.
  *
  * Measured 2026-08-06 (after the D1 builds: withheld-fee report + Variant A
- * codes guard + the D5 confirmed-no), unmutated ALL PASS (122 assertions).
- * confirmuntargetedcode -> 2 failures, noisnull -> 3.
+ * codes guard + the D5 confirmed-no + the G2 registration number), unmutated
+ * ALL PASS (125 assertions).
+ * confirmuntargetedcode -> 2 failures, noisnull -> 3, taxregnowhere -> 10.
  * typingisapproving -> 9 failures, pagecountsall -> 13, feecasing -> 5,
  * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 5,
  * staffcountsanswered -> 4, renameisnotachange -> 2, reviewdropscards -> 1,
@@ -368,6 +369,12 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   noisnull: [[
     `  if (v.charges_tax === false) return tOk({ charges_tax: false });`,
     `  if (v.charges_tax === false) return tOk(null);   // (control noisnull)`]],
+  // The registration number loses its classifyField home, so the row the page
+  // really produced must REFUSE the apply (fail closed) rather than land on a
+  // guessed column.
+  taxregnowhere: [[
+    `  if (f === "tax_registration_number") return { kind: "taxreg" };`,
+    `  // (control taxregnowhere) the field has no home`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -551,7 +558,7 @@ const TOKEN = "wbk_tok_contract";
 const STAFF_BEARER = "staff-session-" + "contract-Kp3";
 const OFFER_ID = "off1";
 const COLUMNS = {
-  clients: ["id", "public_name", "business_name", "tax_config"],
+  clients: ["id", "public_name", "business_name", "tax_config", "tax_registration_number"],
   staff: ["id", "user_id", "name", "email"],
   offers: ["id", "client_id", "status", "title", "type", "data"],
   workbooks: ["id", "client_id", "kind", "token", "status", "submitted_at", "reviewed_at", "snapshot", "created_at", "updated_at"],
@@ -661,6 +668,11 @@ planAnswers("c-p4", { currentTitle: "Legacy Elite", title: "Legacy Elite", inclu
 // because jsonb does not preserve order and a stringifying comparison would
 // report a change nobody made.
 a("c-tax", "tax_config", { charges_tax: true, pct: 9.375, label: "CA sales tax" }, { label: "CA sales tax", pct: 9.375, charges_tax: true }, { target_kind: "academy_setting", target_table: "clients", target_id: "sj" });
+// The optional registration number (G2): seeded with nothing stored and
+// nothing proposed, the shape a freshly minted workbook carries. Older
+// workbooks grow this row through doSave's mint whitelist instead;
+// api/_workbook.test.mjs covers that door.
+a("c-tax", "tax_registration_number", null, null, { target_kind: "academy_setting", target_table: "clients", target_id: "sj" });
 // The discount code. applies_to is the API's OWN statement of which rung is the
 // three-month one, which is what section D holds the page's parser against.
 a("c-codes", "codes.0.code", "SIBLING10");
@@ -1315,6 +1327,13 @@ console.log("\n── F3. a code with no stated targets cannot be confirmed ─�
 // ═════════════════════════════════════════════════════════════════════════════
 console.log("\n── G. the submit gate ──");
 {
+  // G2 first: the optional tax registration number, typed through the real
+  // input path before the tax card is confirmed. The stub's clients row is
+  // checked after the staff apply in H4.
+  await type("tax", "tax_registration_number", "77-880 CA");
+  check(dbAnswer("c-tax", "tax_registration_number").answered === "77-880 CA",
+    "the tax registration number saves through the ordinary answer path");
+
   // Confirm everything except one card, so the refusal has a number in it that
   // both halves have to agree about.
   for (const key of ["tax", "plan:p2", "plan:p3", "plan:p4", "codes", "plans"]) await confirm(key);
@@ -1608,6 +1627,15 @@ check(applied.status === 200 && applied.body.ok === true && applied.body.dry_run
   const taxItem = beforeApply.body.review.academy_settings.find((i) => i.target_field === "tax_config");
   check(!!taxItem && jsonEq(DB.clients[0].tax_config, taxItem.will_write),
     `and the academy setting too: review previewed ${JSON.stringify(taxItem && taxItem.will_write)}, clients.tax_config now holds ${JSON.stringify(DB.clients[0].tax_config)}`);
+
+  // G2: the number he typed on the tax card is now on the academy row, exactly
+  // as review previewed it. MUTATE=taxregnowhere takes away its classifyField
+  // home, and the whole apply must then refuse rather than write it anywhere.
+  const regItem = beforeApply.body.review.academy_settings.find((i) => i.target_field === "tax_registration_number");
+  check(!!regItem && regItem.will_write === "77-880 CA",
+    `review previews the registration number as the text he typed (${JSON.stringify(regItem && regItem.will_write)})`);
+  check(DB.clients[0].tax_registration_number === "77-880 CA",
+    `and apply landed it on clients.tax_registration_number (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
 }
 {
   // THE OWNER'S HALF DID NOT REOPEN. Staff reviewing, approving and applying must
@@ -1649,7 +1677,11 @@ console.log("\n── H5. the rehearsal describes work in the page's own key voc
   // two sides parse the commitment length with two different parsers. A key phase
   // 3 would mint that the page cannot name is a price nobody can ever attach a
   // coupon to.
-  const p3keys = (applied.body.phase3.targets || []).map((t) => t.key);
+  // Read defensively: under an API control that makes apply REFUSE, phase3 is
+  // absent, and a harness that crashes exits without its banner - the H4
+  // assertions above are the ones that report the refusal.
+  const PH3 = (applied.body && applied.body.phase3) || {};
+  const p3keys = (PH3.targets || []).map((t) => t.key);
   const offered = new Set(page.priceKeys());
   const orphan = p3keys.filter((k) => !offered.has(k));
   check(p3keys.length > 0 && orphan.length === 0,
@@ -1659,7 +1691,7 @@ console.log("\n── H5. the rehearsal describes work in the page's own key voc
   // price by the tax he entered and prints a sentence; the rehearsal takes the
   // tax it just wrote to clients and mints cents through _fees.applyFee. Nothing
   // is shared between those two paths except the workbook.
-  const byKey = new Map((applied.body.phase3.targets || []).map((t) => [t.key, t]));
+  const byKey = new Map((PH3.targets || []).map((t) => [t.key, t]));
   const money = [];
   let priced = 0;
   for (const c of page.CARDS.filter((x) => x.type === "plan")) {
@@ -1683,7 +1715,7 @@ console.log("\n── H5. the rehearsal describes work in the page's own key voc
   // holds. The two halves must agree on WHEN that state exists, or the owner is
   // warned about a withhold that never happens - or worse, not warned about one
   // that does. MUTATE=feewithheldsilently.
-  const whs = applied.body.phase3.withheld_signup_fees;
+  const whs = PH3.withheld_signup_fees;
   const codesModel = page.MODEL[lidOf("codes")] || [];
   const anyFee = page.CARDS.filter((c) => c.type === "plan")
     .some((c) => page.MODEL[c.lid] && !page.MODEL[c.lid].archived && page.MODEL[c.lid].fee === 1);

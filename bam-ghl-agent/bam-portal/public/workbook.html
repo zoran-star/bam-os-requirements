@@ -680,7 +680,8 @@ function planModel(c){
 function taxModel(c){
   const t=val(c,'tax_config',null)||{};
   return {on:t.charges_tax===true?1:(t.charges_tax===false?0:null),
-          pct:has(t.pct)?String(t.pct):'', label:t.label||'Sales tax'};
+          pct:has(t.pct)?String(t.pct):'', label:t.label||'Sales tax',
+          reg:val(c,'tax_registration_number','')};
 }
 function codeModel(c){
   const out=[];
@@ -1021,6 +1022,9 @@ function taxCardHTML(lid){
         <input class="bb-input" placeholder="Sales tax" value="${esc(T.label)}" style="max-width:180px" oninput="setTaxField('label',this.value)">
       </div>
       <div class="qhint" id="taxecho" style="margin-top:8px"></div>
+      <div class="q">Do you have a tax registration number?</div>
+      <div class="qhint">Optional. If you have one it goes on parent receipts. You can send it to us later.</div>
+      <input class="bb-input" placeholder="e.g. 123-456-789" value="${esc(T.reg)}" style="max-width:220px" oninput="setA('${lid}','tax_registration_number',this.value)">
     </div>
     <div class="confirmbar"><button class="cbtn" onclick="confirmCard('${lid}')">&#10003; That's right</button>
      <span class="chint">Nothing is taxed until you answer this. Answering No is a real answer, not a skip.</span></div>

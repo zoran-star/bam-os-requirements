@@ -373,10 +373,18 @@ const NOISNULL = [[
   `  if (v.charges_tax === false) return tOk({ charges_tax: false });`,
   `  if (v.charges_tax === false) return tOk(null);   // (control noisnull) the deliberate no collapses into never-asked`]];
 
+// The registration number loses its classifyField home. Fail-closed means the
+// row must then REFUSE (unknown field, refusal printed on the row) - never
+// land somewhere guessed - and the clients write must not happen.
+const TAXREGNOWHERE = [[
+  `  if (f === "tax_registration_number") return { kind: "taxreg" };`,
+  `  // (control taxregnowhere) the field has no home`]];
+
 const EDITS = {
   applybeforereview: APPLYBEFOREREVIEW,
   feewithheldsilently: FEEWITHHELDSILENTLY,
   noisnull: NOISNULL,
+  taxregnowhere: TAXREGNOWHERE,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -415,7 +423,7 @@ const TOKEN = "wbk_" + "tok_" + "applySanJose";
 const STAFF_BEARER = "staff-session-" + "bearer-Kp3";
 
 const COLUMNS = {
-  clients: ["id", "public_name", "business_name", "tax_config"],
+  clients: ["id", "public_name", "business_name", "tax_config", "tax_registration_number"],
   staff: ["id", "user_id", "name", "email"],
   offers: ["id", "client_id", "status", "title", "type", "data"],
   workbooks: ["id", "client_id", "kind", "token", "status", "expires_at", "sent_at", "submitted_at", "reviewed_at", "applied_at", "snapshot", "created_by", "created_by_name", "created_at", "updated_at"],
@@ -1331,6 +1339,38 @@ console.log("\n── 16. a confirmed No to tax is a VALUE, never null ──");
   const resolved = fees.resolveFee({ taxConfig: { charges_tax: false }, legacyText: "13% HST" });
   ok(resolved === null,
     `resolveFee: a confirmed no beats a stale typed "13% HST" instead of falling through to it (resolved ${JSON.stringify(resolved)})`);
+}
+
+console.log("\n── 17. the tax registration number lands on the academy row ──");
+{
+  reset();
+  approveAll();
+  DB.clients[0].tax_registration_number = "OLD-000";
+  addAnswer("c-tax", "tax_registration_number", "123-456-789", { target_kind: "academy_setting", target_table: "clients", target_id: "sj" });
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r.body.ok === true && DB.clients[0].tax_registration_number === "123-456-789",
+    `the answered number lands on clients.tax_registration_number (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
+  ok(!!r.body.tax_registration && r.body.tax_registration.tax_registration_number === "123-456-789",
+    "and the apply response says it did");
+  // Read defensively: under MUTATE=taxregnowhere the apply REFUSES, no
+  // snapshot exists, and a control that crashes the harness exits without its
+  // banner.
+  ok((wbRow().snapshot || {}).tax_registration_number === "OLD-000",
+    `while the snapshot photographs the PRIOR value (saw ${JSON.stringify((wbRow().snapshot || {}).tax_registration_number)})`);
+  const rb = await staffPost({ action: "rollback", workbook_id: "wb1" });
+  ok(rb.body.ok === true && DB.clients[0].tax_registration_number === "OLD-000",
+    `and rollback restores it (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
+  reset();
+
+  // ── blank means "he left the optional box alone", never an erase ──────────
+  reset();
+  approveAll();
+  DB.clients[0].tax_registration_number = "KEEP-ME";
+  addAnswer("c-tax", "tax_registration_number", "", { target_kind: "academy_setting", target_table: "clients", target_id: "sj" });
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r2.body.ok === true && DB.clients[0].tax_registration_number === "KEEP-ME",
+    `a blank answer writes nothing - the stored number survives (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
+  reset();
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────
