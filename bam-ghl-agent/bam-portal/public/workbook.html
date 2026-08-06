@@ -1408,7 +1408,7 @@ function codeCardHTML(lid){
       </div>
       <div class="q" style="margin:12px 0 6px;font-size:12.5px">How long does it apply?</div>
       <div class="chiprow">${DUR.map((d,j)=>`<button class="bchip sm ${c.dur===j?'sel':''}" onclick="setA('${lid}',${F}duration',DUR[${j}]);drawCodes()">${d}</button>`).join('')}
-      ${c.dur===1?`<input class="bb-input" type="number" inputmode="numeric" style="max-width:80px" placeholder="3" value="${c.durMonths||''}" oninput="setA('${lid}',${F}duration_months',+this.value||0)"><span class="ml">months</span>`:''}</div>
+      ${c.dur===1?`<input class="bb-input" type="number" inputmode="numeric" min="1" max="24" style="max-width:80px" placeholder="3" value="${c.durMonths||''}" oninput="setA('${lid}',${F}duration_months',+this.value||0)"><span class="ml">1 to 24 months</span>`:''}</div>
       <div class="q" style="margin:12px 0 6px;font-size:12.5px">What does it apply to?</div>
       <div class="chiprow">${keys.length?`<button class="bchip sm ${appliesEverything(c)?'sel':''}" onclick="applyEverything('${lid}',${i})">Everything, including the joining fee</button>`+keys.map(k=>`<button class="bchip sm ${(c.applies||[]).includes(k)?'sel':''}" onclick="toggleApplies('${lid}',${i},${JSON.stringify(k).replace(/"/g,'&quot;')})">${esc(keyLabel(k))}</button>`).join(''):'<span class="ml">Add your prices above first.</span>'}</div>
       ${String(c.code).trim()?`<div class="qhint" style="margin-top:8px">Tick the prices this code covers. It comes off them ${esc(scope)}${esc(feeClause)}. Choosing "Everything, including the joining fee" is a real choice, not a default.</div>`:''}

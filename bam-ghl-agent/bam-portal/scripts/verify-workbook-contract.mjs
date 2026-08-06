@@ -166,6 +166,10 @@
  *       paginating, so it reads only the fixture's 100 page-one fillers and
  *       never sends the starting_after cursor - in production, exists:false
  *       past price #100 and the mint duplicates real prices.
+ *   MUTATE=monthsunbounded          API. CODE_T.duration_months goes back to
+ *       the unbounded tIntOrNull, so the 25 months section J types on the
+ *       real page reviews clean and applies with ok:true - a claim about
+ *       billing months this build can never sell.
  *
  * Measured 2026-08-06, after the full rehearsal-round-1 build (Steps 1-12:
  * withheld fee report, Variant A codes guard, confirmed-no tax, registration
@@ -186,7 +190,9 @@
  * agesunknownfield -> 18, agenotegone -> 1, onepagestripe -> 1 (measured
  * 2026-08-06, R3: the H5 read-pattern assertion; the existence assertions it
  * also breaks live in api/_workbook-apply.test.mjs, where the same pin
- * catches 4).
+ * catches 4), monthsunbounded -> 3 (measured 2026-08-06, R4: section J's
+ * review refusal, apply refusal and untouched-offer pins; the same pin
+ * catches 2 in api/_workbook-apply.test.mjs).
  * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
  * flow never submits an inverted band because the page guard refuses it in
  * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
@@ -443,6 +449,12 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   agenotegone: [[
     `    ...(wroteAges ? { age_note: "Plan ages were stored on the offer for later use. Nothing reads plan ages yet: class age routing still reads the class list, so no routing changed." } : {}),`,
     `    // (control agenotegone) the note is gone`]],
+  // CODE_T.duration_months goes back to the unbounded tIntOrNull, so the 25
+  // months section J types on the real page reviews clean and applies with
+  // ok:true - a claim about billing months this build can never sell.
+  monthsunbounded: [[
+    `  duration: tChip(V_DUR, "duration"), duration_months: tMonths1to24,`,
+    `  duration: tChip(V_DUR, "duration"), duration_months: tIntOrNull,   // (control monthsunbounded)`]],
   // The live-Stripe price read stops paginating, so it reads only the fixture's
   // 100 fillers and never sends the starting_after cursor - which H5's
   // read-pattern assertion has to catch (the existence assertions live in
@@ -2124,6 +2136,42 @@ console.log("\n── I. a confirmed No to tax survives as a value the next work
   const TI = page.MODEL[lidOf("tax")];
   check(TI.on === 0,
     `the next workbook renders the tax card as ANSWERED No (on ${JSON.stringify(TI.on)}), not as never asked (null)`);
+}
+
+console.log("\n── J. 25 months on the real page is refused where staff read, and cannot apply ──");
+{
+  // R4: duration_months is bounded 1-24 (the term vocabulary's own ceiling).
+  // A fresh run, section I's pattern: the owner picks "a set number of
+  // months" and types 25 through the page's real input path - there is no
+  // confirm-gate block, the translator refusal IS the enforcement, so it must
+  // print in review AND refuse the apply. MUTATE=monthsunbounded.
+  reset();
+  page = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await page.boot(); await settle();
+  await type("codes", "codes.0.duration", page.DUR[1]);        // For a set number of months
+  await type("codes", "codes.0.duration_months", 25);          // the page's number input sends a NUMBER
+  check(dbAnswer("c-codes", "codes.0.duration_months").answered === 25,
+    "typing 25 months saves through the ordinary answer path");
+  for (const key of ["tax", "plan:p1", "plan:p2", "plan:p3", "plan:p4", "codes", "plans", "notes"]) await confirm(key);
+  ALERTS = [];
+  await page.doSubmit(); await settle();
+  check(DB.workbooks[0].status === "submitted", `the workbook sends${ALERTS.length ? " (alerts: " + ALERTS.join(" | ") + ")" : ""}`);
+
+  const rvJ = await staffApi({ action: "review", workbook_id: "wb1" });
+  const monthsItem = REVIEW_ITEMS(rvJ.body).find((i) => i.target_field === "codes.0.duration_months") || {};
+  check(/a set number of months must be a whole number from 1 to 24/.test(String(monthsItem.translation_error))
+    && monthsItem.will_write === undefined,
+    `review carries the refusal where staff read ("${monthsItem.translation_error}")`);
+
+  for (const k of rvJ.body.gate.unapproved_card_keys) await staffApi({ action: "approve-card", workbook_id: "wb1", card_key: k });
+  const offersBeforeJ = JSON.stringify(DB.offers.map((o) => ({ id: o.id, data: o.data })));
+  const apJ = await staffApi({ action: "apply", workbook_id: "wb1" });
+  const fJ = (Array.isArray((apJ.body || {}).failures) ? apJ.body.failures : [])
+    .find((f) => f.target_field === "codes.0.duration_months") || {};
+  check(apJ.body.ok === false && /a set number of months must be a whole number from 1 to 24/.test(String(fJ.error)),
+    `and apply refuses the workbook with the same sentence ("${fJ.error}")`);
+  check(JSON.stringify(DB.offers.map((o) => ({ id: o.id, data: o.data }))) === offersBeforeJ,
+    "so the 25-month claim never reached the offer jsonb");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

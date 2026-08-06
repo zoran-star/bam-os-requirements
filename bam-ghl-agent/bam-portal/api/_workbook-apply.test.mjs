@@ -162,6 +162,10 @@
 //       PAGE TWO, so section 18 catches the missed matches and the missing
 //       starting_after request. Before the paginated fixture, this mutation
 //       passed every gate.
+//   MUTATE=monthsunbounded    node api/_workbook-apply.test.mjs
+//       CODE_T.duration_months goes back to the unbounded tIntOrNull, so a
+//       discount code claiming 0 or 25 billing months - months this build can
+//       never sell - lands in the offer jsonb with ok:true.
 //
 // A pin that no longer matches api/workbook.js reports NEGATIVE CONTROL FAILED
 // rather than passing quietly. A control run exits ZERO when the mutation IS
@@ -183,6 +187,10 @@
 //                       product name; also pinned in
 //                       scripts/verify-workbook-contract.mjs, where it catches
 //                       the read-pattern assertion -> 1)
+//   monthsunbounded  -> 2 failures (section 23's 0-months and 25-months
+//                       refusals; also pinned in
+//                       scripts/verify-workbook-contract.mjs, where section J's
+//                       real-page 25 catches 3)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -465,6 +473,13 @@ const AGEBANDUNCHECKED = [[
   "        refuse(lo.a, `age_min ${lo.value} is above age_max ${hi.value}, so no athlete could ever fit this plan. Fix the ages first.`);",
   "        // (control agebandunchecked) the inverted band sails through"]];
 
+// CODE_T.duration_months goes back to the unbounded tIntOrNull, so a code
+// claiming 0 or 25 billing months - months this build can never sell - lands
+// in the offer jsonb with ok:true. Section 23's edges are what has to catch it.
+const MONTHSUNBOUNDED = [[
+  `  duration: tChip(V_DUR, "duration"), duration_months: tMonths1to24,`,
+  `  duration: tChip(V_DUR, "duration"), duration_months: tIntOrNull,   // (control monthsunbounded)`]];
+
 // The live-Stripe read stops paginating: one page of 100 and the loop ends,
 // so every price past #100 reads exists:false and the rehearsal says "mint
 // them all" against real cards. The fixture serves the real hits on PAGE TWO
@@ -502,6 +517,7 @@ const EDITS = {
   agenotegone: AGENOTEGONE,
   agesanythinggoes: AGESANYTHINGGOES,
   onepagestripe: ONEPAGESTRIPE,
+  monthsunbounded: MONTHSUNBOUNDED,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -1768,6 +1784,46 @@ console.log("\n── 22. tAgeStrOrEmpty is PINNED: the exact vocabulary of an a
   const apEq = await staffPost({ action: "apply", workbook_id: "wb1" });
   ok((apEq.body || {}).ok === true && offering(0).age_min === "9" && offering(0).age_max === "9",
     `MUST ACCEPT min === max ("9"/"9"): a one-age band applies (stored ${JSON.stringify(offering(0).age_min)}/${JSON.stringify(offering(0).age_max)})`);
+  reset();
+}
+
+console.log("\n── 23. a code's set-number-of-months is bounded 1-24, like the terms it rides ──");
+{
+  // Ruled in the remediation pass: bound it 1-24, consistent with the 24-month
+  // ceiling of the adjustable-prepay term vocabulary. A code that outlives the
+  // longest commitment this build can sell is a claim about billing months
+  // that cannot exist, and 0 months is not "a set number of months". The
+  // translator refusal IS the enforcement - it prints in review and apply.
+  // MUTATE=monthsunbounded.
+  const monthsRe = /a set number of months must be a whole number from 1 to 24/;
+  const codeMonths = () => (((row("offers", "off1").data.pricing || {}).discount_codes || [])[0] || {}).duration_months;
+  const failMonths = (ap) => (Array.isArray((ap.body || {}).failures) ? ap.body.failures : [])
+    .find((f) => f.target_field === "codes.0.duration_months") || {};
+
+  for (const bad of [0, 25]) {
+    reset(); approveAll();
+    addAnswer("c-codes", "codes.0.duration_months", bad);
+    const ap = await staffPost({ action: "apply", workbook_id: "wb1" });
+    const f = failMonths(ap);
+    ok((ap.body || {}).ok === false && monthsRe.test(String(f.error)) && noEmDash(String(f.error)),
+      `MUST REFUSE ${bad} months: apply refuses with the sentence ("${f.error}")`);
+    reset();
+  }
+  for (const edge of [1, 24]) {
+    reset(); approveAll();
+    addAnswer("c-codes", "codes.0.duration_months", edge);
+    const ap = await staffPost({ action: "apply", workbook_id: "wb1" });
+    ok((ap.body || {}).ok === true && codeMonths() === edge,
+      `MUST ACCEPT ${edge} months (range edge): stored ${JSON.stringify(codeMonths())}`);
+    reset();
+  }
+  // Blank stays null: the duration chip, not this number, decides whether
+  // months apply at all.
+  reset(); approveAll();
+  addAnswer("c-codes", "codes.0.duration_months", "");
+  const apBk = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok((apBk.body || {}).ok === true && codeMonths() == null,
+    `blank stays null (stored ${JSON.stringify(codeMonths())})`);
   reset();
 }
 

@@ -1373,6 +1373,18 @@ const tIntOrNull = (v) => {
   const n = typeof v === "number" ? v : (typeof v === "string" && /^\d+$/.test(v.trim()) ? parseInt(v, 10) : NaN);
   return Number.isInteger(n) && n >= 0 ? tOk(n) : tErr(`expected a whole number: ${JSON.stringify(v)}`);
 };
+// "For a set number of months" must name a number of months that can exist:
+// 1 to 24, consistent with the 24-month ceiling of the adjustable-prepay term
+// vocabulary - a code that outlives the longest commitment this build can sell
+// is a claim about billing months that cannot exist, and 0 months is not "a
+// set number of months". Blank stays null: the duration chip, not this number,
+// decides whether months apply at all. MUTATE=monthsunbounded.
+const tMonths1to24 = (v) => {
+  if (v === "" || v === null) return tOk(null);
+  const n = typeof v === "number" ? v : (typeof v === "string" && /^\d+$/.test(v.trim()) ? parseInt(v, 10) : NaN);
+  return Number.isInteger(n) && n >= 1 && n <= 24 ? tOk(n)
+    : tErr(`a set number of months must be a whole number from 1 to 24, the longest commitment this build can sell: ${JSON.stringify(v)}`);
+};
 const tYesNoBool = (v) => {
   if (typeof v === "boolean") return tOk(v);
   const s = String(v == null ? "" : v).trim().toLowerCase();
@@ -1418,7 +1430,7 @@ const RUNG_T = {
 };
 const CODE_T = {
   code: tText, kind: tChip(V_KIND, "discount kind"), value: tMoneyStr,
-  duration: tChip(V_DUR, "duration"), duration_months: tIntOrNull,
+  duration: tChip(V_DUR, "duration"), duration_months: tMonths1to24,
   applies_to: tStrArray, expires_at: tText, max_redemptions: tIntOrNull,
   once_per_customer: tYesNoBool,
 };
