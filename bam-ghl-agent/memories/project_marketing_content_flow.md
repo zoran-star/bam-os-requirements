@@ -355,3 +355,12 @@ round-trips that START from a legacy systems ticket; revisit if systems stops
 using the legacy tab entirely. Prime By Design lesson: a reopened origin
 assigned to a non-systems person is invisible to the team - the edited clips
 had to be copied onto Jenny's own ticket manually.
+
+## Staff-create from ContentView (2026-08-06, Cam)
+"+ New ticket" button in the Content tickets toolbar -> StaffNewTicketModal
+(client picker, channel + type pills, title, brief, high-priority toggle).
+POSTs the existing staff-create path (client_id from staff skips organic
+credits + funnel gates; context gets source staff-request + requester; Slack
+ping tagged "(from <staff>)"). Born from "Mike texted me to get an ad going
+for DETAIL Miami" - texts become tracked tickets. context.priority passes
+high/normal for the SLA.

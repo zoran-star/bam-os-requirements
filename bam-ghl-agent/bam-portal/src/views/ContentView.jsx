@@ -784,6 +784,7 @@ function ContentTicketsTab({ tk, session, me }) {
   const [channelFilter, setChannelFilter] = useState("all"); // all | ads | organic
   const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
   const [stateFilter, setStateFilter] = useState("all"); // all | overdue (cross-cuts tabs)
+  const [showNewTicket, setShowNewTicket] = useState(false); // staff-create modal
 
   // Reassignment: managers/admin can re-route a creative to a different owner,
   // one at a time (detail) or in bulk (list multi-select) — e.g. covering for
@@ -992,6 +993,13 @@ function ContentTicketsTab({ tk, session, me }) {
     <div>
       {/* Toolbar: search + type filter + sort */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <button
+          onClick={() => setShowNewTicket(true)}
+          style={{
+            padding: "9px 16px", fontSize: 13, fontWeight: 700, borderRadius: 8,
+            background: tk.accent, color: "#0A0A0B", border: "none", cursor: "pointer", fontFamily: "inherit",
+          }}
+        >+ New ticket</button>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -1068,6 +1076,17 @@ function ContentTicketsTab({ tk, session, me }) {
 
       {/* Bulk reassign bar — appears once rows are selected (managers/admin only).
           Route a batch of creatives to one owner in a single action. */}
+      {showNewTicket && (
+        <StaffNewTicketModal
+          tk={tk} session={session} me={me}
+          onClose={() => setShowNewTicket(false)}
+          onCreated={async (code) => {
+            setShowNewTicket(false);
+            await refetch();
+            showBanner(`Ticket ${code} created.`);
+          }}
+        />
+      )}
       {canReassign && selectedIds.size > 0 && (
         <div style={{
           display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
@@ -1566,6 +1585,97 @@ function ClientMediaLibrary({ clientId, currentTicketId, tk, session }) {
       )}
       {preview && <MediaLightbox file={preview} tk={tk} onClose={() => setPreview(null)} />}
     </Card>
+  );
+}
+
+// Staff-create a content ticket without a client submission or a systems
+// origin - "Mike texted me, get an ad going for DETAIL Miami" becomes a real
+// tracked ticket instead of a text thread. Reuses the staff-create POST path
+// (skips organic credits + funnel plan gates; routes + Slack-pings like any
+// client submission, tagged "(from <staff>)").
+function StaffNewTicketModal({ tk, session, onClose, onCreated }) {
+  const [clients, setClients] = useState(null);
+  const [clientId, setClientId] = useState("");
+  const [channel, setChannel] = useState("ads");
+  const [type, setType] = useState("video");
+  const [title, setTitle] = useState("");
+  const [notes, setNotes] = useState("");
+  const [high, setHigh] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let dead = false;
+    supabase.from("clients").select("id,business_name").order("business_name").then(({ data }) => {
+      if (!dead) setClients(data || []);
+    });
+    return () => { dead = true; };
+  }, []);
+  async function create() {
+    if (busy) return;
+    if (!clientId) { setErr("Pick a client."); return; }
+    if (!notes.trim() && !title.trim()) { setErr("Give it a title or a brief."); return; }
+    setBusy(true); setErr("");
+    try {
+      const res = await fetch("/api/marketing?resource=content-tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` },
+        body: JSON.stringify({
+          client_id: clientId,
+          type,
+          channel,
+          title: title.trim().slice(0, 120),
+          notes: notes.trim(),
+          context: { priority: high ? "high" : "normal" },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      onCreated(String(json.ticket?.id || "").slice(0, 3).toUpperCase());
+    } catch (e) {
+      setErr(e?.message || "Failed to create the ticket.");
+      setBusy(false);
+    }
+  }
+  const field = { width: "100%", background: tk.surfaceEl, border: `1px solid ${tk.borderMed}`, color: tk.text, fontSize: 13, padding: "9px 12px", borderRadius: 8, fontFamily: "inherit", outline: "none" };
+  const pill = (on) => ({ padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 999, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${on ? tk.accent : tk.border}`, background: on ? `${tk.accent}1A` : "transparent", color: on ? tk.accent : tk.textSub });
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "min(520px, 94vw)", background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 12, padding: 22 }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: tk.text }}>New content ticket</div>
+          <span style={{ flex: 1 }} />
+          <button onClick={onClose} aria-label="Close" style={{ border: "none", background: "transparent", color: tk.textSub, fontSize: 16, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <select value={clientId} onChange={e => setClientId(e.target.value)} style={field}>
+            <option value="">{clients === null ? "Loading clients…" : "Select a client…"}</option>
+            {(clients || []).map(c => <option key={c.id} value={c.id}>{c.business_name}</option>)}
+          </select>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {[["ads", "Ads"], ["funnel", "Funnel"], ["organic", "Organic"]].map(([k, label]) => (
+              <button key={k} onClick={() => setChannel(k)} style={pill(channel === k)}>{label}</button>
+            ))}
+            <span style={{ width: 1, alignSelf: "stretch", background: tk.border, margin: "0 4px" }} />
+            {[["video", "Video"], ["graphic", "Graphic"]].map(([k, label]) => (
+              <button key={k} onClick={() => setType(k)} style={pill(type === k)}>{label}</button>
+            ))}
+          </div>
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title - e.g. DETAIL Miami evergreen ad" style={field} />
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4} placeholder="Brief - who it's for, offer details, direction, deadline context…" style={{ ...field, resize: "vertical", lineHeight: 1.5 }} />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: tk.textSub, cursor: "pointer", userSelect: "none" }}>
+            <input type="checkbox" checked={high} onChange={e => setHigh(e.target.checked)} style={{ accentColor: tk.accent }} />
+            High priority (3-day SLA instead of 5)
+          </label>
+          {err && <div style={{ color: tk.red || "#E0524A", fontSize: 12 }}>{err}</div>}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={onClose} style={{ padding: "9px 16px", fontSize: 13, fontWeight: 600, borderRadius: 8, background: "transparent", color: tk.textSub, border: `1px solid ${tk.border}`, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button onClick={create} disabled={busy} style={{ padding: "9px 18px", fontSize: 13, fontWeight: 700, borderRadius: 8, background: tk.accent, color: "#0A0A0B", border: "none", cursor: busy ? "wait" : "pointer", fontFamily: "inherit" }}>
+              {busy ? "Creating…" : "Create ticket"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
