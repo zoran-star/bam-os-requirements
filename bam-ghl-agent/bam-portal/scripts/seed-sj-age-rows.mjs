@@ -40,7 +40,29 @@
 // SUPABASE_SERVICE_KEY). Never run from a machine that has not been pointed
 // at the intended project on purpose.
 
+import { pathToFileURL } from "node:url";
+
 const CLIENT_ID = "5576acf0-acd3-4c05-9f9f-ebfde8618154";   // BAM San Jose
+
+// THE ONE CLAIM A PREFILL MAY MAKE, trimmed of paste artifacts (R5). A padded
+// class value ("9 ") used to seed a padded `proposed`; the owner confirming
+// unedited materialises it as `answered`, and the apply-side translator
+// (tAgeStrOrEmpty, which rightly refuses " 9") then refuses a value OUR OWN
+// SEED manufactured. So: both reads stringify and trim, and a value that
+// trims to "" is NO proposal (null) - the prefill-is-a-claim rule, applied to
+// whitespace. Pure and EXPORTED so api/_workbook.test.mjs can hold the round
+// trip - every value this seed can propose passes tAgeStrOrEmpty - without
+// running any of the script below (MUTATE=seeduntrimmed lives there).
+export function proposedFromClass(cls) {
+  const clean = (v) => {
+    if (v == null) return null;
+    const s = String(v).trim();
+    return s === "" ? null : s;
+  };
+  return { age_min: clean((cls || {}).age_min), age_max: clean((cls || {}).age_max) };
+}
+
+async function main() {
 const APPLY = process.env.APPLY === "yes";
 
 const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -93,11 +115,12 @@ const offers = (await sb(`offers?client_id=eq.${enc(CLIENT_ID)}&status=neq.archi
 let eleAges = null;
 for (const o of offers) {
   const classes = (((o.data || {}).schedule) || {}).classes || [];
-  const twin = classes.find((cl) => cl && /elementary/i.test(String(cl.name || cl.title || "")));
-  if (twin && (String(twin.age_min || "").trim() || String(twin.age_max || "").trim())) {
-    eleAges = { age_min: String(twin.age_min || ""), age_max: String(twin.age_max || "") };
-    break;
+  for (const twin of classes) {
+    if (!twin || !/elementary/i.test(String(twin.name || twin.title || ""))) continue;
+    const p = proposedFromClass(twin);
+    if (p.age_min != null || p.age_max != null) { eleAges = p; break; }
   }
+  if (eleAges) break;
 }
 console.log(eleAges
   ? `Elementary class twin found: ages ${eleAges.age_min || "?"}-${eleAges.age_max || "?"} (prefill for the Elementary card only).`
@@ -147,3 +170,11 @@ await sb("workbook_answers", {
   body: JSON.stringify(inserts),
 });
 console.log(`Inserted ${inserts.length} workbook_answers rows.`);
+}
+
+// Importing this file runs NOTHING - only the exported mapper. The script
+// body executes only when invoked directly, so the suite can test the mapper
+// without a Supabase key in sight.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

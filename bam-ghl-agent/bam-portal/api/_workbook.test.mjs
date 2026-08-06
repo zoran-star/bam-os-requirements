@@ -140,8 +140,15 @@
 //   MUTATE=blankadd            node api/_workbook.test.mjs
 //       the same ghost through the autosave door: an addition emptied by a save
 //       rather than removed.
+//   MUTATE=seeduntrimmed       node api/_workbook.test.mjs
+//       the seed's class-twin mapper stops trimming, so a padded class value
+//       ("9 ") seeds a padded `proposed`, the owner confirming unedited
+//       materialises it as `answered`, and the apply-side translator then
+//       rightly refuses " 9" - a refusal manufactured by our own seed. This
+//       control pins scripts/seed-sj-age-rows.mjs, not api/workbook.js.
 //
-// TWENTY-ONE controls, in three families: PRODUCT rules (partialsubmit,
+// TWENTY-TWO controls: twenty-one over the route in three families, plus the
+// seed-side seeduntrimmed above. The route's: PRODUCT rules (partialsubmit,
 // confirmblind, confirmnomaterialize, submittededitable, echoacts, orphanmint,
 // metawritable, dropnulls, addconfirmed, ghostremove, blankadd), DISCLOSURE AND
 // BLAST RADIUS (tokenecho, voidreadable, crosscard, rawcredential, noguard,
@@ -153,6 +160,13 @@
 //
 // A control run exits ZERO when the mutation IS caught. CI greps for the banner
 // and for the MUTATE= names above, not for the exit code.
+//
+// MEASURED CATCH COUNTS - controls added or re-pointed in the 2026-08-06
+// remediation pass, each run and counted on that date (re-measure and update
+// this block whenever one of THESE pins moves; the older controls keep their
+// proof in CI, which runs every name and greps for the banner):
+//   seeduntrimmed -> 4 failures (the padded, whitespace-only and newline/tab
+//                    mapper pins, and the tAgeStrOrEmpty round trip)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -479,6 +493,7 @@ const EDITS = {
   othernofollowup: OTHERNOFOLLOWUP,
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
+  seeduntrimmed: [],   // pins scripts/seed-sj-age-rows.mjs, not workbook.js - see below
 };
 
 const edits = MUTATE
@@ -488,6 +503,31 @@ if (!sentryOk) console.log("  (note) @sentry/node is not installed here, so the 
 const modulePath = (!MUTATE && sentryOk)
   ? path.join(HERE, "workbook.js")
   : copyWith(sentryOk ? edits : [...edits, [SENTRY_IMPORT, SENTRY_STUB]]);
+
+// ── the seed mapper under test (R5) ─────────────────────────────────────────
+// scripts/seed-sj-age-rows.mjs gates its script body on being invoked
+// directly, so importing it runs NOTHING - the suite gets the pure mapper and
+// no Supabase key is ever in sight. MUTATE=seeduntrimmed drops the trim, the
+// exact regression that made our own seed manufacture a refusal at apply.
+const SEED_PATH = path.join(HERE, "..", "scripts", "seed-sj-age-rows.mjs");
+const SEEDUNTRIMMED = [[
+  `    const s = String(v).trim();`,
+  `    const s = String(v);   // (control seeduntrimmed) the paste artifact survives`]];
+let seedModulePath = SEED_PATH;
+if (MUTATE === "seeduntrimmed") {
+  let seedSrc = fs.readFileSync(SEED_PATH, "utf8");
+  for (const [find, repl] of SEEDUNTRIMMED) {
+    if (!seedSrc.includes(find)) {
+      controlBroken = `MUTATE=seeduntrimmed is pinned to text that is no longer in scripts/seed-sj-age-rows.mjs:\n\n${find}\n\nRe-point it or delete it - a pin that fails to apply looks exactly like a check that passed.`;
+      throw new Error(controlBroken);
+    }
+    seedSrc = seedSrc.split(find).join(repl);
+  }
+  seedModulePath = path.join(HERE, ".mutant-seed-sj-age-rows.mjs");
+  fs.writeFileSync(seedModulePath, seedSrc);
+  tmpFiles.push(seedModulePath);
+}
+const { proposedFromClass } = await import(pathToFileURL(seedModulePath).href);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // ── the in-memory world ──────────────────────────────────────────────────────
@@ -1565,6 +1605,50 @@ console.log("\n── the add-a-plan cadence follow-up: 'Other' must say how oft
   ok(good.status === 200 && good.body.ok === true && good.body.answer.answered.billing_cycle_other === "every 6 weeks",
     `with the follow-up it stores, carrying the text (${JSON.stringify(good.body.answer && good.body.answer.answered)})`);
   reset();
+}
+
+console.log("\n── the seed's class-twin prefill: trimmed, and never refusing its own apply ──");
+{
+  // R5. A padded class value ("9 ") used to seed a padded `proposed`; the
+  // owner confirming unedited materialises it as `answered`, and the
+  // apply-side translator then rightly refuses " 9" - a refusal manufactured
+  // by our own seed. The mapper trims, treats whitespace-only as NO proposal
+  // (null, the prefill-is-a-claim rule), and the round trip below closes the
+  // loop with the translator pin in api/_workbook-apply.test.mjs section 22:
+  // every value the seed can propose passes tAgeStrOrEmpty.
+  // MUTATE=seeduntrimmed.
+  const battery = [
+    [{ age_min: "9 ", age_max: " 12" }, { age_min: "9", age_max: "12" }],
+    [{ age_min: 9, age_max: 12 }, { age_min: "9", age_max: "12" }],
+    [{ age_min: "", age_max: "14" }, { age_min: null, age_max: "14" }],
+    [{ age_min: "   ", age_max: null }, { age_min: null, age_max: null }],
+    [{}, { age_min: null, age_max: null }],
+    [{ age_min: "9\n", age_max: "\t12" }, { age_min: "9", age_max: "12" }],
+  ];
+  for (const [input, want] of battery) {
+    const got = proposedFromClass(input);
+    ok(JSON.stringify(got) === JSON.stringify(want),
+      `proposedFromClass(${JSON.stringify(input)}) -> ${JSON.stringify(got)} (want ${JSON.stringify(want)})`);
+  }
+
+  // THE ROUND TRIP. The translator is extracted from api/workbook.js SOURCE
+  // (the real one, not this suite's mutant copy), so this holds the seed
+  // against the refusal rule as it actually ships - a hand-kept copy here
+  // could agree with nothing.
+  const wbSrc = fs.readFileSync(path.join(HERE, "workbook.js"), "utf8");
+  const mAge = wbSrc.match(/const tAgeStrOrEmpty = \(v\) => \{[\s\S]*?\n\};/);
+  ok(!!mAge, "tAgeStrOrEmpty is still extractable from api/workbook.js source (re-point this extraction if it moved)");
+  if (mAge) {
+    const tOk = (value) => ({ ok: true, value });
+    const tErr = (error) => ({ ok: false, error });
+    const tAgeStrOrEmpty = new Function("tOk", "tErr", `${mAge[0]}\nreturn tAgeStrOrEmpty;`)(tOk, tErr);
+    const proposals = battery
+      .flatMap(([input]) => { const p = proposedFromClass(input); return [p.age_min, p.age_max]; })
+      .filter((v) => v != null);
+    const refused = proposals.filter((v) => !tAgeStrOrEmpty(v).ok);
+    ok(proposals.length > 0 && refused.length === 0,
+      `every value the seed can propose passes tAgeStrOrEmpty - a seeded proposal can never refuse its own apply (${proposals.length} proposals ${JSON.stringify(proposals)}${refused.length ? ", REFUSED: " + JSON.stringify(refused) : ""})`);
+  }
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────
