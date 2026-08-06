@@ -653,6 +653,11 @@ function planModel(c){
     feeOnBase:idxOf(CHARGE_W,val(c,'signup_fee_on_base','Charge'),0),
     sessions:val(c,'sessions_included',''),
     expires:val(c,'expires_after',''),
+    /* STRINGS, never coerced with + here: "" is the no-bound encoding the
+       server stores (same as schedule.classes), and +"" is 0, which is an
+       age. Comparison happens only at the confirm guard, on both present. */
+    ageMin:val(c,'age_min',''),
+    ageMax:val(c,'age_max',''),
     otherDesc:val(c,'other_description',''),
     notes:val(c,'description',''),
     archived:val(c,'archived',false)?1:0,
@@ -869,6 +874,11 @@ async function confirmCard(lid){
     if(!String(p.title).trim()){alert('Give this plan a name first.');return}
     if(p.type===null||p.type===undefined){alert('Pick what kind of pricing this is first.');return}
     if(!(p.price>0)){alert('Set a price first.');return}
+    /* Ages: blank does NOT block - blank means the plan is for everyone. The
+       one guard is an inverted band, which no athlete could ever fit, refused
+       here in the same direction the apply refuses it. */
+    const mn=String(p.ageMin==null?'':p.ageMin).trim(),mx=String(p.ageMax==null?'':p.ageMax).trim();
+    if(mn&&mx&&+mn>+mx){alert('The youngest age is above the oldest. Fix the ages first.');return}
   }
   if(c.type==='tax'){
     const t=MODEL[lid];
@@ -1145,6 +1155,15 @@ function planCardHTML(lid){
      <div class="laddernote">Savings are compared against paying <b id="basecmp_${lid}">${money(p.price)}</b> ${CYCLES[p.cad]}.</div>
      ${addSectionHTML(lid,'length')}`:''}
 
+     <div class="q">Who is this plan for?</div>
+     <div class="qhint">Ages. Leave it blank if the plan is for everyone.</div>
+     <div class="chiprow">
+       <span class="ml">Ages</span>
+       <input class="bb-input" type="number" inputmode="numeric" style="max-width:80px" value="${esc(p.ageMin)}" oninput="setA('${lid}','age_min',this.value)">
+       <span class="ml">to</span>
+       <input class="bb-input" type="number" inputmode="numeric" style="max-width:80px" value="${esc(p.ageMax)}" oninput="setA('${lid}','age_max',this.value)">
+     </div>
+
      <div class="q">Anything else about this price?</div>
      <textarea class="bb-input" placeholder="optional, just for you and BAM" oninput="${s('description','this.value')}">${esc(p.notes)}</textarea>
 
@@ -1301,6 +1320,11 @@ function prevOpts(lid){
       bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee when you pay up front for ${lens(charged)}.`);
   }
   if(p.type===1&&p.expires)bits.push(`Expires after ${p.expires}.`);
+  /* The age band a parent reads, only ever claiming the bound that exists. */
+  {const mn=String(p.ageMin==null?'':p.ageMin).trim(),mx=String(p.ageMax==null?'':p.ageMax).trim();
+   if(mn&&mx)bits.push(`Ages ${mn} to ${mx}.`);
+   else if(mn)bits.push(`Ages ${mn} and up.`);
+   else if(mx)bits.push(`Ages ${mx} and under.`);}
   document.getElementById('pv_fee_'+lid).textContent=bits.join(' ');
   const back=R.filter(r=>r.after===0).length, ren=R.filter(r=>r.after===1).length;
   let line='';

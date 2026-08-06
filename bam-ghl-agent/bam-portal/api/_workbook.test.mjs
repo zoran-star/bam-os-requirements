@@ -1520,6 +1520,37 @@ console.log("\n── the mint whitelist: a question added after seeding can gro
   reset();
 }
 
+console.log("\n── the mint whitelist, plan cards: the age question can grow its rows ──");
+{
+  reset();
+  // Step 12: plan cards seeded before the per-plan age question existed have no
+  // age_min/age_max rows for the page to save into. mintableOn("plan:*") allows
+  // exactly those two fields, aimed by the card's own siblings.
+  const before = DB.workbook_answers.length;
+  const r1 = await post({ token: TOKEN, action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "age_min", answered: "9" }] });
+  ok(r1.status === 200 && r1.body.ok === true, "a null-id save of age_min on a plan card is accepted");
+  const minted = DB.workbook_answers.filter((a) => a.card_id === "c-p1" && a.target_field === "age_min");
+  ok(minted.length === 1 && DB.workbook_answers.length === before + 1 && minted[0].answered === "9",
+    `exactly ONE row is minted, carrying the answer as a STRING (id ${minted[0] && minted[0].id}, answered ${JSON.stringify(minted[0] && minted[0].answered)})`);
+  ok(minted.length === 1 && minted[0].target_kind === "price_row" && minted[0].target_table === "offer_prices" && minted[0].target_id === "p1",
+    "aimed at the plan's own offer row by the card's title sibling - never by the payload");
+
+  // The save reply carries no answer ids, so the page's next autosave sends
+  // null again: it must land on the SAME row, never mint a twin.
+  const r2 = await post({ token: TOKEN, action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "age_min", answered: "10" }] });
+  const again = DB.workbook_answers.filter((a) => a.card_id === "c-p1" && a.target_field === "age_min");
+  ok(r2.body.ok === true && again.length === 1 && again[0].id === minted[0].id && again[0].answered === "10",
+    `a second null-id save updates the SAME row (${again[0] && again[0].id}), not a twin`);
+
+  // The whitelist is per card: the codes card grows nothing, so the same
+  // null-id age_min save there keeps today's refusal, byte for byte.
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  const r3 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "age_min", answered: "9" }] });
+  ok(r3.status === 404 && /does not belong to this card/.test(String(r3.body.error)),
+    `a null-id save of age_min on the CODES card still refuses with the existing sentence ("${r3.body.error}")`);
+  reset();
+}
+
 console.log("\n── the add-a-plan cadence follow-up: 'Other' must say how often ──");
 {
   reset();

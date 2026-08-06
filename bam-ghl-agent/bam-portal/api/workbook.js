@@ -217,6 +217,9 @@ function addableOn(cardKey) {
 function mintableOn(cardKey) {
   const k = String(cardKey || "");
   if (k === "tax") return ["tax_registration_number"];
+  // Per-plan age bands (Step 12): plan cards seeded before the question
+  // existed grow exactly these two rows, aimed by their own siblings.
+  if (k.startsWith("plan:")) return ["age_min", "age_max"];
   return [];
 }
 
@@ -1379,6 +1382,18 @@ const tYesNoBool = (v) => {
 };
 const tStrArray = (v) =>
   (Array.isArray(v) && v.every((x) => typeof x === "string") ? tOk(v) : tErr("expected a list of price keys"));
+// Plan ages are STRINGS ("9", "12", "" = no bound) - the byte-identical
+// encoding offers.data.schedule.classes already uses (api/_offer-class-ages
+// .test.mjs pins it), so nothing downstream ever has to ask which shape a
+// stored age is in. A number input answers a number; that is a page fact, not
+// an age change, so a whole number 1-99 becomes its string and anything else
+// refuses.
+const tAgeStrOrEmpty = (v) => {
+  if (v === "") return tOk("");
+  const n = typeof v === "number" ? v
+    : (typeof v === "string" && /^\d+$/.test(v.trim()) && v.trim() === v ? parseInt(v, 10) : NaN);
+  return Number.isInteger(n) && n >= 1 && n <= 99 ? tOk(String(n)) : tErr(`not an age this can store: ${JSON.stringify(v)}`);
+};
 
 const PLAN_T = {
   title: tText, type: tChip(V_TYPE, "pricing type"), whats_included: tText,
@@ -1387,6 +1402,11 @@ const PLAN_T = {
   signup_fee: tMoneyStrOrEmpty, signup_fee_taxable: tChip(V_YESNO, "taxable answer"),
   signup_fee_on_base: tChip(V_CHARGE, "charge-or-waive answer"),
   sessions_included: tIntOrNull, expires_after: tText, other_description: tText,
+  // Who the plan is FOR. Stored on the offering, consumed by NOTHING yet
+  // (class age routing reads schedule.classes) - the apply response says so
+  // out loud (age_note). Dot-free plan leafs, so classifyField picks them up
+  // from this table automatically. MUTATE=agesunknownfield.
+  age_min: tAgeStrOrEmpty, age_max: tAgeStrOrEmpty,
   description: tText, archived: tBool,
 };
 const RUNG_T = {
@@ -1919,7 +1939,37 @@ async function doApplyStaff(req, body) {
     }
     const out = cls.t(eff);
     if (!out.ok) { refuse(a, out.error); continue; }
+    // A BLANK age with nothing stored writes nothing: "" is the no-bound
+    // encoding, and stamping it onto a plan that never had bounds grows keys
+    // nobody asked for. Clearing a REAL stored bound still writes "".
+    if (cls.kind === "plan" && /^age_(min|max)$/.test(String(a.target_field))
+      && out.value === "" && (isBlank(a.current_value) || a.current_value === "")) {
+      skipped.no_answer.push(a.id);
+      continue;
+    }
     offerPending.push({ a, cls, value: out.value });
+  }
+
+  // ── cross-field sanity: an inverted age band can never fit an athlete ─────
+  // Judged here in phase 0 with everything else, so the whole apply refuses
+  // while the configuration is untouched. Only a card carrying BOTH effective
+  // ages can be inverted; blank never blocks, because blank means "for
+  // everyone". Same direction as the page's own confirm guard.
+  // MUTATE=agebandunchecked.
+  {
+    const agesByCard = new Map();
+    for (const p of offerPending) {
+      if (p.cls.kind !== "plan" || !/^age_(min|max)$/.test(String(p.a.target_field))) continue;
+      if (!agesByCard.has(p.a.card_id)) agesByCard.set(p.a.card_id, {});
+      agesByCard.get(p.a.card_id)[p.a.target_field] = p;
+    }
+    for (const [, pair] of agesByCard) {
+      const lo = pair.age_min, hi = pair.age_max;
+      if (!lo || !hi || lo.value === "" || hi.value === "") continue;
+      if (+lo.value > +hi.value) {
+        refuse(lo.a, `age_min ${lo.value} is above age_max ${hi.value}, so no athlete could ever fit this plan. Fix the ages first.`);
+      }
+    }
   }
 
   // Read the live offers and resolve every card to its offering BEFORE the
@@ -2198,6 +2248,13 @@ async function doApplyStaff(req, body) {
 
   // Status DOES NOT MOVE. apply(dry) leaves the workbook where the review left
   // it; nothing reaches 'applied' until a live apply exists to earn it.
+  // STORED-FOR-LATER IS SAID OUT LOUD. Plan ages are consumed by NOTHING
+  // today - class age routing (api/agent/_class-routing.js) reads
+  // schedule.classes, and so do offer.js/fact-render.js/marketing.js - so an
+  // apply that wrote them must say no behaviour changed, or the person who
+  // typed 9-12 reasonably believes routing just moved. MUTATE=agenotegone.
+  const wroteAges = offerReports.some((rep) => (rep.wrote || []).some((w) => /^age_(min|max)$/.test(String(w.target_field))));
+
   return {
     ok: true,
     dry_run: true,
@@ -2206,6 +2263,7 @@ async function doApplyStaff(req, body) {
     tax: taxResult,
     tax_registration: taxRegResult,
     offers: offerReports,
+    ...(wroteAges ? { age_note: "Plan ages were stored on the offer for later use. Nothing reads plan ages yet: class age routing still reads the class list, so no routing changed." } : {}),
     skipped,
     phase3,
   };

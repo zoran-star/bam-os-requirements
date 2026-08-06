@@ -139,6 +139,16 @@
 //   MUTATE=answercolumn       node api/_workbook-apply.test.mjs
 //       the staff answers read loses its 42703 fallback, so a missing
 //       apply_error column 500s the entire review surface.
+//   MUTATE=agesunknownfield   node api/_workbook-apply.test.mjs
+//       age_min loses its PLAN_T home, so the row the page really produced
+//       must REFUSE the apply (fail closed) rather than land on a guessed key.
+//   MUTATE=agebandunchecked   node api/_workbook-apply.test.mjs
+//       the min>max refusal is deleted, so a plan no athlete could ever fit
+//       lands in the offer jsonb with ok:true.
+//   MUTATE=agenotegone        node api/_workbook-apply.test.mjs
+//       the age_note is dropped from the apply response, so an apply that
+//       stored plan ages stops saying that nothing reads them yet - and the
+//       person who typed 9-12 reasonably believes routing just moved.
 //
 // A pin that no longer matches api/workbook.js reports NEGATIVE CONTROL FAILED
 // rather than passing quietly. A control run exits ZERO when the mutation IS
@@ -406,6 +416,25 @@ const STALENOTESKEPT = [[
   `        rung.discount_notes = "";`,
   `        return;   // (control stalenoteskept) the stale note survives the apply`]];
 
+// age_min loses its home in the plan whitelist. The row the page really
+// produced must then REFUSE the whole apply (unknown field, fail closed),
+// never land on a guessed key - same proof shape as taxregnowhere.
+const AGESUNKNOWNFIELD = [[
+  `  age_min: tAgeStrOrEmpty, age_max: tAgeStrOrEmpty,`,
+  `  age_max: tAgeStrOrEmpty,   // (control agesunknownfield) age_min has no home`]];
+
+// The inverted-band refusal is deleted, so a plan whose youngest age is above
+// its oldest - a plan no athlete could ever fit - writes with ok:true.
+const AGEBANDUNCHECKED = [[
+  "        refuse(lo.a, `age_min ${lo.value} is above age_max ${hi.value}, so no athlete could ever fit this plan. Fix the ages first.`);",
+  "        // (control agebandunchecked) the inverted band sails through"]];
+
+// The stored-for-later note is dropped from the response, so an apply that
+// wrote plan ages stops saying that nothing consumes them yet.
+const AGENOTEGONE = [[
+  `    ...(wroteAges ? { age_note: "Plan ages were stored on the offer for later use. Nothing reads plan ages yet: class age routing still reads the class list, so no routing changed." } : {}),`,
+  `    // (control agenotegone) the note is gone`]];
+
 const EDITS = {
   applybeforereview: APPLYBEFOREREVIEW,
   feewithheldsilently: FEEWITHHELDSILENTLY,
@@ -414,6 +443,9 @@ const EDITS = {
   stripequietfail: STRIPEQUIETFAIL,
   stripewrite: STRIPEWRITE,
   stalenoteskept: STALENOTESKEPT,
+  agesunknownfield: AGESUNKNOWNFIELD,
+  agebandunchecked: AGEBANDUNCHECKED,
+  agenotegone: AGENOTEGONE,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -1531,6 +1563,52 @@ console.log("\n── 20. approve-card names its parameter and the valid keys �
   ok(bogus.status === 404 && /no card called "plan:banana"/.test(String(bogus.body.error))
     && /tax, plan:two, plan:ele, plans, codes, notes/.test(String(bogus.body.error)) && noEmDash(String(bogus.body.error)),
     `an unknown key is refused with the whole vocabulary ("${bogus.body.error}")`);
+  reset();
+}
+
+console.log("\n── 21. per-plan age bands: strings on the offering, said out loud ──");
+{
+  // ── answered ages land as STRINGS, and the response says nothing reads them ──
+  reset();
+  approveAll();
+  addAnswer("c-two", "age_min", "9");
+  // A number input answers a NUMBER; the translator stores the string - the
+  // byte-identical encoding offers.data.schedule.classes already uses.
+  addAnswer("c-two", "age_max", 12);
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r.body.ok === true && offering(0).age_min === "9" && offering(0).age_max === "12",
+    `answered ages land on pricing_offerings[0] as STRINGS (age_min ${JSON.stringify(offering(0).age_min)}, age_max ${JSON.stringify(offering(0).age_max)})`);
+  ok(typeof r.body.age_note === "string" && /Nothing reads plan ages yet/.test(r.body.age_note) && noEmDash(r.body.age_note),
+    `and the apply response says so out loud: stored for later, no routing changed ("${r.body.age_note}")`);
+  reset();
+
+  // ── blank ages write nothing, and no note is claimed for it ──────────────
+  reset();
+  approveAll();
+  addAnswer("c-ele", "age_min", "");
+  addAnswer("c-ele", "age_max", "");
+  const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r2.body.ok === true && !("age_min" in offering(1)) && !("age_max" in offering(1)),
+    `blank ages on a plan that never had bounds grow NO keys in the jsonb (offering keys: ${Object.keys(offering(1)).join(", ")})`);
+  ok(!("age_note" in r2.body),
+    "and no age_note is claimed for a write that never happened");
+  reset();
+
+  // ── an inverted band refuses the WHOLE apply, configuration untouched ─────
+  reset();
+  approveAll();
+  addAnswer("c-ele", "age_min", "14");
+  addAnswer("c-ele", "age_max", "9");
+  const before21 = worldState();
+  const r3 = await staffPost({ action: "apply", workbook_id: "wb1" });
+  // Read defensively: under MUTATE=agebandunchecked there ARE no failures and
+  // a harness that crashes exits without its banner.
+  const f21 = (Array.isArray((r3.body || {}).failures) ? r3.body.failures : [])
+    .find((f) => /age_min 14 is above age_max 9/.test(String(f.error)));
+  ok(r3.body.ok === false && !!f21 && noEmDash(String((f21 || {}).error)),
+    `age_min 14 over age_max 9 refuses the apply with the sentence ("${(f21 || {}).error}")`);
+  ok(worldState() === before21,
+    "and NOTHING was written - not the snapshot, not the tax, not the other answers");
   reset();
 }
 

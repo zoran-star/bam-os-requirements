@@ -163,26 +163,26 @@
  *       parent pays with tax on. The defect the tax card exists to close, one
  *       write later.
  *
- * Measured 2026-08-06, after the rehearsal-round-1 builds through D6 (withheld
- * fee report, Variant A codes guard, confirmed-no tax, registration number,
- * duration scope sentence, every-card-counts). Unmutated ALL PASS
- * (135 assertions; 137 after the D7 live-Stripe checks joined H5; 142 after the D2 fee-line section; 148 after the G1 follow-up section). feelineflat -> 4, othernofollowup -> 3.
- * typingisapproving -> 17 failures, pagedenominatorgrows -> 7,
- * emptycardsdontcount -> 7, feecasing -> 5, addkeepsconfirm -> 5,
+ * Measured 2026-08-06, after the full rehearsal-round-1 build (Steps 1-12:
+ * withheld fee report, Variant A codes guard, confirmed-no tax, registration
+ * number, duration scope sentence, every-card-counts, live-Stripe dry run,
+ * fee-line truth, Other-cadence follow-up, stale-note clear, approve-card
+ * vocabulary, per-plan age bands). Unmutated ALL PASS (161 assertions;
+ * was 148 before the Step 12 age sections D3/G/H4 joined).
+ * typingisapproving -> 18 failures, pagedenominatorgrows -> 7,
+ * emptycardsdontcount -> 7, feecasing -> 10, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
  * renameisnotachange -> 2, reviewdropscards -> 2,
- * reviewshowsuntranslated -> 1, staffgateoff -> 4, refusalnamescount -> 1,
+ * reviewshowsuntranslated -> 1, staffgateoff -> 5, refusalnamescount -> 1,
  * applyreopensediting -> 3, rollbackleavesoffers -> 1,
  * rollbackclearsanswers -> 2, taxneverlands -> 5, feewithheldsilently -> 1,
- * confirmuntargetedcode -> 2, noisnull -> 3, taxregnowhere -> 10,
- * firstbillalways -> 1.
- * typingisapproving -> 9 failures, pagecountsall -> 13, feecasing -> 5,
- * addkeepsconfirm -> 3, numericprice -> 5, monthsmisparse -> 5,
- * staffcountsanswered -> 4, renameisnotachange -> 2, reviewdropscards -> 1,
- * reviewshowsuntranslated -> 1, staffgateoff -> 4, refusalnamescount -> 1,
- * applyreopensediting -> 3, rollbackleavesoffers -> 1,
- * rollbackclearsanswers -> 2, taxneverlands -> 2, feewithheldsilently -> 1
- * (and 3 more in api/_workbook-apply.test.mjs, which pins the same line).
+ * confirmuntargetedcode -> 2, noisnull -> 3, taxregnowhere -> 15,
+ * firstbillalways -> 1, feelineflat -> 4, othernofollowup -> 3,
+ * agesunknownfield -> 18, agenotegone -> 1.
+ * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
+ * flow never submits an inverted band because the page guard refuses it in
+ * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
+ * both files and catch 4 and 1 there.)
  *
  * EVERY MULTI-LINE PIN IN THIS FILE WAS SPLIT AND EACH HALF RUN ON ITS OWN
  * (2026-08-06), because a control that patches two lines otherwise reports one
@@ -421,6 +421,20 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   taxregnowhere: [[
     `  if (f === "tax_registration_number") return { kind: "taxreg" };`,
     `  // (control taxregnowhere) the field has no home`]],
+  // age_min loses its home in the plan whitelist, so the age row the page
+  // really produced must REFUSE the whole apply (fail closed) - and every
+  // downstream check on the offer jsonb trips because nothing landed.
+  agesunknownfield: [[
+    `  age_min: tAgeStrOrEmpty, age_max: tAgeStrOrEmpty,`,
+    `  age_max: tAgeStrOrEmpty,   // (control agesunknownfield) age_min has no home`]],
+  // (MUTATE=agebandunchecked - the deleted min>max refusal - lives in
+  // api/_workbook-apply.test.mjs: this flow never submits an inverted band,
+  // because the page's own confirm guard refuses it in section D3.)
+  // The stored-for-later note is dropped from the apply response, so an apply
+  // that wrote plan ages stops saying that nothing consumes them yet.
+  agenotegone: [[
+    `    ...(wroteAges ? { age_note: "Plan ages were stored on the offer for later use. Nothing reads plan ages yet: class age routing still reads the class list, so no routing changed." } : {}),`,
+    `    // (control agenotegone) the note is gone`]],
   // The server drops the Other-cycle follow-up requirement, so the two halves
   // stop refusing in the same sentence - the page refuses, the API stores the
   // riddle.
@@ -674,6 +688,12 @@ function planAnswers(cardId, o) {
   a(cardId, "expires_after", null);
   a(cardId, "other_description", null);
   a(cardId, "description", null);
+  // Per-plan age bands (Step 12). PREFILL IS A CLAIM: only the Elementary card
+  // carries proposed values (from its class twin in schedule.classes on the
+  // live workbook); every other plan proposes NOTHING, because a prefill the
+  // owner confirms without editing lands in configuration.
+  a(cardId, "age_min", null, o.ageMin === undefined ? null : o.ageMin);
+  a(cardId, "age_max", null, o.ageMax === undefined ? null : o.ageMax);
   // ARCHIVING IS A PROPOSAL LIKE ANY OTHER. currentArchived is what the offer
   // holds today; archived is what BAM proposed. Keeping them apart matters: a
   // card whose offering is ALREADY archived cannot be resolved at all, so a
@@ -719,7 +739,7 @@ planAnswers("c-p1", {
 // A SECOND RENAME, and it is a WORD rather than a letter case, so the two shapes
 // of "confirmed without editing is still a change" are both on the table.
 planAnswers("c-p2", { currentTitle: "Academy Unlimited Pass", title: "Academy Unlimited", included: "Every session we run.", price: "425", fee: "40", feeOnBase: "charge", rungs: [] });
-planAnswers("c-p3", { currentTitle: "Elementary 1x/Week", title: "Elementary 1x/week", included: "One session a week.", price: "180", fee: "40", feeOnBase: "waive", rungs: [] });
+planAnswers("c-p3", { currentTitle: "Elementary 1x/Week", title: "Elementary 1x/week", included: "One session a week.", price: "180", fee: "40", feeOnBase: "waive", ageMin: "9", ageMax: "12", rungs: [] });
 planAnswers("c-p4", { currentTitle: "Legacy Elite", title: "Legacy Elite", included: "Not sold to new families.", price: "500", fee: "0", feeOnBase: "charge", archived: true, rungs: [] });
 // The tax card: one column, one answer, keys in a DIFFERENT order in `proposed`
 // because jsonb does not preserve order and a stringifying comparison would
@@ -1270,6 +1290,49 @@ console.log("\n── D2. the fee line carries the per-rung truth ──");
   await type("plan:p1", "commitments.0.signup_fee_charge", null);
 }
 
+console.log("\n── D3. the age band: the preview claims only the bound that exists ──");
+{
+  // PREFILL IS A CLAIM. Only the Elementary card carries one (its class twin
+  // in schedule.classes is the one thing to point at); every other plan
+  // renders the age boxes EMPTY, because a prefill the owner confirms without
+  // editing lands in configuration.
+  const pre = Object.fromEntries(["plan:p1", "plan:p2", "plan:p3", "plan:p4"].map((k) => {
+    const m = page.MODEL[lidOf(k)] || {};
+    return [k, `${m.ageMin}|${m.ageMax}`];
+  }));
+  check(pre["plan:p3"] === "9|12" && pre["plan:p1"] === "|" && pre["plan:p2"] === "|" && pre["plan:p4"] === "|",
+    `the proposed prefill exists ONLY on the Elementary card (${JSON.stringify(pre)})`);
+
+  const lid = lidOf("plan:p1");
+  const ages = () => { page.prevOpts(lid); return txt("pv_fee_" + lid); };
+  await type("plan:p1", "age_min", "9");
+  let said = ages();
+  check(/Ages 9 and up\./.test(said), `min only: the parent preview says "Ages 9 and up." ("${said}")`);
+  await type("plan:p1", "age_max", "12");
+  said = ages();
+  check(/Ages 9 to 12\./.test(said), `both bounds: "Ages 9 to 12." ("${said}")`);
+  await type("plan:p1", "age_min", "");
+  said = ages();
+  check(/Ages 12 and under\./.test(said) && !/Ages 9/.test(said), `max only: "Ages 12 and under." ("${said}")`);
+  await type("plan:p1", "age_max", "");
+  said = ages();
+  check(!/Ages /.test(said), `neither: no age line at all ("${said}")`);
+
+  // The ONE page-side guard, same direction as the apply's refusal: an
+  // inverted band cannot be confirmed. Blank never blocks - blank means the
+  // plan is for everyone, and the empty-age confirms in section G prove it.
+  await type("plan:p1", "age_min", "14");
+  await type("plan:p1", "age_max", "9");
+  ALERTS = [];
+  await confirm("plan:p1");
+  check(ALERTS.length === 1 && /youngest age is above the oldest/.test(ALERTS[0]) && !dbCard("c-p1").confirmed_at,
+    `an inverted band cannot be confirmed ("${ALERTS[0]}")`);
+  ALERTS = [];
+  // Back to unanswered so the rest of the flow reads the fixture's own state.
+  await type("plan:p1", "age_min", null);
+  await type("plan:p1", "age_max", null);
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // E. COUNTING - which cards hold Send
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1521,9 +1584,22 @@ console.log("\n── G. the submit gate ──");
   check(dbAnswer("c-tax", "tax_registration_number").answered === "77-880 CA",
     "the tax registration number saves through the ordinary answer path");
 
+  // Step 12: the age band, typed through the real inputs. The stub's offer
+  // jsonb is checked after the staff apply in H4.
+  await type("plan:p1", "age_min", "9");
+  await type("plan:p1", "age_max", "12");
+  check(dbAnswer("c-p1", "age_min").answered === "9" && dbAnswer("c-p1", "age_max").answered === "12",
+    "the ages save through the ordinary answer path, as strings");
+
   // Confirm everything except one card, so the refusal has a number in it that
-  // both halves have to agree about.
-  for (const key of ["tax", "plan:p2", "plan:p3", "plan:p4", "codes", "plans"]) await confirm(key);
+  // both halves have to agree about. plan:p1 is re-confirmed here because the
+  // age edit above rightly RETIRED its earlier confirm - an approval does not
+  // survive the answer changing underneath it.
+  for (const key of ["tax", "plan:p1", "plan:p2", "plan:p3", "plan:p4", "codes", "plans"]) await confirm(key);
+  // Blank never blocks: p2 and p4 carry NO ages and confirmed anyway - being
+  // for everyone is an answer, not an omission.
+  check(!!dbCard("c-p2").confirmed_at && !!dbCard("c-p4").confirmed_at,
+    "a card with blank ages confirms - blank means the plan is for everyone");
   const left = page.remainingCount();
   check(left === 1, `one card is left unconfirmed (page says ${left})`);
   check(page.sendBlocked() === true, "the page holds the Send button off");
@@ -1831,6 +1907,27 @@ check(applied.status === 200 && applied.body.ok === true && applied.body.dry_run
     `review previews the registration number as the text he typed (${JSON.stringify(regItem && regItem.will_write)})`);
   check(DB.clients[0].tax_registration_number === "77-880 CA",
     `and apply landed it on clients.tax_registration_number (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
+
+  // Step 12: the age band. Review previews the STRING the translator will
+  // write - MUTATE=agesunknownfield takes away its PLAN_T home, and the whole
+  // apply must then refuse rather than land it on a guessed key.
+  const ageItem = (beforeApply.body.review.cards.find((c) => c.card_key === "plan:p1") || { items: [] })
+    .items.find((i) => i.target_field === "age_min");
+  check(!!ageItem && ageItem.will_write === "9",
+    `review previews age_min as the STRING "9" (${JSON.stringify(ageItem && ageItem.will_write)})`);
+  const offP1 = offerRow().data.pricing.pricing_offerings[OFFERING_IX.get("plan:p1")] || {};
+  check(offP1.age_min === "9" && offP1.age_max === "12" && typeof offP1.age_min === "string",
+    `and the ages he typed landed on the offering as strings (age_min ${JSON.stringify(offP1.age_min)}, age_max ${JSON.stringify(offP1.age_max)})`);
+  const offP3 = offerRow().data.pricing.pricing_offerings[OFFERING_IX.get("plan:p3")] || {};
+  check(offP3.age_min === "9" && offP3.age_max === "12",
+    `the Elementary prefill he confirmed landed too (age_min ${JSON.stringify(offP3.age_min)}, age_max ${JSON.stringify(offP3.age_max)})`);
+  const offP2 = offerRow().data.pricing.pricing_offerings[OFFERING_IX.get("plan:p2")] || {};
+  check(!("age_min" in offP2) && !("age_max" in offP2),
+    "while the blank-age plan grew NO age keys at all");
+  // Stored-for-later is said OUT LOUD: nothing consumes plan ages yet, and an
+  // apply that wrote them must say no routing changed. MUTATE=agenotegone.
+  check(typeof applied.body.age_note === "string" && /Nothing reads plan ages yet/.test(applied.body.age_note),
+    `the apply response says plan ages are stored for later and no routing changed ("${applied.body.age_note}")`);
 }
 {
   // THE OWNER'S HALF DID NOT REOPEN. Staff reviewing, approving and applying must
@@ -1965,8 +2062,10 @@ console.log("\n── I. a confirmed No to tax survives as a value the next work
   const apI = await staffApi({ action: "apply", workbook_id: "wb1" });
   check(apI.body.ok === true && JSON.stringify(DB.clients[0].tax_config) === JSON.stringify({ charges_tax: false }),
     `apply stores the No as { charges_tax: false }, never null (saw ${JSON.stringify(DB.clients[0].tax_config)})`);
-  check(apI.body.phase3.tax_state === "confirmed_no",
-    `and the rehearsal reports it (tax_state ${JSON.stringify(apI.body.phase3.tax_state)})`);
+  // Read defensively: under an API control that makes apply REFUSE, phase3 is
+  // absent, and a harness that crashes exits without its banner.
+  check((apI.body.phase3 || {}).tax_state === "confirmed_no",
+    `and the rehearsal reports it (tax_state ${JSON.stringify((apI.body.phase3 || {}).tax_state)})`);
 
   // THE DISTINGUISHABILITY THE PAGE COPY PROMISES ("Answering No is a real
   // answer, not a skip"): a future workbook minted over this academy carries
