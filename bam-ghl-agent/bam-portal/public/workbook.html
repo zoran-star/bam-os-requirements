@@ -1281,7 +1281,24 @@ function prevOpts(lid){
   if(cc)cc.textContent=p.type===0?' / '+CYCLES[p.cad].replace('every ',''):(p.type===1?` / ${p.sessions||'?'} sessions`:' once');
   const bits=[];
   if(taxedPlan(p))bits.push(`With ${esc(T.pct)}% ${esc(T.label)}, a parent pays ${money(base*(1+pctNum()/100))}.`);
-  if(p.type===0&&p.fee===1&&p.feeOnBase===0)bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee.`);
+  /* THE FEE LINE TELLS THE WHOLE TRUTH (D2). The old line said only "Plus a
+     one-time $40 joining fee." whenever the base charged - while San Jose's
+     real state is base charges, EVERY prepay waives, so the one sentence a
+     parent-facing preview showed omitted the fact that paying up front skips
+     the fee entirely. Computed from the per-rung values the model already
+     carries; a fee nobody charges prints nothing at all. Plain text into
+     textContent, so no esc() here - entities would render literally. */
+  if(p.type===0&&p.fee===1&&p.feeAmt>0){
+    const FR=liveRungs(p);
+    const charged=FR.filter(r=>r.fee===0),waivedR=FR.filter(r=>r.fee===1);
+    const lens=a=>a.map(r=>r.len).join(' and ');
+    if(p.feeOnBase===0&&FR.length&&charged.length===0)
+      bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee on the ${CYCLES[p.cad]} option. Pay up front and the joining fee is waived.`);
+    else if(p.feeOnBase===0)
+      bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee.`+(waivedR.length?` Waived on ${lens(waivedR)}.`:''));
+    else if(charged.length)
+      bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee when you pay up front for ${lens(charged)}.`);
+  }
   if(p.type===1&&p.expires)bits.push(`Expires after ${p.expires}.`);
   document.getElementById('pv_fee_'+lid).textContent=bits.join(' ');
   const back=R.filter(r=>r.after===0).length, ren=R.filter(r=>r.after===1).length;

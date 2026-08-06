@@ -166,7 +166,7 @@
  * Measured 2026-08-06, after the rehearsal-round-1 builds through D6 (withheld
  * fee report, Variant A codes guard, confirmed-no tax, registration number,
  * duration scope sentence, every-card-counts). Unmutated ALL PASS
- * (135 assertions; 137 after the D7 live-Stripe checks joined H5).
+ * (135 assertions; 137 after the D7 live-Stripe checks joined H5; 142 after the D2 fee-line section). feelineflat -> 4.
  * typingisapproving -> 17 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 5, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -277,6 +277,20 @@ const PAGE_CONTROLS = {
   firstbillalways: [[
     `      const scope=c.dur===2?'on every bill':c.dur===1?('on the first '+(c.durMonths||'?')+' months of bills'):'on the first bill';`,
     `      const scope='on the first bill';   // (control firstbillalways)`]],
+  // The fee line goes back to the flat sentence: "Plus a one-time $40 joining
+  // fee." whenever the base charges, with the per-rung waivers - San Jose's
+  // real state - omitted from the one fee sentence a parent would read.
+  feelineflat: [[
+    `    const FR=liveRungs(p);
+    const charged=FR.filter(r=>r.fee===0),waivedR=FR.filter(r=>r.fee===1);
+    const lens=a=>a.map(r=>r.len).join(' and ');
+    if(p.feeOnBase===0&&FR.length&&charged.length===0)
+      bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee on the \${CYCLES[p.cad]} option. Pay up front and the joining fee is waived.\`);
+    else if(p.feeOnBase===0)
+      bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee.\`+(waivedR.length?\` Waived on \${lens(waivedR)}.\`:''));
+    else if(charged.length)
+      bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee when you pay up front for \${lens(charged)}.\`);`,
+    `    if(p.feeOnBase===0)bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee.\`);   // (control feelineflat)`]],
   monthsmisparse: [[
     `  const t=String(s==null?'':s);
   const mo=t.match(/(\\d+(?:\\.\\d+)?)\\s*(?:mo|mos|month|months)\\b/i);
@@ -1205,6 +1219,49 @@ console.log("\n── D. \"3 Months (12 Weeks)\": what the page reads it as ─�
   const orphan = stored.filter((k) => !offered.includes(k));
   check(orphan.length === 0, `every applies_to key the API sent is one the page can offer back${orphan.length ? " - ORPHANED: " + orphan.join(", ") : ""}`);
   check(offered.includes("Academy 2x/week|signup_fee"), "and the joining fee is offered as its own scope");
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// D2. THE PARENT PREVIEW TELLS THE TRUTH ABOUT THE JOINING FEE
+// The old line said only "Plus a one-time $40 joining fee." whenever the base
+// charged, while San Jose's real state is base charges, EVERY prepay waives -
+// so the one fee sentence a parent would read omitted that paying up front
+// skips the fee. Driven through the real chips, read off the real preview.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── D2. the fee line carries the per-rung truth ──");
+{
+  const lid = lidOf("plan:p1");
+  const feeLine = () => { page.prevOpts(lid); return txt("pv_fee_" + lid); };
+
+  // San Jose's real state: base charges, every prepay waives.
+  await type("plan:p1", "signup_fee_on_base", page.CHARGE_W[0]);
+  let said = feeLine();
+  check(/joining fee on the every month option/.test(said) && /waived/i.test(said),
+    `base charges + every rung waives: the line names the charged option AND says prepay waives it ("${said}")`);
+  check(!/joining fee\.$/.test(said.trim()),
+    "and it is not the old bare sentence that stopped at the fee and omitted the waiver");
+
+  // One rung flips to Charge: the line names what still waives.
+  await type("plan:p1", "commitments.0.signup_fee_charge", page.CHARGE_W[0]);
+  said = feeLine();
+  check(/Waived on .*6 Months \(24 Weeks\)/.test(said),
+    `some rungs charge too: the waived lengths are named ("${said}")`);
+
+  // Base waives while a rung charges: the fee is a prepay-only fact.
+  await type("plan:p1", "signup_fee_on_base", page.CHARGE_W[1]);
+  said = feeLine();
+  check(/joining fee when you pay up front for 3 Months \(12 Weeks\)/.test(said),
+    `base waives + a rung charges: the line names the charged length ("${said}")`);
+
+  // Nothing charges: no line at all.
+  await type("plan:p1", "commitments.0.signup_fee_charge", page.CHARGE_W[1]);
+  said = feeLine();
+  check(!/joining fee/.test(said), `nothing charges: no fee line at all ("${said}")`);
+
+  // Put the probes back to unanswered so the rest of the flow reads the
+  // fixture's own state.
+  await type("plan:p1", "signup_fee_on_base", null);
+  await type("plan:p1", "commitments.0.signup_fee_charge", null);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
