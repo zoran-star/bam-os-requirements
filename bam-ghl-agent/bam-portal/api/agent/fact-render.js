@@ -383,7 +383,6 @@ export function renderPricing(data, prices, taxConfig) {
   }
 
   const out = [];
-  let sawNotes = false;
   let sawParts = false;
   // Owner-typed copy rarely ends in a full stop; the agent reads this as prose.
   const sentence = (s) => { const t = String(s || "").trim(); return t && !/[.!?]$/.test(t) ? `${t}.` : t; };
@@ -437,7 +436,23 @@ export function renderPricing(data, prices, taxConfig) {
       if (line) sawParts = true;
       out.push(`    ${label}: ${line || fromCents(t.amount_cents)}${after ? `, then ${after.charAt(0).toLowerCase() + after.slice(1)}` : ""}.`);
       if (c.whats_included) out.push(`      Includes: ${sentence(c.whats_included)}`);
-      if (c.discount_notes) { out.push(`      Note: ${sentence(c.discount_notes)}`); sawNotes = true; }
+      // `discount_notes` is DELIBERATELY NOT RENDERED (Zoran, 2026-08-06). It is a
+      // free-text box where an academy owner leaves a note FOR OUR TEAM; it was
+      // never customer-facing copy, and it is the one field here that routinely
+      // carries its OWN arithmetic - a per-month figure and a percentage the owner
+      // worked out by hand and never revisits when a price changes.
+      //
+      // Four of BAM San Jose's six notes are already wrong against its own offer:
+      // "about $240/mo, save 20%" on a 3-month Unlimited that is $249.67/mo and
+      // 16.8% off. Rendering it put a number the parent is NOT charged into the
+      // fact sheet the agent quotes from - the exact failure the pricing block
+      // above was rewritten to end, arriving one field later through free text
+      // instead of through a stale price column.
+      //
+      // The note stays in offers.data and stays visible to staff. It simply never
+      // becomes a fact. Nothing the agent says about money is typed by hand; the
+      // amounts come from offer_prices, which is what Stripe actually bills.
+      // Guarded by api/_discount-notes-never-quoted.test.mjs.
     }
   }
 
@@ -464,9 +479,14 @@ export function renderPricing(data, prices, taxConfig) {
     }
   }
 
-  // Owner-typed notes can carry their own arithmetic and go stale against the
-  // catalog. The charged amounts win, and the agent is told so explicitly.
-  if (sawNotes) out.push("", "If a note above disagrees with a plan amount, the plan amount is what gets charged.");
+  // The "if a note disagrees with a plan amount, the plan amount wins" line lived
+  // here and went WITH the notes. It existed only to defend against owner-typed
+  // arithmetic being wrong, so once the notes stopped being rendered it was
+  // defending against nothing - and a disclaimer with no wrong number left to
+  // correct is worse than absent: it tells the agent some number above may be
+  // untrustworthy, inviting hedging about amounts that are now all exact.
+  // The `sawNotes` flag that gated it went too, rather than being left behind as
+  // a condition that can never be true again.
 
   // Reconciliation failed on at least one row: the amount charged is still
   // exact, but its parts are unknown, so the agent is told to quote the total

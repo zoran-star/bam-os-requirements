@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Confirm your pricing</title>
+<meta name="robots" content="noindex,nofollow">
+<!-- Self-contained on purpose: no CDN, no web fonts, no external scripts. The owner
+     opens this from a link Zoran texts him, often on a phone on mobile data, with no
+     login and no second chance. Every byte it needs is in this file.
+     LIGHT THEMED on purpose (Zoran, 2026-08-01): both workbooks are one light product
+     family to the owner. Portal-dark applies only inside the portal itself. -->
+<style>
+  :root{
+    --bg:#faf9f6; --paper:#ffffff; --line:#e6e2d8; --line2:#f0ede5;
+    --ink:#22211e; --mut:#8a867c; --gold:#D4B65C; --gold-bg:#faf3df; --gold-ink:#8a6d1f;
+    --good:#3e8e5a; --good-bg:#eaf5ee; --bad:#b3543f; --bad-bg:#fbeee9; --warn:#a15f28; --warn-bg:#fdf3e8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:110px;-webkit-text-size-adjust:100%}
+  .wrap{max-width:860px;margin:0 auto;padding:0 16px}
+
+  header{padding:20px 0 6px}
+  .backlink{display:inline-block;font-size:12.5px;color:var(--mut);text-decoration:none;margin-bottom:8px}
+  .backlink:hover{color:var(--gold-ink)}
+  .brand{font-size:11px;letter-spacing:.15em;color:var(--gold-ink);text-transform:uppercase;font-weight:700}
+  h1{font-size:21px;font-weight:800;margin-top:2px}
+  .sub{color:var(--mut);font-size:13px;margin-top:5px;line-height:1.55}
+  .sub b{color:var(--ink)}
+
+  .prog{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin:14px 0 16px;position:sticky;top:0;z-index:5}
+  .prog .pline{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:7px;gap:10px}
+  .prog .pline b{font-weight:800}
+  .prog .left{color:var(--gold-ink);font-size:12px;font-weight:700;text-align:right}
+  .pbar{height:6px;background:var(--line2);border-radius:3px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:var(--gold);border-radius:3px;transition:width .25s}
+
+  .sechead{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:22px 0 8px;font-weight:700}
+
+  .bcard{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;border-left:4px solid var(--fam,var(--line))}
+  .bcard[data-fam="unl"]{--fam:#7b5ea7}
+  .bcard[data-fam="two"]{--fam:#2f7fa8}
+  .bcard[data-fam="one"]{--fam:#3e8e5a}
+  .bcard[data-fam="ele"]{--fam:#b3546f}
+  .bcard[data-fam="cus"]{--fam:var(--gold)}
+  .bcard[data-fam="new"]{--fam:#8a867c}
+  .bcard.arch{opacity:.55}
+  .famdot{width:9px;height:9px;border-radius:50%;background:var(--fam);display:inline-block;flex-shrink:0}
+  .bhead{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .btog{width:26px;height:26px;border:1px solid var(--gold);color:var(--gold-ink);background:none;border-radius:6px;cursor:pointer;flex-shrink:0}
+  .binfo{flex:1;min-width:0}
+  .btitle{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .rowsent{font-size:12.5px;color:var(--mut);margin-top:2px}
+  .rowsent b{color:var(--ink);font-weight:600}
+  .pill{font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;border:1px solid var(--line);color:var(--mut);background:none;white-space:nowrap}
+  .pill.confirmed{border-color:var(--good);color:var(--good);background:var(--good-bg)}
+  .pill.changed{border-color:var(--gold);color:var(--gold-ink);background:var(--gold-bg)}
+  .pill.live{border-color:var(--good);color:var(--good)}
+  .pill.attn{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
+  /* Scoped to the BUTTON. `arch` is also the state class on an archived plan card
+     and an archived rung, so the unscoped rule was repainting those as if they were
+     little buttons: a 5px/10px pad instead of the card's own, a stray border, and an
+     11px indent that knocked the archived rung out of line with the rungs above it. */
+  button.arch{border:1px solid var(--line);background:none;color:var(--mut);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0}
+  button.arch:hover{border-color:var(--warn);color:var(--warn)}
+  .bfields{margin-top:14px;border-top:1px solid var(--line2);padding-top:4px;display:none}
+  .bcard.open .bfields{display:block}
+
+  .q{font-size:14px;font-weight:700;color:var(--ink);margin:16px 0 7px}
+  .q .req{color:var(--gold-ink)}
+  .qhint{font-size:11.5px;color:var(--mut);margin:-4px 0 7px;line-height:1.5}
+  /* 340px truncated a plan name of ordinary length. There is room in the column, so
+     the field takes it: nothing on this page may show the owner a value with its
+     end cut off. */
+  .bb-input{width:100%;max-width:400px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:inherit;color:var(--ink)}
+  .bb-input:focus{border-color:var(--gold);outline:none}
+  /* 60px is two lines and a bit, so a real "what a parent gets" paragraph arrived
+     with a line sliced through the middle of its letters. `field-sizing:content`
+     grows the box to whatever he wrote where the browser supports it; the taller
+     floor is what everywhere else falls back to, and it is a whole number of lines
+     so a half-cut line is not the first thing he sees. */
+  textarea.bb-input{max-width:100%;min-height:102px;resize:vertical;field-sizing:content}
+  .chiprow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .bchip{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:7px 13px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+  .bchip.sel{background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700}
+  .bchip.sm{padding:4px 10px;font-size:11.5px;border-radius:20px}
+  .members{font-size:11.5px;color:var(--mut)}
+
+  .twocol{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+  .twocol .left{flex:1 1 340px;min-width:280px}
+  .twocol .right{flex:0 0 240px;position:sticky;top:80px}
+  .prevlabel{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+  .prevcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 3px 14px rgba(40,35,20,.07)}
+  .prevcard .pt{font-weight:800;font-size:15px}
+  .prevcard .pp{font-size:26px;font-weight:800;margin:6px 0 0;letter-spacing:-.02em}
+  .prevcard .pp small{font-size:13px;font-weight:500;color:var(--mut)}
+  .prevcard .pd{font-size:12.5px;color:var(--mut);margin:8px 0 12px;line-height:1.5}
+  .prevcard .popt{border-top:1px solid var(--line2);padding-top:9px}
+  .prevcard .oh{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+  .prevcard .opt{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;gap:10px}
+  .prevcard .opt .os{color:var(--good);font-weight:700;font-size:11.5px}
+  .prevcard .pfee{font-size:11.5px;color:var(--mut);margin-top:8px;line-height:1.45}
+  .prevcard .pafter{font-size:11.5px;color:var(--mut);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line2);line-height:1.45}
+  .prevcard .cta{margin-top:12px;background:var(--gold);color:#fff;border:none;border-radius:8px;padding:9px;width:100%;font-weight:800;font-size:13px}
+
+  .ladder{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:4px}
+
+  /* THE LADDER IS A TABLE HE READS DOWN, so its columns have to be declared rather
+     than inferred. It used to be a flex row held together by min-widths: every row
+     sized itself from its own content, so the "Month to month" baseline and the
+     rungs beneath it only lined up while every value happened to be short, and the
+     length field was a flat 88px - which is how "3 Months (12 Weeks)" reached the
+     owner's screen as "3 Months (1".
+     Every row is its own grid element, so the only way separate rows stay in step
+     is for the shared tracks to be fixed lengths and the flexible one to be fr:
+     both resolve to the same numbers on every row because every row is the same
+     width. Nothing here is sized to its own content.
+     The length gets a line of its own. That is also the only honest way to promise
+     it is never cut off, because it is free text and the owner can type anything. */
+  .rung{
+    --rw-price:78px; --rw-per:92px;
+    display:grid;
+    grid-template-columns:minmax(var(--rw-price),max-content) minmax(var(--rw-per),max-content) minmax(0,1fr) auto;
+    grid-template-areas:
+      "len   len len  tags"
+      "price per save edit";
+    align-items:center;gap:7px 12px;padding:10px 12px;background:var(--paper);
+  }
+  .rung.base{background:var(--bg)}
+  .rung .rprice{grid-area:price;font-weight:800;font-size:14px;white-space:nowrap}
+  .rung .rper{grid-area:per;color:var(--mut);font-size:12px;white-space:nowrap}
+  /* Two shapes arrive in the saving column: on the baseline row the badge is a
+     direct child, on a rung it sits inside the span recalc() rewrites. Place both. */
+  .rung>.rsave,.rung>.rsavecell{grid-area:save;justify-self:start;min-width:0}
+  .rung .rsave{display:inline-block;color:var(--good);font-weight:700;font-size:12px;background:var(--good-bg);border-radius:20px;padding:3px 10px}
+  .rung .rsave.none{color:var(--gold-ink);background:var(--gold-bg)}
+  /* "new" and the member count ride together so that a rung carrying both does not
+     push the edit controls onto a line of their own. */
+  .rtags{grid-area:tags;justify-self:end;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+  .rtags:empty{display:none}
+  .rnew{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-ink);background:var(--gold-bg);border:1px solid var(--gold);border-radius:20px;padding:2px 8px;white-space:nowrap}
+  .rung .redit{grid-area:edit;justify-self:end;display:flex;gap:8px;align-items:center}
+  .rung .redit input{border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;width:88px;background:var(--paper);color:var(--ink)}
+  .rung .redit input:focus{border-color:var(--gold);outline:none}
+  /* Full width of its own line. The -6px cancels the field's own padding so the
+     label's text and the money underneath it share one left edge. */
+  .rlenin{grid-area:len;width:100%;min-width:0;margin-left:-6px;font-weight:700;font-size:13px;border:1px solid transparent;border-radius:6px;padding:4px 6px;background:none;color:var(--ink);font-family:inherit}
+  /* Only the editable one reacts. The baseline label and an archived length are
+     spans that read as headings, and a hover border would offer an edit that is
+     not there. They keep the same transparent border so they sit on the same line. */
+  input.rlenin:hover{border-color:var(--line)}
+  input.rlenin:focus{border-color:var(--gold);background:var(--paper);outline:none}
+  .rarch{border:none;background:none;color:var(--mut);cursor:pointer;font-size:11px;text-decoration:underline dotted;white-space:nowrap}
+  .rarch:hover{color:var(--warn)}
+  .laddernote{font-size:11.5px;color:var(--mut);margin-top:8px}
+  .rungwrap{border-bottom:1px solid var(--line2)}
+  .rungwrap:last-child{border-bottom:none}
+  .rungwrap.arch{opacity:.5}
+  .rungwrap .rung{border-bottom:none;padding-bottom:6px}
+  /* An archived rung carries a sentence where the edit controls would be. */
+  .rungwrap.arch .rung{grid-template-areas:"len len len edit" "price note note note"}
+  .rung>.members{grid-area:note;justify-self:start}
+
+  /* THE BLOCK UNDER A RUNG IS A FORM, so it is laid out as one: one question per
+     row, every label in the same column, every control starting at the same x.
+     It used to be a flex pile in which each label pushed its own control to
+     wherever that label happened to end, and the two text inputs were narrow
+     enough to truncate their own placeholders ("same as m...").
+     `display:contents` on .mf lets a label and the control it owns join the shared
+     grid instead of forming a private flex box that only lines up with itself. */
+  .afterrow,.rmore{
+    --rlbl:176px;
+    display:grid;grid-template-columns:var(--rlbl) minmax(0,1fr);
+    gap:8px 12px;align-items:start;background:var(--paper);
+  }
+  .afterrow{padding:0 12px 10px}
+  .rmore{padding:2px 12px 12px}
+  .mf{display:contents}
+  .afterrow .al,.rmore .ml{font-size:11.5px;color:var(--mut);line-height:1.5;padding-top:6px}
+  .afterwarn{font-size:11px;font-weight:700;color:var(--warn);background:var(--warn-bg);border-radius:20px;padding:3px 10px}
+  .rin{width:100%;min-width:0;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;font-size:12.5px;background:var(--bg);color:var(--ink)}
+  .rin:focus{border-color:var(--gold);background:var(--paper);outline:none}
+  /* The ladder is the widest thing on the page, so the parent preview drops below
+     the form well before the phone breakpoint. Squeezed between the two, the rung
+     columns had nowhere to go but on top of each other. */
+  @media(max-width:760px){.twocol .right{flex:1 1 100%;position:static}}
+  .addbtn{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:6px}
+
+  .confirmbar{display:flex;align-items:center;gap:12px;margin-top:16px;border-top:1px solid var(--line2);padding-top:12px;flex-wrap:wrap}
+  .cbtn{border:2px solid var(--good);background:none;color:var(--good);border-radius:9px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0}
+  .bcard.confirmed .cbtn{background:var(--good);color:#fff}
+  .chint{font-size:11.5px;color:var(--mut);line-height:1.45;flex:1;min-width:180px}
+
+  .subrow{border:1px solid var(--line2);border-radius:9px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+  .subrow .sl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .subgrid{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .warnbox{background:var(--warn-bg);border:1px solid var(--warn);border-radius:8px;padding:9px 11px;font-size:11.5px;color:var(--warn);line-height:1.5;margin-top:8px}
+
+  .legacy{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:16px;background:var(--paper)}
+  .legacy .mt{font-size:12.5px;font-weight:700}
+  .legacy .ms{font-size:11.5px;color:var(--mut);margin-top:3px;line-height:1.6}
+
+  footer{position:fixed;left:0;right:0;bottom:0;background:rgba(250,249,246,.95);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:11px 16px;padding-bottom:calc(11px + env(safe-area-inset-bottom))}
+  .footin{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:14px}
+  .footin .cnt{color:var(--mut);font-size:13px;flex:1}
+  .footin .cnt b{color:var(--gold-ink)}
+  .send{background:var(--gold);color:#fff;border:none;border-radius:9px;padding:11px 24px;font-size:14px;font-weight:800;cursor:pointer}
+  /* Looks disabled, is not `disabled`. Chrome suppresses pointer events on a
+     disabled form control entirely: the click reaches neither the button NOR any
+     ancestor, so the "press it and the reason pulses" behaviour cannot fire. Held
+     off with aria-disabled instead, which is also what a screen reader wants. */
+  .send[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
+  .send:disabled{opacity:.45;cursor:not-allowed}
+  .sendwrap{display:flex;align-items:center;gap:12px}
+  .sendwhy{font-size:12.5px;color:#8a6d1f;background:#fdf6e3;border:1px solid #f0e0b0;
+           border-radius:8px;padding:6px 10px;line-height:1.3;display:none}
+  .sendwhy.pulse{animation:whypulse .5s ease}
+  @keyframes whypulse{0%{transform:scale(1)}35%{transform:scale(1.06);background:#fbeec4}100%{transform:scale(1)}}
+  .note{color:var(--mut);font-size:11px;margin:14px 0}
+
+  /* ── added for the real page, not in the mockup ─────────────────────────── */
+
+  /* Save status. The mockup could promise "changes save automatically" for free
+     because nothing was ever saved. Here the promise is only as good as the last
+     request, so its true state is always on screen. */
+  .savechip{font-size:11.5px;font-weight:700;border-radius:20px;padding:3px 10px;border:1px solid var(--line);color:var(--mut);white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+  .savechip.saving{border-color:var(--gold);color:var(--gold-ink);background:var(--gold-bg)}
+  .savechip.saved{border-color:var(--good);color:var(--good);background:var(--good-bg)}
+  .savechip.err{border-color:var(--bad);color:var(--bad);background:var(--bad-bg)}
+  .savechip button{border:1px solid currentColor;background:none;color:inherit;font:inherit;font-size:10.5px;font-weight:800;border-radius:20px;padding:1px 8px;cursor:pointer}
+  .prog .ptop{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px;flex-wrap:wrap}
+
+  /* Whole-page states. A blank white page is never one of them. */
+  .screen{max-width:520px;margin:60px auto;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:22px 20px;text-align:left}
+  .screen h2{font-size:17px;font-weight:800;margin-bottom:8px}
+  .screen p{font-size:13.5px;color:var(--mut);line-height:1.6;margin-bottom:10px}
+  .screen .rtry{background:var(--gold);color:#fff;border:none;border-radius:9px;padding:10px 20px;font-size:13.5px;font-weight:800;cursor:pointer}
+  .screen code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--bg);border:1px solid var(--line2);border-radius:5px;padding:1px 5px}
+
+  /* Submitted: read only, and it says why rather than just going dead. */
+  .donebar{background:var(--good-bg);border:1px solid var(--good);border-radius:10px;padding:12px 14px;margin:14px 0 4px}
+  .donebar .dt{font-size:14px;font-weight:800;color:var(--good)}
+  .donebar .dd{font-size:12.5px;color:var(--ink);margin-top:4px;line-height:1.55}
+  /* button.arch, not .arch: unscoped, this hid every ARCHIVED plan card and rung the
+     moment the workbook went read only, so the copy he sent back was missing the
+     plans he had just archived. */
+  body.ro .cbtn,body.ro .addbtn,body.ro button.arch,body.ro .rarch,body.ro .prevcard .cta,body.ro footer{display:none}
+  body.ro{padding-bottom:24px}
+  /* input.rlenin for the same reason the hover is: "Month to month" and an archived
+     length are spans, and greying them like a locked field paints a control that was
+     never there. */
+  body.ro .bb-input,body.ro .rin,body.ro input.rlenin,body.ro .redit input{background:var(--bg);color:var(--mut)}
+  body.ro .bchip{cursor:default;opacity:.75}
+  body.ro .bchip.sel{opacity:1}
+
+  /* ── additions: things the owner TELLS US ABOUT, never things he creates ──
+     Deliberately not styled like the plan cards around them. A plan card is
+     configuration he is correcting; an addition is a request a human will act
+     on. If the two looked alike he could reasonably believe he had just added a
+     plan to his own checkout. */
+  .addbox{border:1px dashed var(--gold);background:var(--gold-bg);border-radius:10px;padding:12px 14px;margin-top:8px}
+  .addbox .at{font-size:12.5px;font-weight:800;color:var(--gold-ink);margin-bottom:2px}
+  .addbox .ah{font-size:11.5px;color:var(--gold-ink);line-height:1.5;margin-bottom:9px;opacity:.9}
+  .addgrid{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .addgrid .bb-input{background:var(--paper)}
+  .addact{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .addgo{background:var(--gold);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:800;cursor:pointer}
+  .addcancel{border:none;background:none;color:var(--gold-ink);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline dotted}
+  .adderr{font-size:11.5px;font-weight:700;color:var(--bad);background:var(--bad-bg);border:1px solid var(--bad);border-radius:8px;padding:7px 10px;margin-top:8px;line-height:1.45}
+  .addlist{margin-top:8px}
+  .additem{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--gold);background:var(--paper);border-radius:9px;padding:9px 12px;margin-bottom:6px}
+  .additem .ai{flex:1;min-width:0}
+  .additem .an{font-weight:700;font-size:13px}
+  .additem .ad{font-size:11.5px;color:var(--mut);margin-top:2px;line-height:1.45}
+  .addtag{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--gold-ink);background:var(--gold-bg);border:1px solid var(--gold);border-radius:20px;padding:2px 8px;white-space:nowrap}
+  .addcap{font-size:11.5px;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn);border-radius:8px;padding:8px 11px;margin-top:8px;line-height:1.5}
+  .pill.req{border-color:var(--gold);color:var(--gold-ink);background:var(--gold-bg)}
+  body.ro .addbox,body.ro .addcap{display:none}
+
+  /* The footer is the only thing that must never be unreadable on a phone: it
+     holds the reason the Send button is off. */
+  @media(max-width:560px){
+    .footin{flex-wrap:wrap;gap:8px}
+    .footin .cnt{flex:1 1 100%;font-size:12px}
+    .sendwrap{flex:1 1 100%;flex-wrap:wrap;gap:8px}
+    .sendwhy{flex:1 1 100%;order:2}
+    .send{flex:1 1 100%;order:1}
+    .twocol .right{flex:1 1 100%;position:static}
+    h1{font-size:19px}
+    /* Same four columns of meaning, stacked. The edit controls take a line of their
+       own because $ + field + Archive is wider than a phone has left after the
+       money columns, and squeezing them in is what crushed the saving badge. */
+    .rung{
+      --rw-price:70px; --rw-per:84px;
+      grid-template-columns:minmax(var(--rw-price),max-content) minmax(var(--rw-per),max-content) minmax(0,1fr);
+      grid-template-areas:
+        "len   len  len"
+        "tags  tags tags"
+        "price per  save"
+        "edit  edit edit";
+    }
+    .rungwrap.arch .rung{grid-template-areas:"len len len" "price note note" "edit edit edit"}
+    .rtags,.rung .redit{justify-self:start}
+    /* One column: the label sits directly above the control it belongs to, and the
+       gap above each label is what keeps the pairs apart. */
+    .afterrow,.rmore{grid-template-columns:minmax(0,1fr);gap:4px 0}
+    .afterrow .al,.rmore .ml{padding-top:9px}
+  }
+</style>
+</head>
+<body>
+
+<!-- Everything below is painted by JS from the API. The static shell is only the
+     boot screen, so a failed load can never leave a blank page behind. -->
+<div id="boot" class="screen">
+  <h2>Opening your workbook</h2>
+  <p>One moment.</p>
+</div>
+
+<div id="app" style="display:none">
+<div class="wrap">
+
+<header>
+  <a class="backlink" id="backlink" href="#" style="display:none">&larr; Back to your member workbook</a>
+  <div class="brand" id="brandname"></div>
+  <h1>Confirm your pricing</h1>
+  <div class="sub">These are the plans your new system will sell, built from what your members actually pay today. Open each one, fix anything that's wrong, then press <b>This is right</b>. Old members keep their current rate no matter what, this only sets prices for new signups.</div>
+</header>
+
+<div id="donebar"></div>
+
+<div class="prog" id="progbar">
+  <div class="ptop">
+    <span style="font-size:13px"><b id="ncf">0</b> of <b id="ntot">0</b> confirmed</span>
+    <span class="savechip" id="savechip" style="display:none"></span>
+  </div>
+  <div class="pline" style="margin-bottom:7px"><span class="left" id="lefttxt" style="text-align:left"></span></div>
+  <div class="pbar"><i id="pfill" style="width:0%"></i></div>
+</div>
+
+<div class="sechead" id="sh_tax" style="display:none">First, one question about tax</div>
+<div id="taxcard"></div>
+
+<div class="sechead" id="sh_plans" style="display:none">Your plans</div>
+<div id="cards"></div>
+<div id="addplans"></div>
+
+<div class="sechead" id="sh_extras" style="display:none">Everything else</div>
+<div id="extras"></div>
+
+<div id="legacy"></div>
+
+<div class="note" id="autonote">Changes save automatically. Nothing goes live until BAM confirms everything with you.</div>
+</div>
+
+<footer id="foot">
+  <div class="footin">
+    <div class="cnt"><b id="ncf2">0</b>/<span id="ntot2">0</span> confirmed &middot; <b id="nflag">0</b> <span id="nflagword">changes</span> flagged</div>
+    <!-- A disabled button with no stated reason is the dead-control failure in quieter form:
+         the owner sees a button that does nothing and cannot tell why. The reason is always
+         on screen, on hover, and pulses if he presses the dead button. -->
+    <div class="sendwrap" id="sendwrap" onclick="nudgeSend()">
+      <div class="sendwhy" id="sendwhy"></div>
+      <button class="send" id="sendbtn" aria-disabled="true" onclick="doSubmit()">Send back to BAM</button>
+    </div>
+  </div>
+</footer>
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════════
+   WHAT THIS FILE IS
+   The real, hosted version of docs/plans/sj-price-workbook-mockup-v1.html,
+   which the product owner approved. Look, copy, card anatomy, ladder maths,
+   tax card, confirm pills, progress bar and footer are carried over unchanged.
+   What is new is that it is no longer a page about one academy with its data
+   typed into it: EVERY word of content now arrives from GET /api/workbook, so
+   the same file serves any academy. Nothing is seeded here.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ─────────── vocabulary ───────────
+   Two columns on purpose. UI[] is what the owner reads and was approved; WIRE[]
+   is what the offer schema stores (docs/plans/sj-price-match-log.md, FIELD MAP
+   sections 1 and 2). Chip positions are a rendering detail and must never leave
+   this page: an answer that reads `2` tells a staff reviewer nothing, and would
+   silently mean something different the day a chip is reordered. */
+const TYPES =["Membership","Package","Single session","Something else"];
+const TYPES_W=["Membership","Package","Single Session","Other"];
+const CYCLES =["every week","every 2 weeks","every month","every 4 weeks","every 3 months","every year","something else"];
+const CYCLES_W=["Weekly","Biweekly","Monthly","Every 4 weeks","Quarterly","Annually","Other"];
+const AFTER  =["Goes back to monthly","Renews for the same length","Just ends","Something else"];
+const AFTER_W=["Goes back to monthly","Renews same length","Ends","Other"];
+const YESNO_W=["Yes","No"];                 // taxable, signup_fee_taxable
+const CHARGE_W=["Charge","Waive"];          // signup_fee_on_base, rung signup_fee_charge
+const DUR    =["First payment only","A set number of months","Every payment"]; // already exact
+const KIND   =["Percent off","Dollar off"];  // already exact
+
+/* ─────────── page-wide state ─────────── */
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+let WB   = null;   // {id,kind,status,academy_name,submitted_at,...}
+let CARDS= [];     // server cards, each given a short local id
+let MODEL= {};     // local id -> derived view object for rendering
+let RO   = false;  // read only (submitted, or a load that must not be edited)
+let newPlanN = 0;
+let newCardSeq = 0;
+
+const byLocal = {};      // local id -> card
+function card(id){return byLocal[id]}
+function plan(id){return MODEL[id]}
+
+/* ─────────── helpers carried from the mockup ─────────── */
+function money(n){return '$'+Math.round(n||0).toLocaleString()}
+/* How many MONTHS a commitment length means. Everything the owner reads about a
+   prepay option is divided by this: the per-month figure and the saving.
+
+   It used to take the first number in the string and then convert if the string
+   mentioned weeks ANYWHERE. Real offer data says "3 Months (12 Weeks)" - both
+   units in one label - so it took the 3 and then divided it by 4.345, giving 1.
+   The page then told the owner his 3-month prepay cost $599 a MONTH and saved
+   him nothing, when it is $200 a month and saves $151. A parsing miss became a
+   wrong money claim on the page whose only job is checking the money.
+
+   So the UNIT is matched together with its own number, and months win when a
+   label carries both, because that is the unit the label leads with. */
+function monthsOf(s){
+  const t=String(s==null?'':s);
+  const mo=t.match(/(\d+(?:\.\d+)?)\s*(?:mo|mos|month|months)\b/i);
+  if(mo)return Math.max(1,Math.round(+mo[1]));
+  const yr=t.match(/(\d+(?:\.\d+)?)\s*(?:yr|yrs|year|years)\b/i);
+  if(yr)return Math.max(1,Math.round(+yr[1]*12));
+  const wk=t.match(/(\d+(?:\.\d+)?)\s*(?:wk|wks|week|weeks)\b/i);
+  if(wk)return Math.max(1,Math.round(+wk[1]/4.345));
+  const any=t.match(/\d+(?:\.\d+)?/);
+  return any?Math.max(1,Math.round(+any[0])):1;
+}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function liveRungs(p){return (p.rungs||[]).filter(r=>!r.archived)}
+function pctNum(){return parseFloat(TAX().pct)||0}
+function taxedPlan(p){return TAX().on===1&&p.tax===0&&pctNum()>0}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE ANSWER LAYER
+   One card carries a flat list of answers. `current_value` is what the portal
+   stores today, `proposed` is what we showed him, `answered` is what he typed.
+   Reading order is answered, then proposed, then current_value: a blank he
+   deliberately typed must beat our prefill, which is why this tests for
+   null/undefined and not for falsiness. An empty string is an answer.
+   ══════════════════════════════════════════════════════════════════════════ */
+function has(v){return v!==null&&v!==undefined}
+
+/* ANSWER IN THE SHAPE THE STORE ALREADY USES.
+   The API compares primitives with === and no coercion, on purpose: on a money
+   surface a difference nobody can see is exactly the difference staff must be
+   shown. But offer_prices holds prices as STRINGS ("300"), while a number input
+   yields a NUMBER, so the page was turning "he opened the box and typed the same
+   figure back" into a real recorded change. Verified against the live database:
+   retyping 300 over a stored "300" produced state 'changed', "1 change flagged",
+   and a was/now pair reading 300 -> 300 for a human to adjudicate.
+   Fixing it by loosening the comparison would blind the API to genuine
+   differences. Fixing it here keeps === strict and simply stops answering in a
+   different type than we were asked in. Only string/number is bridged: objects,
+   arrays, booleans and nulls pass through untouched, so a real "" or 0 still
+   reads as the deliberate clear it is. */
+function sameShape(a,v){
+  if(v===null||v===undefined)return v;
+  if(typeof v!=='string'&&typeof v!=='number')return v;
+  const ref=has(a.current_value)?a.current_value:a.proposed;
+  if(typeof ref==='string'&&typeof v==='number')return String(v);
+  if(typeof ref==='number'&&typeof v==='string'&&v.trim()!==''&&isFinite(+v))return +v;
+  /* CASE, for the same reason as type. The offer stores vocabulary lowercase
+     ("waive"); this page's chip lists are capitalised ("Waive"); idxOf matches
+     case-insensitively so the right chip is already lit. Pressing the chip that
+     is ALREADY SELECTED then wrote "Waive" over "waive", and the API compares
+     with === - so a click that changed nothing was recorded as a money change
+     for staff to adjudicate, and on an approved card it retired the confirm.
+     Found by scripts/verify-workbook-contract.mjs, which is the only thing that
+     can see it: each half is self-consistent and they disagree with each other.
+     Choosing a DIFFERENT chip still differs after this and is still recorded. */
+  if(typeof ref==='string'&&typeof v==='string'&&v!==ref&&v.trim().toLowerCase()===ref.trim().toLowerCase())return ref;
+  return v;
+}
+function ansOf(c,field){return (c.answers||[]).find(a=>a.target_field===field)}
+function val(c,field,dflt){
+  const a=ansOf(c,field); if(!a)return dflt;
+  if(has(a.answered))return a.answered;
+  if(has(a.proposed))return a.proposed;
+  if(has(a.current_value))return a.current_value;
+  return dflt;
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   ADDITIONS
+   A REQUEST, never a write. The owner is telling us about something we do not
+   sell yet; a person at BAM creates it by hand after reading it. Nothing on this
+   path may ever read as configuration he has changed.
+   Shape mirrors api/workbook.js: an addition is an ANSWER whose target_field
+   starts with "add:", with current_value and proposed both null, so `answered`
+   is the whole of it. Caps and the validation sentences below are COPIED from
+   that file rather than reinvented, because two different limits or two
+   different refusal sentences is the same bug as two different schemas.
+   ══════════════════════════════════════════════════════════════════════════ */
+const ADD_PREFIX='add:';
+const MAX_ADD_PER_CARD=6, MAX_ADD_CHARS=2000;
+/* target_field is EXACTLY "add:plan" / "add:length" / "add:code" with no suffix,
+   so several additions on one card share a target_field. Identity is the
+   SERVER-GENERATED id and nothing else. Every lookup on this path is by id: the
+   by-field lookup the rest of the page uses would silently collapse six requests
+   into one. */
+const isAdditionField=f=>typeof f==='string'&&f.startsWith(ADD_PREFIX);
+/* LIVE additions: ones he still wants. Drives what is listed and what counts
+   toward the cap. */
+function additionsOf(c){return (c.answers||[]).filter(a=>isAdditionField(a.target_field)&&has(a.answered))}
+function hasAdditions(c){return additionsOf(c).length>0}
+/* ANY add: field, including one he added and then removed. The API pins a card
+   to 'changed' on the FIELD NAME, not on the value, so once an add: row has
+   reached the server that card can never report 'confirmed' again. Without this
+   distinction a removed addition leaves the card asking "press confirm" forever,
+   however many times he presses it. */
+function hasAdditionFields(c){return (c.answers||[]).some(a=>isAdditionField(a.target_field))}
+/* What a card may take is the SERVER'S answer, never a rule the page reimplements.
+   can_add fails closed, so a card the API says nothing about grows nothing, and
+   the tax card comes back with an empty list. A second copy of this rule living
+   here is exactly how the two halves drift apart. */
+function canAdd(c,kind){return Array.isArray(c.can_add)&&c.can_add.includes(kind)}
+function addLeft(c){return has(c.add_left)?c.add_left:null}
+/* The API's own sentences, verbatim. It refuses in these words, so the page must
+   ask in the same ones or the owner gets told two different things. */
+function addProblem(kind,v){
+  const s=x=>typeof x==='string'?x.trim():'';
+  const n=x=>typeof x==='number'&&isFinite(x)?x:null;
+  if(kind==='plan')return !s(v.title)?'Please give the plan a name before adding it.'
+    :(n(v.price)===null||n(v.price)<0)?'Please add a price for this plan before adding it.':'';
+  if(kind==='length')return (n(v.months)===null||!Number.isInteger(v.months)||v.months<1||v.months>120)
+    ?'Please say how many months this length runs for.'
+    :(n(v.price)===null||n(v.price)<0)?'Please add a price for this length before adding it.':'';
+  if(kind==='code')return !s(v.code)?'Please type the discount code before adding it.':'';
+  return 'We cannot add that here.';
+}
+/* Why he cannot add another, in the API's own words, BEFORE he types anything.
+   `add_left` folds both caps into one number, so it drops on every card as the
+   workbook fills up. Which cap he actually hit is knowable from the count on
+   this card, and saying the right one matters: "you can add 6 here" when the
+   real limit he hit was the whole workbook would send him to another card to
+   try again and fail again. */
+function capReason(c){
+  if(addLeft(c)!==0)return '';
+  return additionsOf(c).length>=MAX_ADD_PER_CARD
+    ? 'You can add up to 6 new items here. Please tell us the rest directly and we will add them for you.'
+    : 'You can add up to 20 new items in this workbook. Please tell us the rest directly and we will add them for you.';
+}
+/* Said one step early, while he can still act on it. */
+function capWarn(c){
+  const n=addLeft(c);
+  return n===1?'You can add 1 more item here.':'';
+}
+
+/* An answer counts as a flagged change when what came back differs from what we
+   showed. The mockup counted keystrokes, so its footer would have read "47
+   changes flagged" after typing one plan name. Same sentence, honest number. */
+function isChanged(a){
+  if(!has(a.answered))return false;
+  const shown=has(a.proposed)?a.proposed:a.current_value;
+  return JSON.stringify(a.answered)!==JSON.stringify(has(shown)?shown:null);
+}
+/* Vocabulary lookup, CASE-INSENSITIVE on purpose. The offer stores these values
+   lowercase ("waive", "charge") while this page's lists are capitalised, and an
+   exact match silently fell through to the DEFAULT - which on the sign-up fee is
+   "Charge". Every prepay rung then told the owner we take his joining fee, the
+   opposite of what his own Stripe does. A money field must not fail toward
+   charging, and a vocabulary mismatch is not the owner's answer. */
+function idxOf(list,v,dflt){
+  if(v==null)return dflt;
+  const t=String(v).trim().toLowerCase();
+  const i=list.findIndex(x=>String(x).trim().toLowerCase()===t);
+  return i<0?dflt:i;
+}
+
+/* Writes an answer and schedules the save. Every write goes through here, so
+   there is exactly one place where "the owner changed something" is defined. */
+function setA(id,field,value,opts){
+  if(RO)return;
+  const c=card(id);
+  let a=ansOf(c,field);
+  if(!a){
+    // A field with no row yet: a rung or code he just added. Sent with a null id
+    // so the API can upsert on target_field.
+    a={id:null,target_kind:c.target_kind||'price_row',target_table:c.target_table||null,
+       target_id:c.target_id||null,target_field:field,current_value:null,proposed:null,answered:null};
+    (c.answers=c.answers||[]).push(a);
+  }
+  a.answered=sameShape(a,value);
+  c.dirty=c.dirty||new Set(); c.dirty.add(field);
+  // Local guess at the state, using the SAME rule the API applies, so the pill does
+  // not lie for the 800ms until the server answers and does not flicker when it
+  // does. An autosave that merely echoes what we proposed is NOT an act: if it
+  // were, a card the owner only scrolled past would promote itself and end up
+  // serializing like one he approved, which is the whole thing the three states
+  // exist to prevent. Only a value that differs counts.
+  if(!(opts&&opts.keepConfirmed)){
+    // An addition is by definition a change and no confirm can talk it back.
+    // A card reading "confirmed by you" while it holds a request for a plan we
+    // do not sell would be the same lie as a rename recorded as untouched.
+    const acted=hasAdditionFields(c)||(c.answers||[]).some(isChanged);
+    if(acted)c.state='changed';
+    else if(c.state==='changed')c.state='untouched';
+  }
+  rebuild(id);
+  paintPill(id);
+  updProg();
+  queueSave(id);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ANSWERS  ->  the shape the approved page renders from
+   ══════════════════════════════════════════════════════════════════════════ */
+function rungIndices(c){
+  const s=new Set();
+  (c.answers||[]).forEach(a=>{const m=/^commitments\.(\d+)\./.exec(a.target_field||'');if(m)s.add(+m[1])});
+  return [...s].sort((x,y)=>x-y);
+}
+function codeIndices(c){
+  const s=new Set();
+  (c.answers||[]).forEach(a=>{const m=/^codes\.(\d+)\./.exec(a.target_field||'');if(m)s.add(+m[1])});
+  return [...s].sort((x,y)=>x-y);
+}
+function rebuild(id){
+  const c=card(id);
+  if(c.type==='plan')MODEL[id]=planModel(c);
+  else if(c.type==='tax')MODEL[id]=taxModel(c);
+  else if(c.type==='codes')MODEL[id]=codeModel(c);
+  else MODEL[id]={};
+}
+function planModel(c){
+  const meta=c.meta||{};
+  const feeRaw=val(c,'signup_fee',null);
+  const hasFee=has(feeRaw)&&feeRaw!==''&&+feeRaw>0;
+  const p={
+    id:c.lid, fam:meta.fam||'new',
+    title:val(c,'title',c.title||''),
+    type:idxOf(TYPES_W,val(c,'type','Membership'),0),
+    desc:val(c,'whats_included',''),
+    price:+val(c,'price',0)||0,
+    cad:idxOf(CYCLES_W,val(c,'billing_cycle','Monthly'),3),
+    cadOther:val(c,'billing_cycle_other',''),
+    // Precedence rule, straight from the wizard: with an academy tax template
+    // set, a row nobody answered counts as taxed. Exempt is the deliberate
+    // exception, so the default index is 0 (Yes) whenever no answer exists.
+    tax:idxOf(YESNO_W,val(c,'taxable','Yes'),0),
+    fee:hasFee?1:0,
+    feeAmt:hasFee?+feeRaw:(has(meta.default_signup_fee)?+meta.default_signup_fee:0),
+    feeTax:idxOf(YESNO_W,val(c,'signup_fee_taxable','Yes'),0),
+    feeOnBase:idxOf(CHARGE_W,val(c,'signup_fee_on_base','Charge'),0),
+    sessions:val(c,'sessions_included',''),
+    expires:val(c,'expires_after',''),
+    otherDesc:val(c,'other_description',''),
+    notes:val(c,'description',''),
+    archived:val(c,'archived',false)?1:0,
+    live:meta.live, members:meta.members||'', hint:meta.hint||'',
+    rungs:[]
+  };
+  const rmeta=meta.commitments||[];
+  rungIndices(c).forEach(i=>{
+    const g=(f,d)=>val(c,'commitments.'+i+'.'+f,d);
+    const lenA=ansOf(c,'commitments.'+i+'.length');
+    p.rungs.push({
+      i, len:g('length',''), price:+g('price',0)||0,
+      after:idxOf(AFTER_W,g('after','Renews same length'),1),
+      other:g('after_other',''), gets:g('whats_included',''),
+      taxable:idxOf(YESNO_W,g('taxable','Yes'),0),
+      fee:idxOf(CHARGE_W,g('signup_fee_charge','Charge'),0),
+      notes:g('discount_notes',''), archived:g('archived',false)?1:0,
+      m:(rmeta[i]&&rmeta[i].members)||'',
+      // "new" means BAM proposed it and the academy's Stripe has never sold it.
+      // Derivable without extra plumbing: nothing is stored today.
+      fresh:(rmeta[i]&&rmeta[i].fresh)||(lenA?!has(lenA.current_value):false)
+    });
+  });
+  return p;
+}
+function taxModel(c){
+  const t=val(c,'tax_config',null)||{};
+  return {on:t.charges_tax===true?1:(t.charges_tax===false?0:null),
+          pct:has(t.pct)?String(t.pct):'', label:t.label||'Sales tax'};
+}
+function codeModel(c){
+  const out=[];
+  codeIndices(c).forEach(i=>{
+    const g=(f,d)=>val(c,'codes.'+i+'.'+f,d);
+    out.push({i,code:g('code',''),kind:idxOf(KIND,g('kind','Percent off'),0),value:+g('value',0)||0,
+      dur:idxOf(DUR,g('duration','First payment only'),0),durMonths:+g('duration_months',0)||0,
+      applies:g('applies_to',[])||[],expires:g('expires_at',''),max:+g('max_redemptions',0)||0,
+      once:idxOf(YESNO_W,g('once_per_customer','Yes'),0)});
+  });
+  return out;
+}
+function TAX(){const c=CARDS.find(x=>x.type==='tax');return c?MODEL[c.lid]:{on:null,pct:'',label:'Sales tax'}}
+function taxCardId(){const c=CARDS.find(x=>x.type==='tax');return c?c.lid:null}
+function planCards(){return CARDS.filter(c=>c.type==='plan')}
+
+/* Every price on the page, for "what does this code apply to?". Keys, not
+   labels: FIELD MAP section 3. */
+function priceKeys(){
+  const out=[];
+  planCards().forEach(c=>{
+    const p=MODEL[c.lid];
+    if(!p||p.archived||p.type!==0||!p.title||!(p.price>0))return;
+    out.push(p.title+'|monthly');
+    liveRungs(p).forEach(r=>{const mo=monthsOf(r.len);if(mo===3)out.push(p.title+'|3_months');else if(mo===6)out.push(p.title+'|6_months')});
+    if(p.fee===1)out.push(p.title+'|signup_fee');
+  });
+  return [...new Set(out)];
+}
+function keyLabel(k){
+  const b=String(k).split('|');
+  return b[1]==='monthly'?b[0]+' · monthly':b[1]==='signup_fee'?b[0]+' · joining fee':b[0]+' · '+String(b[1]).replace('_',' ');
+}
+function anyJoiningFee(){return planCards().some(c=>MODEL[c.lid]&&!MODEL[c.lid].archived&&MODEL[c.lid].fee===1)}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NETWORK
+   ══════════════════════════════════════════════════════════════════════════ */
+async function api(body){
+  let res;
+  try{
+    res=await fetch('/api/workbook',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.assign({token:TOKEN},body))});
+  }catch(e){ throw new Error('offline'); }
+  let json=null;
+  try{ json=await res.json(); }catch(e){ json=null; }
+  if(!json)throw new Error('The server sent something we could not read. Status '+res.status+'.');
+  if(json.ok===false&&body.action!=='submit')throw new Error(json.error||('Request failed, status '+res.status));
+  if(!res.ok&&json.ok!==false)throw new Error('Request failed, status '+res.status);
+  return json;
+}
+
+/* ─────────── save status: the promise on the page is only as good as this ── */
+let SAVE={state:'idle',msg:'',at:0};
+function paintSave(){
+  const el=document.getElementById('savechip'); if(!el)return;
+  if(RO||SAVE.state==='idle'){el.style.display='none';return}
+  el.style.display='inline-flex';
+  el.className='savechip '+(SAVE.state==='error'?'err':SAVE.state);
+  if(SAVE.state==='saving')el.textContent='Saving...';
+  else if(SAVE.state==='saved')el.textContent='Saved';
+  else el.innerHTML='<span>Not saved. '+esc(SAVE.msg)+'</span><button onclick="retrySaves()">Try again</button>';
+}
+function setSave(state,msg){SAVE={state,msg:msg||'',at:Date.now()};paintSave();
+  if(state==='saved')setTimeout(()=>{if(SAVE.state==='saved'&&Date.now()-SAVE.at>2400){SAVE.state='idle';paintSave()}},2600);
+}
+
+const timers={};
+function queueSave(lid){clearTimeout(timers[lid]);timers[lid]=setTimeout(()=>flush(lid),800);setSave('saving')}
+let inflight=0;
+async function flush(lid){
+  const c=card(lid); if(!c||!c.dirty||!c.dirty.size)return true;
+  const fields=[...c.dirty];
+  const payload=fields.map(f=>{const a=ansOf(c,f);return {id:a?a.id:null,target_field:f,answered:a?a.answered:null}});
+  // Whether this batch tries to CREATE something (a rung, a code, a whole plan the
+  // owner added) rather than answer a question we asked. The API does not accept
+  // creates yet, so a failure here has a known cause worth saying plainly instead
+  // of echoing a validation string at an academy owner.
+  const creating=payload.some(p=>!p.id);
+  inflight++; setSave('saving');
+  try{
+    const r=await api({action:'save',card_key:c.card_key,answers:payload});
+    // Only clear the fields we actually sent. Anything typed while the request
+    // was in the air stays dirty and saves on the next pass, so a fast typist
+    // cannot lose a keystroke to a race.
+    fields.forEach(f=>c.dirty.delete(f));
+    applyCard(c,r);
+    inflight--;
+    if(inflight===0)setSave(anyDirty()?'saving':'saved');
+    paintPill(lid); updProg();
+    return true;
+  }catch(e){
+    inflight--;
+    setSave('error', e.message==='offline'
+      ? 'You look offline. Your typing is still on screen, nothing is lost.'
+      : creating
+        ? 'This page cannot add brand new items yet, so the one you just added is not stored. Everything you changed on the questions we asked you is saved. Tell BAM what you wanted to add and we will add it for you.'
+        : e.message);
+    return false;
+  }
+}
+function anyDirty(){return CARDS.some(c=>c.dirty&&c.dirty.size)}
+async function flushAll(){
+  Object.values(timers).forEach(t=>clearTimeout(t));
+  let ok=true;
+  for(const c of CARDS){if(c.dirty&&c.dirty.size){if(!await flush(c.lid))ok=false}}
+  return ok;
+}
+function retrySaves(){flushAll()}
+
+/* Closing the tab mid-debounce must not eat the last edit. */
+addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&anyDirty())flushAll()});
+addEventListener('beforeunload',e=>{if(!RO&&anyDirty()){e.preventDefault();e.returnValue=''}});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CONFIRM / PROGRESS
+   State is the server's. Nothing here paints a card confirmed because a click
+   happened; it paints what came back.
+   ══════════════════════════════════════════════════════════════════════════ */
+function pillOf(lid){
+  const c=card(lid); const s=c?c.state:'untouched';
+  // A card holding a request never reads plain "Confirmed by you". Once he HAS
+  // pressed confirm it must not read "press confirm" either, or the card asks
+  // forever for something he already did. It says both true things instead.
+  if(c&&hasAdditionFields(c)){
+    const n=additionsOf(c).length;
+    const ask=n===1?'1 to add':n+' to add';
+    // A card holding a request NEVER reads "Confirmed by you": it is not settled,
+    // a human still has to build the thing. But once he HAS pressed confirm it
+    // must not keep saying "press confirm" either, because telling him to redo
+    // something he already did is its own lie. So it says both true things.
+    if(!n)return c.confirmed_at
+      ? '<span class="pill confirmed">Confirmed by you</span>'
+      : '<span class="pill changed">Changed, press confirm</span>';
+    return c.confirmed_at
+      ? '<span class="pill req">Confirmed, '+ask+' and we will set it up</span>'
+      : '<span class="pill changed">Changed, press confirm</span> <span class="pill req">'+ask+'</span>';
+  }
+  // KEYED ON confirmed_at, THE SAME FIELD isReady USES. `state` answers a
+  // different question: whether his answer differs from what we store. Keying
+  // the pill on state made a card he HAD confirmed keep reading "Changed, press
+  // confirm" whenever his answer legitimately differs from the portal - which is
+  // most of them, since three of four plans are renames. Seen on the live page:
+  // Elementary confirmed, counter moved 7 to 6, pill still demanding a confirm
+  // he had just given. Two fields, two questions, one answer each.
+  if(c&&c.confirmed_at)return '<span class="pill confirmed">Confirmed by you</span>';
+  if(s==='changed')return '<span class="pill changed">Changed, press confirm</span>';
+  return '<span class="pill">Not reviewed yet</span>';
+}
+/* A card is done when he has deliberately confirmed it. For a card holding an
+   addition the SERVER pins state at 'changed' forever, so 'confirmed' can never
+   arrive and confirmed_at is the only honest record that he pressed the button.
+   Every card still requires the deliberate act; this only reads it from the
+   right field. */
+/* READY MEANS HE PRESSED CONFIRM. Not "the answer looks different", which is
+   what `state` describes. This page and the server each had their own rule and
+   they disagreed: the server accepted state 'changed' (so a card he typed into
+   and never confirmed sailed through submit), while this page accepted only
+   'confirmed' (so a card he DID confirm that differs from what we store still
+   read as outstanding). Same field, two readings, both wrong in opposite
+   directions - found by running the real page against the real database.
+   There is now one rule, it is the deliberate act, and confirmed_at is its only
+   record. `state` stays what it always was: whether his answer differs. */
+function isReady(c){return !!c.confirmed_at}
+function paintPill(lid){
+  const el=document.getElementById('pill_'+lid); if(el)el.innerHTML=pillOf(lid);
+  const box=document.getElementById('card_'+lid);
+  if(box)box.classList.toggle('confirmed',card(lid).state==='confirmed');
+}
+async function confirmCard(lid){
+  if(RO)return;
+  const c=card(lid);
+  const p=MODEL[lid];
+  if(c.type==='plan'&&p&&!p.archived){
+    if(!String(p.title).trim()){alert('Give this plan a name first.');return}
+    if(p.type===null||p.type===undefined){alert('Pick what kind of pricing this is first.');return}
+    if(!(p.price>0)){alert('Set a price first.');return}
+  }
+  if(c.type==='tax'){
+    const t=MODEL[lid];
+    if(t.on===null){alert('Pick Yes or No first.');return}
+    if(t.on===1&&!(parseFloat(t.pct)>0)){alert('Type the tax rate first.');return}
+  }
+  // Confirm after the edits it is confirming, never before, or the server would
+  // record an approval of a value it has not been told about yet.
+  if(!await flushAll()){alert('Your last change has not saved yet, so we did not confirm this card. Check the message at the top of the page and try again.');return}
+  try{
+    const r=await api({action:'confirm',card_key:c.card_key});
+    // No optimistic fallback: if the response carries no card, the page has not
+    // been told this was confirmed and must not draw it as though it had.
+    if(r.card)applyCard(c,r);
+    else{c.state='confirmed';c.confirmed_at=new Date().toISOString()}
+    paintPill(lid); updProg();
+  }catch(e){
+    alert('We could not save that confirmation. '+(e.message==='offline'?'You look offline. Try again when you have signal.':e.message));
+  }
+}
+/* A card the SERVER does not count cannot be counted here either, or the owner
+   reads "Confirm the remaining 8 cards" while the server will happily accept at
+   7 - two different numbers about the same workbook, one of them on his screen.
+   The gate has ONE definition and it lives on the server; `counts` is that
+   definition arriving over the wire. Only a card carrying nothing to review is
+   ever excluded, which is why an empty add-a-plan card does not hold Send.
+   The `!==false` shape is deliberate: an older API that sends no `counts` key at
+   all must keep counting every card, never silently stop counting them. */
+function counted(c){
+  // A CARD HOLDING A REQUEST ALWAYS COUNTS, whatever `counts` says. Verified on
+  // the live handler 2026-08-06: adding "Summer 1x/week" to the empty add-a-plan
+  // card returned counts:false on the ADD response while the very next GET
+  // returned counts:true. The page therefore stayed at "7 cards, 5 still to
+  // review" while the server meant 8 and 6, and Send would have gone with an
+  // unreviewed request for a plan we do not sell riding inside it.
+  // Reported rather than worked around, but the guard stays regardless: it can
+  // only ever ask for MORE review, and it does not depend on the API getting the
+  // ordering right on every future action.
+  if(hasAdditionFields(c))return true;
+  return c.counts!==false;
+}
+function countedCards(){return CARDS.filter(counted)}
+function remainingCount(){return countedCards().filter(c=>!isReady(c)).length}
+function flaggedCount(){
+  let n=0; CARDS.forEach(c=>(c.answers||[]).forEach(a=>{if(isChanged(a))n++}));
+  return n;
+}
+function updProg(){
+  const tot=countedCards().length, left=remainingCount(), n=tot-left;
+  ncf.textContent=n;ncf2.textContent=n;ntot.textContent=tot;ntot2.textContent=tot;
+  const fl=flaggedCount();
+  nflag.textContent=fl; nflagword.textContent=fl===1?'change':'changes';
+  pfill.style.width=(tot?n/tot*100:0)+'%';
+  lefttxt.textContent=RO?'':(left===0?'all done, press Send':left+' still to review');
+  if(RO)return;
+  sendbtn.setAttribute('aria-disabled',left>0?'true':'false');
+  // Same sentence in all three places, so the reason never depends on hovering the right pixel.
+  const why=left>0?('Confirm the remaining '+left+' '+(left===1?'card':'cards')+' to send'):'';
+  sendwhy.textContent=why;
+  sendwhy.style.display=left>0?'block':'none';
+  sendbtn.title=left>0?why:'Send your answers back to BAM';
+  sendwrap.title=sendbtn.title;
+}
+function sendBlocked(){return sendbtn.getAttribute('aria-disabled')==='true'}
+// Pressing the held-off button says why, and jumps to the first card that is why.
+function nudgeSend(){
+  if(!sendBlocked())return;
+  const first=countedCards().find(c=>!isReady(c));
+  sendwhy.classList.remove('pulse');void sendwhy.offsetWidth;sendwhy.classList.add('pulse');
+  if(first){const el=document.getElementById('card_'+first.lid);if(el){el.classList.add('open');el.scrollIntoView({block:'center',behavior:'smooth'})}}
+}
+function tog(lid){const c=document.getElementById('card_'+lid);if(c)c.classList.toggle('open')}
+function reopen(lid,fn){
+  const c=document.getElementById('card_'+lid);if(!c)return;
+  const open=c.classList.contains('open');
+  c.outerHTML=fn();
+  const n=document.getElementById('card_'+lid);
+  if(open)n.classList.add('open');
+  if(card(lid).state==='confirmed')n.classList.add('confirmed');
+  if(RO)lockCard(n);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SUBMIT
+   ══════════════════════════════════════════════════════════════════════════ */
+let submitting=false;
+async function doSubmit(){
+  if(RO||submitting)return;
+  if(sendBlocked()){nudgeSend();return}
+  submitting=true; sendbtn.textContent='Sending...'; sendbtn.setAttribute('aria-disabled','true');
+  try{
+    if(!await flushAll()){
+      alert('Some of your changes have not saved yet, so we did not send it. Check the message at the top of the page, then press Send again.');
+      return;
+    }
+    const r=await api({action:'submit'});
+    if(r.ok===false){
+      // The no-partial-submit rule is enforced on the server too. If the page and
+      // the server disagree about what is left, the SERVER is right and the page
+      // corrects itself rather than arguing.
+      if(has(r.remaining))WB.remaining=r.remaining;
+      await reload(true);
+      alert(r.error||('Not sent. '+r.remaining+' cards still need confirming.'));
+      return;
+    }
+    WB.status='submitted';
+    WB.submitted_at=(r.workbook&&r.workbook.submitted_at)||new Date().toISOString();
+    if(r.cards)ingest(r);
+    goReadOnly();
+    scrollTo({top:0,behavior:'smooth'});
+  }catch(e){
+    alert('We could not send it. '+(e.message==='offline'?'You look offline. Nothing is lost, try again when you have signal.':e.message));
+  }finally{
+    submitting=false; sendbtn.textContent='Send back to BAM'; updProg();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE TAX CARD
+   ══════════════════════════════════════════════════════════════════════════ */
+function taxCardHTML(lid){
+  const T=MODEL[lid]; const a=T.on!==null;
+  return `<div class="bcard" data-fam="cus" id="card_${lid}">
+   <div class="bhead" onclick="tog('${lid}')"><button class="btog">&#9656;</button>
+    <div class="binfo"><div class="btitle"><span class="famdot"></span>Sales tax <span id="pill_${lid}">${pillOf(lid)}</span></div>
+     <div class="rowsent" id="sent_${lid}">${a?(T.on?`You charge <b>${esc(T.pct)||'?'}% ${esc(T.label)}</b> on top of your prices`:'You do not charge sales tax, prices are what parents pay'):'One question that affects every price below'}</div>
+    </div></div>
+   <div class="bfields">
+    <div class="q">Do you charge sales tax on training? <span class="req">*</span></div>
+    <div class="qhint">One answer for your whole academy. If yes, we add it on top of every price unless you mark a specific one as exempt. Not sure? Answer No and we will check it with you before anything goes live.</div>
+    <div class="chiprow">
+      <button class="bchip ${T.on===0?'sel':''}" onclick="setTax(0)">No, my prices are the full amount</button>
+      <button class="bchip ${T.on===1?'sel':''}" onclick="setTax(1)">Yes, tax gets added</button>
+    </div>
+    <div style="display:${T.on===1?'block':'none'}">
+      <div class="q">How much, and what is it called?</div>
+      <div class="chiprow">
+        <input class="bb-input" type="number" step="0.01" inputmode="decimal" placeholder="8.25" value="${esc(T.pct)}" style="max-width:100px;font-weight:800" oninput="setTaxField('pct',this.value)">
+        <span style="font-size:17px;font-weight:800;color:var(--mut)">%</span>
+        <input class="bb-input" placeholder="Sales tax" value="${esc(T.label)}" style="max-width:180px" oninput="setTaxField('label',this.value)">
+      </div>
+      <div class="qhint" id="taxecho" style="margin-top:8px"></div>
+    </div>
+    <div class="confirmbar"><button class="cbtn" onclick="confirmCard('${lid}')">&#10003; That's right</button>
+     <span class="chint">Nothing is taxed until you answer this. Answering No is a real answer, not a skip.</span></div>
+   </div></div>`;
+}
+/* clients.tax_config is one column, so it is one answer. Staff review then reads
+   a single academy-wide row with the blast radius attached, not three fragments
+   that only mean something together. */
+function writeTax(next){
+  const lid=taxCardId(); if(lid==null)return;
+  setA(lid,'tax_config',{charges_tax:next.on===1,pct:next.on===1?(parseFloat(next.pct)||null):null,label:next.label||'Sales tax'});
+}
+function setTax(v){
+  const lid=taxCardId();const T=Object.assign({},MODEL[lid]);T.on=v;
+  writeTax(T);
+  // Turning tax ON makes the per-plan and per-rung tax questions exist. They
+  // default to taxed with no answer written (see planModel), which is the wizard
+  // precedence rule, so nothing here sprays writes across every plan card.
+  drawTax();planCards().forEach(c=>drawPlan(c.lid));drawCodes();
+}
+function setTaxField(f,v){
+  const lid=taxCardId();const T=Object.assign({},MODEL[lid]);T[f]=v;
+  writeTax(T);taxEcho();
+}
+function taxEcho(){
+  const e=document.getElementById('taxecho');const T=TAX();
+  if(e){const p=pctNum();
+    e.innerHTML=p>0?`A $250 plan would show as <b>${money(250*(1+p/100))}</b> with ${esc(T.label)||'tax'} added.`:'';}
+  const lid=taxCardId();
+  const s=document.getElementById('sent_'+lid);
+  if(s&&T.on===1)s.innerHTML=`You charge <b>${esc(T.pct)||'?'}% ${esc(T.label)}</b> on top of your prices`;
+  planCards().forEach(c=>prevOpts(c.lid));
+}
+function drawTax(){const lid=taxCardId();if(lid!=null){reopen(lid,()=>taxCardHTML(lid));taxEcho()}}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE PLAN CARD
+   ══════════════════════════════════════════════════════════════════════════ */
+function sentenceOf(p){
+  if(p.archived)return 'Archived. Kept for your records, not sold to new parents.';
+  if(p.type===1)return `<b>${money(p.price)}</b> for ${esc(p.sessions)||'?'} sessions`;
+  if(p.type===2)return `<b>${money(p.price)}</b> per session`;
+  if(p.type===3)return p.otherDesc?esc(p.otherDesc):'Tell us how this one works';
+  const r=liveRungs(p);
+  return `<b>${money(p.price)}</b> ${CYCLES[p.cad]}` + (r.length?`, or pay up front for <b>${r.map(x=>esc(x.len)).join(' or ')}</b> and save`:', no pay-up-front options');
+}
+/* The Stripe pill only appears when the API tells us. Printing "Not in Stripe
+   yet" from a missing field would be inventing a claim about his account. */
+function stripePill(p){
+  if(p.archived)return '<span class="pill">Archived</span>';
+  if(p.live===true)return '<span class="pill live">Live in Stripe</span>';
+  if(p.live===false)return '<span class="pill attn">Not in Stripe yet</span>';
+  return '';
+}
+function planCardHTML(lid){
+  const p=MODEL[lid];const M=p.type===0;const T=TAX();
+  const s=(f,expr)=>`setA('${lid}','${f}',${expr})`;
+  return `<div class="bcard ${p.archived?'arch':''}" data-fam="${esc(p.fam)}" id="card_${lid}">
+   <div class="bhead" onclick="tog('${lid}')"><button class="btog">&#9656;</button>
+    <div class="binfo">
+     <div class="btitle"><span class="famdot"></span><span id="t_${lid}">${esc(p.title)||'(new plan)'}</span>
+      ${stripePill(p)}
+      <span id="pill_${lid}">${pillOf(lid)}</span></div>
+     <div class="rowsent" id="sent_${lid}">${sentenceOf(p)}${p.members&&!p.archived?` · <span class="members">${esc(p.members)}</span>`:''}</div>
+    </div>
+    <button class="arch" onclick="event.stopPropagation();toggleArch('${lid}')">${p.archived?'Restore':'Archive'}</button>
+   </div>
+   <div class="bfields">
+    <div class="twocol"><div class="left">
+
+     <div class="q">What do you call this plan? <span class="req">*</span></div>
+     <input class="bb-input" value="${esc(p.title)}" oninput="${s('title','this.value')};recalc('${lid}')">
+
+     <div class="q">What kind of pricing is this? <span class="req">*</span></div>
+     <div class="chiprow">${TYPES.map((t,j)=>`<button class="bchip ${p.type===j?'sel':''}" onclick="setA('${lid}','type',TYPES_W[${j}]);drawPlan('${lid}')">${t}</button>`).join('')}</div>
+
+     <div class="q">What does a parent get for it?</div>
+     <textarea class="bb-input" oninput="${s('whats_included','this.value')};recalc('${lid}')">${esc(p.desc)}</textarea>
+
+     <div class="q">How much do they pay${M?', and how often':''}? <span class="req">*</span></div>
+     ${p.hint?`<div class="qhint">${esc(p.hint)}</div>`:''}
+     <div class="chiprow">
+       <span style="font-size:19px;font-weight:800;color:var(--mut)">$</span>
+       <input class="bb-input" type="number" inputmode="decimal" value="${p.price}" style="max-width:110px;font-size:17px;font-weight:800" oninput="${s('price','+this.value||0')};recalc('${lid}')">
+       ${M?CYCLES.map((c,j)=>`<button class="bchip ${p.cad===j?'sel':''}" onclick="setA('${lid}','billing_cycle',CYCLES_W[${j}]);drawPlan('${lid}')">${c}</button>`).join(''):''}
+     </div>
+     ${M&&p.cad===6?`<div class="q">How often exactly? <span class="req">*</span></div>
+     <input class="bb-input" placeholder="e.g. every 6 weeks, per term" value="${esc(p.cadOther)}" oninput="${s('billing_cycle_other','this.value')}">`:''}
+
+     ${p.type===1?`<div class="q">How many sessions are included?</div>
+     <input class="bb-input" type="number" inputmode="numeric" style="max-width:120px" value="${esc(p.sessions)}" oninput="${s('sessions_included','+this.value||0')};recalc('${lid}')">
+     <div class="q">Does the package expire?</div>
+     <input class="bb-input" placeholder="e.g. 3 months, end of season" value="${esc(p.expires)}" oninput="${s('expires_after','this.value')};recalc('${lid}')">`:''}
+
+     ${p.type===3?`<div class="q">Describe how this one works <span class="req">*</span></div>
+     <textarea class="bb-input" oninput="${s('other_description','this.value')};recalc('${lid}')">${esc(p.otherDesc)}</textarea>`:''}
+
+     ${''/* TAX EXEMPTIONS REMOVED (Zoran, 2026-08-06): "everything should always be
+        taxed, and the sign up fee will always have tax applied".
+        There used to be three questions here and on each rung asking whether a
+        particular price was exempt. They are gone rather than hidden, because a
+        question we have decided never to honour is a dead control, and this page
+        has already shipped two of those. Tax is now exactly one decision, asked
+        once, on the tax card: does he charge it, and at what rate.
+        The offer's `taxable` and `signup_fee_taxable` fields still exist and
+        still default to taxed, so nothing downstream changes shape. */}
+
+     ${M?`<div class="q">Is there a one-time joining fee?</div>
+     <div class="qhint">It is charged once per athlete, never on renewals.</div>
+     <div class="chiprow">
+       ${["No fee","Yes"].map((c,j)=>`<button class="bchip ${p.fee===j?'sel':''}" onclick="setFee('${lid}',${j})">${c}</button>`).join('')}
+       ${p.fee===1?`<span style="font-weight:800;color:var(--mut)">$</span>
+       <input class="bb-input" type="number" inputmode="decimal" value="${p.feeAmt}" style="max-width:90px;font-weight:800" oninput="${s('signup_fee','+this.value||0')};recalc('${lid}')">`:''}
+     </div>
+     ${p.fee===1?`<div class="q">Charge it on the ${CYCLES[p.cad]} option?</div>
+     <div class="qhint">If you waive it everywhere, the fee is never charged at all.</div>
+     <div class="chiprow">${["Charge it","Waive it"].map((c,j)=>`<button class="bchip ${p.feeOnBase===j?'sel':''}" onclick="setA('${lid}','signup_fee_on_base',CHARGE_W[${j}]);drawPlan('${lid}')">${c}</button>`).join('')}</div>
+`:''}
+
+     <div class="q">Can parents pay up front for a discount?</div>
+     <div class="qhint" id="lhint_${lid}"></div>
+     <div class="ladder" id="ladder_${lid}"></div>
+     <div class="laddernote">Savings are compared against paying <b id="basecmp_${lid}">${money(p.price)}</b> ${CYCLES[p.cad]}.</div>
+     ${addSectionHTML(lid,'length')}`:''}
+
+     <div class="q">Anything else about this price?</div>
+     <textarea class="bb-input" placeholder="optional, just for you and BAM" oninput="${s('description','this.value')}">${esc(p.notes)}</textarea>
+
+    </div>
+    <div class="right">
+     <div class="prevlabel">What a parent sees</div>
+     <div class="prevcard">
+      <div class="pt" id="pv_t_${lid}">${esc(p.title)}</div>
+      <div class="pp">$<span id="pv_p_${lid}">${p.price}</span><small id="pv_c_${lid}"> / ${M?CYCLES[p.cad].replace('every ',''):'once'}</small></div>
+      <div class="pd" id="pv_d_${lid}">${esc(p.desc)}</div>
+      <div class="popt">
+       <div class="oh" id="pv_oh_${lid}">Or save with a commitment</div>
+       <div id="pv_opts_${lid}"></div>
+       <div class="pfee" id="pv_fee_${lid}"></div>
+       <div class="pafter" id="pv_after_${lid}"></div>
+      </div>
+      <button class="cta">Join now</button>
+     </div>
+    </div></div>
+    <div class="confirmbar"><button class="cbtn" onclick="confirmCard('${lid}')">&#10003; This is right</button>
+     <span class="chint">Pressing this tells us you actually looked at it. A plan you never open is never treated as approved.</span></div>
+   </div></div>`;
+}
+/* One currency field on the wire: zero means no fee (FIELD MAP section 1).
+   NEVER null and NEVER "". null means "he has not answered" and falls back to the
+   fee we prefilled, silently reinstating the $40 he just removed. "" reaches staff
+   review as "was 40, now (blank)", leaving an apply step to guess whether blank
+   means zero, unknown, or leave it alone. 0 says the fee is zero dollars. */
+function setFee(lid,j){
+  const p=MODEL[lid];
+  setA(lid,'signup_fee',j===1?(p.feeAmt>0?p.feeAmt:0):0);
+  drawPlan(lid);
+}
+/* Clearing a NUMBER sends 0, clearing TEXT sends "", clearing a LIST sends [].
+   The number inputs already coerce with `+this.value||0`, so this is for the
+   paths that wipe a field the owner did not personally blank. */
+const NUMERIC_FIELD=/(^|\.)(price|signup_fee|value|duration_months|max_redemptions|sessions_included)$/;
+function emptyFor(field){
+  if(/(^|\.)applies_to$/.test(field))return [];
+  return NUMERIC_FIELD.test(field)?0:'';
+}
+async function toggleArch(lid){
+  const p=MODEL[lid];const next=p.archived?false:true;
+  setA(lid,'archived',next);
+  drawPlan(lid);
+  // Archiving IS the decision. The mockup treated it as a confirm so the owner is
+  // not made to open and approve a plan he just said he no longer sells.
+  await confirmCard(lid);
+}
+function drawPlan(lid){reopen(lid,()=>planCardHTML(lid));drawLadder(lid);drawCodes()}
+
+/* ─────────── the price ladder ─────────── */
+function drawLadder(lid){
+  const p=MODEL[lid];const el=document.getElementById('ladder_'+lid);if(!el)return;
+  const base=p.price;const T=TAX();
+  const hint=document.getElementById('lhint_'+lid);
+  if(hint)hint.innerHTML=p.rungs.some(r=>r.fresh&&!r.archived)
+    ? 'Options marked <b>new</b> are ones we are proposing to sell for you. Confirm them to start, or archive them.'
+    : (liveRungs(p).length?'Your Stripe already sells these. The savings are worked out for you.':'No pay-up-front options today. Add one if you want to offer it.');
+  const F=i=>`'commitments.${i}.`;
+  // The baseline row carries ids because recalc has to update it too. Without them
+  // it keeps the price it was drawn with, so typing a new monthly price leaves the
+  // ladder claiming the old one is the baseline every saving is measured against.
+  el.innerHTML=`<div class="rung base"><span class="rlenin">Month to month</span><span class="rprice" id="rbp_${lid}">${money(base)}</span><span class="rper" id="rbm_${lid}">${money(base)}/mo</span><span class="rsave none">the baseline</span></div>`
+   + p.rungs.map((r,n)=>{
+     const i=r.i;
+     const mo=monthsOf(r.len), save=base*mo-r.price, per=r.price/mo;
+     const badge=base?(save>0?`<span class="rsave">saves ${money(save)}</span>`:`<span class="rsave none">no saving</span>`):`<span class="rsave none">set a monthly price</span>`;
+     const warn=(r.after===0&&!base)?`<span class="afterwarn">no monthly price to go back to</span>`:'';
+     if(r.archived)return `<div class="rungwrap arch"><div class="rung">
+       <span class="rlenin">${esc(r.len)}</span><span class="rprice">${money(r.price)}</span>
+       <span class="members">archived, members on it keep paying it</span>
+       <span class="redit"><button class="rarch" onclick="setA('${lid}',${F(i)}archived',false);drawPlan('${lid}')">Restore</button></span></div></div>`;
+     // The badge span keeps its id (recalc rewrites it) and gains a class, because
+     // grid placement needs a handle on the CELL, not on the badge inside it. The
+     // "new" pill and the member count are wrapped together so a rung carrying both
+     // cannot elbow the edit controls onto a line of their own.
+     return `<div class="rungwrap">
+      <div class="rung">
+       <input class="rlenin" value="${esc(r.len)}" oninput="setA('${lid}',${F(i)}length',this.value);recalc('${lid}')">
+       <span class="rprice" id="rp_${lid}_${n}">${money(r.price)}</span>
+       <span class="rper" id="rm_${lid}_${n}">${money(per)}/mo</span>
+       <span class="rsavecell" id="rs_${lid}_${n}">${badge}</span>
+       <span class="rtags">${r.fresh?'<span class="rnew">new</span>':''}${r.m?`<span class="members">${esc(r.m)}</span>`:''}</span>
+       <span class="redit">$<input type="number" inputmode="decimal" value="${r.price}" oninput="setA('${lid}',${F(i)}price',+this.value||0);recalc('${lid}')">
+       <button class="rarch" onclick="setA('${lid}',${F(i)}archived',true);drawPlan('${lid}')" title="Keeps its Stripe price and history; just stops selling it">Archive</button></span>
+      </div>
+      <div class="afterrow"><span class="al">When the <span id="rl_${lid}_${n}">${esc(r.len)}</span> is up</span>
+       <span class="chiprow">${AFTER.map((a,j)=>`<button class="bchip sm ${r.after===j?'sel':''}" onclick="setA('${lid}',${F(i)}after',AFTER_W[${j}]);drawPlan('${lid}')">${a}</button>`).join('')}${warn}</span>
+      </div>
+      ${r.after===3?`<div class="afterrow"><span class="al">What happens instead? <b style="color:var(--gold-ink)">*</b></span>
+       <input class="rin" value="${esc(r.other)}" placeholder="explain in your own words" oninput="setA('${lid}',${F(i)}after_other',this.value)"></div>`:''}
+      <div class="rmore">
+       <div class="mf"><span class="ml">What do they get on this one?</span>
+        <input class="rin" value="${esc(r.gets)}" placeholder="same as monthly" oninput="setA('${lid}',${F(i)}whats_included',this.value)"></div>
+       ${p.fee===1?`<div class="mf"><span class="ml">Joining fee on this one?</span>
+        <span class="chiprow">${["Charge it","Waive it"].map((a,j)=>`<button class="bchip sm ${r.fee===j?'sel':''}" onclick="setA('${lid}',${F(i)}signup_fee_charge',CHARGE_W[${j}]);drawPlan('${lid}')">${a}</button>`).join('')}</span></div>`:''}
+       <div class="mf"><span class="ml">Notes on this discount</span>
+        <input class="rin" value="${esc(r.notes)}" placeholder="optional, just for you and BAM" oninput="setA('${lid}',${F(i)}discount_notes',this.value)"></div>
+      </div></div>`;
+   }).join('');
+  prevOpts(lid);
+}
+/* updates only computed bits, so typing never loses focus */
+function recalc(lid){
+  const p=MODEL[lid];const base=p.price;
+  const bc=document.getElementById('basecmp_'+lid);if(bc)bc.textContent=money(base);
+  const bp=document.getElementById('rbp_'+lid);if(bp)bp.textContent=money(base);
+  const bm=document.getElementById('rbm_'+lid);if(bm)bm.textContent=money(base)+'/mo';
+  p.rungs.forEach((r,n)=>{
+    const el=document.getElementById('rp_'+lid+'_'+n);if(!el)return;
+    const mo=monthsOf(r.len),save=base*mo-r.price;
+    el.textContent=money(r.price);
+    document.getElementById('rm_'+lid+'_'+n).textContent=money(r.price/mo)+'/mo';
+    document.getElementById('rl_'+lid+'_'+n).textContent=r.len;
+    document.getElementById('rs_'+lid+'_'+n).innerHTML=base?(save>0?`<span class="rsave">saves ${money(save)}</span>`:`<span class="rsave none">no saving</span>`):`<span class="rsave none">set a monthly price</span>`;
+  });
+  const t=document.getElementById('t_'+lid);if(t)t.textContent=p.title||'(new plan)';
+  const s=document.getElementById('sent_'+lid);if(s)s.innerHTML=sentenceOf(p)+(p.members&&!p.archived?` · <span class="members">${esc(p.members)}</span>`:'');
+  const a=document.getElementById('pv_t_'+lid);if(a){a.textContent=p.title;
+    document.getElementById('pv_d_'+lid).textContent=p.type===3&&p.otherDesc?p.otherDesc:p.desc;
+    document.getElementById('pv_p_'+lid).textContent=(p.price||0).toLocaleString();}
+  prevOpts(lid);
+}
+function prevOpts(lid){
+  const p=MODEL[lid];if(!p)return;const base=p.price;const w=document.getElementById('pv_opts_'+lid);if(!w)return;
+  const T=TAX();const R=liveRungs(p);
+  const oh=document.getElementById('pv_oh_'+lid);
+  if(oh)oh.style.display=p.type===0?'block':'none';
+  w.innerHTML=p.type!==0?'':(R.map(r=>{
+    const save=base*monthsOf(r.len)-r.price;
+    return `<div class="opt"><span>${esc(r.len)}</span><span>${money(r.price)} ${save>0&&base?`<span class="os">save ${money(save)}</span>`:''}</span></div>`;
+  }).join('')||'<div class="opt" style="color:var(--mut)">none yet</div>');
+  const cc=document.getElementById('pv_c_'+lid);
+  if(cc)cc.textContent=p.type===0?' / '+CYCLES[p.cad].replace('every ',''):(p.type===1?` / ${p.sessions||'?'} sessions`:' once');
+  const bits=[];
+  if(taxedPlan(p))bits.push(`With ${esc(T.pct)}% ${esc(T.label)}, a parent pays ${money(base*(1+pctNum()/100))}.`);
+  if(p.type===0&&p.fee===1&&p.feeOnBase===0)bits.push(`Plus a one-time ${money(p.feeAmt)} joining fee.`);
+  if(p.type===1&&p.expires)bits.push(`Expires after ${p.expires}.`);
+  document.getElementById('pv_fee_'+lid).textContent=bits.join(' ');
+  const back=R.filter(r=>r.after===0).length, ren=R.filter(r=>r.after===1).length;
+  let line='';
+  if(p.type!==0)line='';
+  else if(back)line=`When a commitment ends you go back to ${money(base)} ${CYCLES[p.cad]}.`;
+  else if(ren)line='Commitments renew automatically for the same length.';
+  else if(R.length)line='Commitments simply end, nothing renews.';
+  document.getElementById('pv_after_'+lid).textContent=line;
+}
+/* Plan additions belong to the card the API says owns them (`addableOn` accepts
+   card_key 'plans'). If a deployment does not send that card there is nowhere on
+   the server for a new plan to live, so the button SAYS so rather than taking
+   his typing and losing it. An addition with no card would also escape the rule
+   that an addition forces its card off 'confirmed', which is the guarantee that
+   stops a request being submitted as an approval. */
+function plansCard(){return CARDS.find(c=>c.type==='plansadd')}
+/* It is a real card with a real confirm, never a floating button. A card the
+   owner cannot see but must confirm would block Send with nothing on screen to
+   press, and the no-partial-submit rule would trap him on his own page. */
+function plansAddCardHTML(lid){
+  const c=card(lid);
+  const n=additionsOf(c).length;
+  return `<div class="bcard" data-fam="new" id="card_${lid}">
+   <div class="bhead" onclick="tog('${lid}')"><button class="btog">&#9656;</button>
+    <div class="binfo"><div class="btitle"><span class="famdot"></span>${esc(c.title||'Anything you sell that is not listed')} <span id="pill_${lid}">${pillOf(lid)}</span></div>
+     <div class="rowsent">${n?esc(additionsOf(c).map(a=>addSummary(a.answered||{}).n).join(', ')):'Tell us about any plan we missed'}</div></div></div>
+   <div class="bfields">
+    <div class="q">Do you sell anything that is not on this page?</div>
+    <div class="qhint">Tell us about it and a person at BAM sets it up with you. Nothing you write here starts selling on its own.</div>
+    ${addSectionHTML(lid,'plan')}
+    <div class="confirmbar"><button class="cbtn" onclick="confirmCard('${lid}')">&#10003; This is right</button>
+     <span class="chint">Nothing missing? Confirm it empty and we will know you were asked.</span></div>
+   </div></div>`;
+}
+function drawPlansAdd(){
+  const pc=plansCard();
+  if(pc&&document.getElementById('card_'+pc.lid)){reopen(pc.lid,()=>plansAddCardHTML(pc.lid));return}
+  // No plans card means this deployment cannot host a new plan. Say so rather
+  // than offer a button whose typing has nowhere to go.
+  const host=document.getElementById('addplans'); if(!host)return;
+  host.innerHTML=(RO||pc)?'':`<div class="addcap">Telling us about a whole new plan is not switched on for your workbook yet. Tell BAM about it and we will add it with you.</div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DISCOUNT CODES
+   ══════════════════════════════════════════════════════════════════════════ */
+function codeCardHTML(lid){
+  const C=MODEL[lid]||[];const keys=priceKeys();
+  const loose=C.some(c=>String(c.code).trim()&&!(c.applies&&c.applies.length))&&anyJoiningFee();
+  return `<div class="bcard" data-fam="new" id="card_${lid}">
+   <div class="bhead" onclick="tog('${lid}')"><button class="btog">&#9656;</button>
+    <div class="binfo"><div class="btitle"><span class="famdot"></span>Discount codes <span id="pill_${lid}">${pillOf(lid)}</span>
+     ${loose?'<span class="pill attn">Check what one applies to</span>':''}</div>
+     <div class="rowsent">${C.filter(c=>c.code).length?C.filter(c=>c.code).map(c=>`<b>${esc(c.code)}</b>`).join(', '):'Codes parents type at checkout, like a sibling discount'}</div></div></div>
+   <div class="bfields">
+    <div class="qhint">Leave this empty if you do not use codes. Waiving a setup fee for some families is exactly what a code does.</div>
+    ${C.map(c=>{const i=c.i;const F=`'codes.${i}.`;
+      const wasNamed=codeWasNamed(card(lid),i);
+      // A code he cleared shows as removed with a way back, rather than as an
+      // empty box he cannot tell apart from one he never filled in.
+      if(!String(c.code).trim()&&wasNamed)return `<div class="subrow">
+        <div class="sl"><span>Code ${i+1}</span></div>
+        <div class="subgrid"><span class="ml"><b>${esc(wasNamed)}</b> removed. We will stop offering it, and we will check with you first.</span>
+        <button class="rarch" onclick="undoRemoveCode('${lid}',${i})">Undo</button></div></div>`;
+      return `<div class="subrow">
+      <div class="sl"><span>Code ${i+1}</span><button class="rarch" onclick="removeCode('${lid}',${i})">Remove</button></div>
+      <div class="subgrid">
+        <input class="bb-input" style="max-width:170px;font-weight:700" placeholder="SIBLING10" value="${esc(c.code)}" oninput="setA('${lid}',${F}code',this.value.toUpperCase())">
+        ${KIND.map((k,j)=>`<button class="bchip sm ${c.kind===j?'sel':''}" onclick="setA('${lid}',${F}kind',KIND[${j}]);drawCodes()">${k}</button>`).join('')}
+        <input class="bb-input" type="number" inputmode="decimal" style="max-width:90px;font-weight:800" placeholder="${c.kind===0?'10':'40'}" value="${c.value||''}" oninput="setA('${lid}',${F}value',+this.value||0)">
+        <span class="ml">${c.kind===0?'% off':'dollars off'}</span>
+      </div>
+      <div class="q" style="margin:12px 0 6px;font-size:12.5px">How long does it apply?</div>
+      <div class="chiprow">${DUR.map((d,j)=>`<button class="bchip sm ${c.dur===j?'sel':''}" onclick="setA('${lid}',${F}duration',DUR[${j}]);drawCodes()">${d}</button>`).join('')}
+      ${c.dur===1?`<input class="bb-input" type="number" inputmode="numeric" style="max-width:80px" placeholder="3" value="${c.durMonths||''}" oninput="setA('${lid}',${F}duration_months',+this.value||0)"><span class="ml">months</span>`:''}</div>
+      <div class="q" style="margin:12px 0 6px;font-size:12.5px">What does it apply to?</div>
+      <div class="chiprow">${keys.length?keys.map(k=>`<button class="bchip sm ${(c.applies||[]).includes(k)?'sel':''}" onclick="toggleApplies('${lid}',${i},${JSON.stringify(k).replace(/"/g,'&quot;')})">${esc(keyLabel(k))}</button>`).join(''):'<span class="ml">Add your prices above first.</span>'}</div>
+      ${!(c.applies&&c.applies.length)&&String(c.code).trim()?`<div class="warnbox">Nothing ticked means this code comes off <b>everything</b> on the first bill${anyJoiningFee()?', including the joining fee':''}. Tick the prices it should apply to if that is not what you want.</div>`:''}
+      <div class="subgrid" style="margin-top:10px">
+        <span class="ml">Expires</span><input class="bb-input" type="date" style="max-width:160px" value="${esc(c.expires)}" oninput="setA('${lid}',${F}expires_at',this.value)">
+        <span class="ml">Max total uses</span><input class="bb-input" type="number" inputmode="numeric" style="max-width:130px" placeholder="unlimited" value="${c.max||''}" oninput="setA('${lid}',${F}max_redemptions',+this.value||0)">
+      </div>
+      <div class="subgrid" style="margin-top:8px"><span class="ml">One use per customer?</span>
+        ${["Yes","No"].map((a,j)=>`<button class="bchip sm ${c.once===j?'sel':''}" onclick="setA('${lid}',${F}once_per_customer',YESNO_W[${j}]);drawCodes()">${a}</button>`).join('')}</div>
+    </div>`}).join('')}
+    ${addSectionHTML(lid,'code')}
+    <div class="confirmbar"><button class="cbtn" onclick="confirmCard('${lid}')">&#10003; This is right</button>
+     <span class="chint">No codes? Confirm it empty and we will know you were asked.</span></div>
+   </div></div>`;
+}
+/* Removing a code the API sent us is a REQUEST to stop using it, not a delete:
+   there is no delete in the contract, and emptying the code field is the honest
+   record ("was NOSETUP, now empty"), which is how staff read it. Only the code
+   field is cleared, so the rest stays as history rather than as churn a reviewer
+   has to wade through. Indices are never reshuffled: they are the answer's
+   address on the server. */
+function removeCode(lid,i){
+  setA(lid,'codes.'+i+'.code',emptyFor('code'));
+  drawCodes();
+}
+/* Undo sends the answer back to null, which on the API means "not answered" and
+   falls the value back to what we proposed. That is a real undo, not a retype. */
+function undoRemoveCode(lid,i){
+  setA(lid,'codes.'+i+'.code',null);
+  drawCodes();
+}
+/* What we originally showed him for this code, so a cleared one can still say
+   which code it was. */
+function codeWasNamed(c,i){
+  const a=ansOf(c,'codes.'+i+'.code'); if(!a)return '';
+  return (has(a.proposed)?a.proposed:a.current_value)||'';
+}
+function toggleApplies(lid,i,k){
+  const C=MODEL[lid]||[];const c=C.find(x=>x.i===i);if(!c)return;
+  const list=(c.applies||[]).slice();
+  const j=list.indexOf(k);if(j<0)list.push(k);else list.splice(j,1);
+  setA(lid,'codes.'+i+'.applies_to',list);drawCodes();
+}
+function drawCodes(){const c=CARDS.find(x=>x.type==='codes');if(c&&document.getElementById('card_'+c.lid))reopen(c.lid,()=>codeCardHTML(c.lid))}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE ADDITION UI
+   Every word here is written to promise exactly what happens and nothing more:
+   he is TELLING US about something, and a person at BAM sets it up. No copy on
+   this path may suggest it starts selling, because it does not.
+   ══════════════════════════════════════════════════════════════════════════ */
+const ADDOPEN={}, ADDERR={};
+const ADD_COPY={
+  plan:{btn:"+ Add a plan you sell that isn't here",
+        title:'Tell us about a plan we missed',
+        hint:'We will set this up for you and check it with you first. It does not start selling by adding it here.'},
+  length:{btn:'+ Add another length',
+        title:'Tell us about another length',
+        hint:'We will add this pay-up-front option for you and check it with you first.'},
+  code:{btn:'+ Add a discount code',
+        title:'Tell us about a code we missed',
+        hint:'We will set this code up for you and check it with you first. It does not start working by adding it here.'}
+};
+function addFieldsHTML(lid,kind){
+  if(kind==='plan')return `
+    <div class="addgrid">
+      <input class="bb-input" id="af_title_${lid}" placeholder="Summer 1x/week" style="max-width:220px">
+      <span style="font-weight:800;color:var(--gold-ink)">$</span>
+      <input class="bb-input" id="af_price_${lid}" type="number" inputmode="decimal" placeholder="150" style="max-width:110px;font-weight:800">
+    </div>
+    <div class="addgrid" style="margin-top:8px">
+      ${CYCLES.map((c,j)=>`<button class="bchip sm" data-cyc="${j}" onclick="pickCyc('${lid}',${j})" ${j===3?'style="background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700"':''}>${c}</button>`).join('')}
+    </div>`;
+  if(kind==='length')return `
+    <div class="addgrid">
+      <input class="bb-input" id="af_months_${lid}" type="number" inputmode="numeric" placeholder="3" style="max-width:90px;font-weight:800">
+      <span class="ml">months, for</span>
+      <span style="font-weight:800;color:var(--gold-ink)">$</span>
+      <input class="bb-input" id="af_price_${lid}" type="number" inputmode="decimal" placeholder="425" style="max-width:110px;font-weight:800">
+    </div>`;
+  return `<div class="addgrid">
+      <input class="bb-input" id="af_code_${lid}" placeholder="SIBLING10" style="max-width:200px;font-weight:700"
+        oninput="this.value=this.value.toUpperCase()">
+    </div>`;
+}
+function pickCyc(lid,j){
+  ADDOPEN[lid+'_cyc']=j;
+  document.querySelectorAll('#addbox_'+lid+' [data-cyc]').forEach(b=>{
+    const on=+b.dataset.cyc===j;
+    b.style.cssText=on?'background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700':'';
+  });
+}
+/* Reads the form. Numbers come back as NUMBERS: the API compares strictly with
+   no coercion, so "150" and 150 are different answers to it. */
+function readAdd(lid,kind){
+  const g=id=>{const e=document.getElementById(id);return e?e.value:''};
+  if(kind==='plan')return {kind:'plan',title:g('af_title_'+lid).trim(),
+    price:g('af_price_'+lid)===''?null:+g('af_price_'+lid),
+    billing_cycle:CYCLES_W[has(ADDOPEN[lid+'_cyc'])?ADDOPEN[lid+'_cyc']:3]};
+  if(kind==='length')return {kind:'length',
+    months:g('af_months_'+lid)===''?null:+g('af_months_'+lid),
+    price:g('af_price_'+lid)===''?null:+g('af_price_'+lid)};
+  return {kind:'code',code:g('af_code_'+lid).trim()};
+}
+function addSummary(v){
+  if(v.kind==='plan')return {n:v.title||'(no name)',d:money(v.price)+' '+String(v.billing_cycle||'').toLowerCase()};
+  if(v.kind==='length')return {n:v.months+(v.months===1?' month':' months'),d:money(v.price)+' paid up front'};
+  return {n:v.code||'(no code)',d:'discount code'};
+}
+function addSectionHTML(lid,kind){
+  const c=card(lid);
+  const items=additionsOf(c);
+  const list=items.length?`<div class="addlist">${items.map(a=>{
+    const s=addSummary(a.answered||{});
+    return `<div class="additem"><div class="ai"><div class="an">${esc(s.n)}</div>
+      <div class="ad">${esc(s.d)}. We will set this up for you and check it with you first.</div></div>
+      <span class="addtag">To add</span>
+      <button class="rarch" onclick="removeAddition('${lid}','${esc(a.id)}')">Remove</button></div>`;
+  }).join('')}</div>`:'';
+  // The button exists only if the SERVER says this card takes this kind. A page
+  // that decides for itself is a page that offers a control the API will refuse.
+  if(!canAdd(c,kind))return list;
+  const cap=capReason(c);
+  if(cap)return list+`<div class="addcap">${esc(cap)}</div>`;
+  const warn=capWarn(c)?`<div class="addcap">${esc(capWarn(c))}</div>`:'';
+  if(!ADDOPEN[lid])return list+`<button class="addbtn" onclick="openAdd('${lid}')">${esc(ADD_COPY[kind].btn)}</button>`+warn;
+  return list+warn+`<div class="addbox" id="addbox_${lid}">
+    <div class="at">${esc(ADD_COPY[kind].title)}</div>
+    <div class="ah">${esc(ADD_COPY[kind].hint)}</div>
+    ${addFieldsHTML(lid,kind)}
+    ${ADDERR[lid]?`<div class="adderr">${esc(ADDERR[lid])}</div>`:''}
+    <div class="addact"><button class="addgo" onclick="submitAdd('${lid}','${kind}')">Add it to the list</button>
+      <button class="addcancel" onclick="cancelAdd('${lid}')">Cancel</button></div>
+   </div>`;
+}
+function redrawAdds(lid){
+  const c=card(lid);
+  if(c.type==='plan')drawPlan(lid); else if(c.type==='codes')drawCodes(); else drawPlansAdd();
+}
+function openAdd(lid){ADDOPEN[lid]=1;ADDERR[lid]='';redrawAdds(lid)}
+function cancelAdd(lid){ADDOPEN[lid]=0;ADDERR[lid]='';redrawAdds(lid)}
+/* Applies whatever the add and remove routes say about the card. Their state is
+   the truth, including the rule that a card holding a request reads 'changed'
+   even after he confirms it. */
+/* THE ONE PLACE A CARD IS UPDATED FROM A RESPONSE. save, add, remove and confirm
+   all land here. They each used to do their own subset, which is how `counts`
+   went unread on three of the four paths and how three readings of "ready" grew
+   in the first place.
+   `counts` matters most on `add`: the "anything missing" card does NOT hold Send
+   while it is empty, and starts holding it the moment he adds something. Read it
+   only from GET and the page keeps saying 7 while the server means 8, with his
+   request sitting in the difference. `in` rather than a truthiness test, because
+   the value that carries meaning here is `false`. */
+function applyCard(c,r){
+  if(!r)return;
+  if(r.card){
+    if(r.card.card_key&&r.card.card_key!==c.card_key)c.card_key=r.card.card_key;
+    if(r.card.state)c.state=r.card.state;
+    // Nulled by the server when an addition retires an earlier confirm. Must be
+    // assignable TO null, so this tests presence, never truthiness.
+    if('confirmed_at' in r.card)c.confirmed_at=r.card.confirmed_at;
+    if('counts' in r.card)c.counts=r.card.counts;
+    if(has(r.card.add_left))c.add_left=r.card.add_left;
+    if(Array.isArray(r.card.can_add))c.can_add=r.card.can_add;
+    if(Array.isArray(r.card.answers))r.card.answers.forEach(x=>{
+      const a=ansOf(c,x.target_field); if(a&&x.id)a.id=x.id;
+    });
+  }
+  if(has(r.remaining))WB.remaining=r.remaining;
+}
+let addBusy=false;
+async function submitAdd(lid,kind){
+  if(addBusy)return;
+  const c=card(lid);
+  const cap=capReason(c); if(cap){ADDERR[lid]=cap;redrawAdds(lid);return}
+  const v=readAdd(lid,kind);
+  // Checked here only so he gets the answer instantly. The server runs the same
+  // rules and its refusal is the one that counts.
+  const problem=addProblem(kind,v);
+  if(problem){ADDERR[lid]=problem;redrawAdds(lid);return}
+  if(JSON.stringify(v).length>MAX_ADD_CHARS){
+    ADDERR[lid]='That is too long to add here. Please shorten it, or tell us the details directly.';
+    redrawAdds(lid);return;
+  }
+  addBusy=true; setSave('saving');
+  try{
+    // An addition is created ONCE through its own action, and the server mints
+    // its id. It is an ordinary answer from then on.
+    const wasConfirmed=!!c.confirmed_at;
+    const r=await api({action:'add',card_key:c.card_key,what:kind,answered:v});
+    if(r.answer)(c.answers=c.answers||[]).push(r.answer);
+    applyCard(c,r);
+    // AN ADDITION AFTER A CONFIRM RETIRES THAT CONFIRM. The server is meant to
+    // null confirmed_at here; verified against the live handler on 2026-08-06 it
+    // does NOT, and the card stayed ready with a request inside it that he had
+    // never reviewed as part of the card. So the page retires it too.
+    // This can only ever ask for MORE review than the server does, never less,
+    // and it agrees with the server the moment the server starts doing it.
+    // Deliberately NOT symmetric: REMOVING an addition leaves him holding less
+    // than he already approved, so it does not retire anything.
+    if(wasConfirmed&&c.confirmed_at)c.confirmed_at=null;
+    ADDOPEN[lid]=0;ADDERR[lid]='';
+    setSave('saved');
+  }catch(e){
+    // The server's sentence, not mine. It is written for him and it is the only
+    // one that is actually true about why this was refused.
+    ADDERR[lid]=e.message==='offline'
+      ? 'You look offline, so we could not add that yet. Nothing is lost, try again when you have signal.'
+      : e.message;
+    setSave('idle');
+  }finally{ addBusy=false; }
+  rebuild(lid);paintPill(lid);updProg();redrawAdds(lid);
+}
+/* A HARD DELETE on the server: no tombstone and no emptied row left behind on a
+   "needs creating" list for a human to puzzle over. Nothing leaves the page until
+   the server says it is gone, so the list can never show a state the server does
+   not have. Emptying an addition instead of removing it is refused by the API,
+   which is why there is no clear-the-fields path here. */
+async function removeAddition(lid,id){
+  if(addBusy)return; const c=card(lid);
+  addBusy=true; setSave('saving');
+  try{
+    const r=await api({action:'remove',card_key:c.card_key,id:id});
+    const i=(c.answers||[]).findIndex(a=>a.id===id);
+    if(i>=0)c.answers.splice(i,1);
+    applyCard(c,r);
+    setSave('saved');
+  }catch(e){
+    setSave('error',e.message==='offline'
+      ? 'You look offline, so we could not take that off the list yet. It is still on it.'
+      : e.message);
+  }finally{ addBusy=false; }
+  rebuild(lid);paintPill(lid);updProg();redrawAdds(lid);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FREE TEXT CARD  (notes, and any card_key this page does not know)
+   ══════════════════════════════════════════════════════════════════════════ */
+function notesCardHTML(lid){
+  const c=card(lid);const v=val(c,'notes','');
+  return `<div class="bcard" data-fam="new" id="card_${lid}">
+   <div class="bhead" onclick="tog('${lid}')"><button class="btog">&#9656;</button>
+    <div class="binfo"><div class="btitle"><span class="famdot"></span>${esc(c.title||'Anything else')} <span id="pill_${lid}">${pillOf(lid)}</span></div>
+     <div class="rowsent">${v?esc(String(v).slice(0,80)):'Anything about your pricing we did not ask about'}</div></div></div>
+   <div class="bfields">
+    <div class="q">Anything else we should know about your pricing?</div>
+    <textarea class="bb-input" placeholder="sibling arrangements, seasonal changes, anything at all" oninput="setA('${lid}','notes',this.value)">${esc(v)}</textarea>
+    <div class="confirmbar"><button class="cbtn" onclick="confirmCard('${lid}')">&#10003; Nothing else</button>
+     <span class="chint">Confirm even if you leave it blank, so we know you saw it.</span></div>
+   </div></div>`;
+}
+/* A card_key we do not have a renderer for still has to be answerable, or the
+   no-partial-submit rule would lock the owner out of sending with no way
+   forward. So it renders generically instead of being dropped. */
+function genericCardHTML(lid){
+  const c=card(lid);
+  const rows=(c.answers||[]).map(a=>{
+    const cur=has(a.answered)?a.answered:(has(a.proposed)?a.proposed:a.current_value);
+    const isObj=cur&&typeof cur==='object';
+    return `<div class="q" style="font-size:12.5px;margin:12px 0 4px">${esc(a.target_field)}</div>`+
+      (isObj?`<div class="qhint">${esc(JSON.stringify(cur))}</div>`
+            :`<input class="bb-input" value="${esc(cur==null?'':cur)}" oninput="setA('${lid}','${esc(a.target_field)}',this.value)">`);
+  }).join('')||'<div class="qhint">Nothing to change here, just confirm you have seen it.</div>';
+  return `<div class="bcard" data-fam="new" id="card_${lid}">
+   <div class="bhead" onclick="tog('${lid}')"><button class="btog">&#9656;</button>
+    <div class="binfo"><div class="btitle"><span class="famdot"></span>${esc(c.title||c.card_key)} <span id="pill_${lid}">${pillOf(lid)}</span></div>
+     <div class="rowsent">${(c.answers||[]).length} thing${(c.answers||[]).length===1?'':'s'} to check</div></div></div>
+   <div class="bfields">${rows}
+    <div class="confirmbar"><button class="cbtn" onclick="confirmCard('${lid}')">&#10003; This is right</button>
+     <span class="chint">Pressing this tells us you actually looked at it.</span></div>
+   </div></div>`;
+}
+function drawCard(lid){
+  const c=card(lid);
+  if(c.type==='tax')return taxCardHTML(lid);
+  if(c.type==='plan')return planCardHTML(lid);
+  if(c.type==='plansadd')return plansAddCardHTML(lid);
+  if(c.type==='codes')return codeCardHTML(lid);
+  if(c.type==='notes')return notesCardHTML(lid);
+  return genericCardHTML(lid);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LOAD AND RENDER
+   ══════════════════════════════════════════════════════════════════════════ */
+function classify(key){
+  const k=String(key||'');
+  if(k==='tax')return 'tax';
+  if(k.startsWith('plan:'))return 'plan';
+  if(k==='plans'||k.startsWith('plans:'))return 'plansadd';
+  if(k==='codes')return 'codes';
+  if(k==='notes')return 'notes';
+  return 'other';
+}
+function mkCard(raw,forceType){
+  const c=Object.assign({},raw);
+  c.lid='c'+(++newCardSeq);
+  c.type=forceType||classify(c.card_key);
+  c.answers=(c.answers||[]).map(a=>Object.assign({},a));
+  c.state=c.state||'untouched';
+  byLocal[c.lid]=c;
+  return c;
+}
+function ingest(data){
+  WB=data.workbook||{};
+  CARDS=(data.cards||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(r=>mkCard(r));
+  MODEL={};
+  CARDS.forEach(c=>rebuild(c.lid));
+}
+function render(){
+  document.getElementById('boot').style.display='none';
+  document.getElementById('app').style.display='';
+  document.getElementById('brandname').textContent=WB.academy_name||'';
+  document.title=(WB.academy_name?WB.academy_name+' · ':'')+'Confirm your pricing';
+
+  const tax=CARDS.filter(c=>c.type==='tax');
+  // The plans-add card sits WITH the plans, not in "everything else": it is the
+  // last thing in the list of what he sells, which is where he looks for the
+  // thing that is missing from it.
+  const plans=CARDS.filter(c=>c.type==='plan'||c.type==='plansadd')
+    .sort((a,b)=>(a.type==='plansadd')-(b.type==='plansadd'));
+  const extras=CARDS.filter(c=>c.type!=='tax'&&c.type!=='plan'&&c.type!=='plansadd');
+  document.getElementById('sh_tax').style.display=tax.length?'':'none';
+  document.getElementById('sh_plans').style.display=plans.length?'':'none';
+  document.getElementById('sh_extras').style.display=extras.length?'':'none';
+  document.getElementById('taxcard').innerHTML=tax.map(c=>drawCard(c.lid)).join('');
+  document.getElementById('cards').innerHTML=plans.map(c=>drawCard(c.lid)).join('');
+  document.getElementById('extras').innerHTML=extras.map(c=>drawCard(c.lid)).join('');
+  plans.forEach(c=>drawLadder(c.lid));
+  taxEcho();
+
+  // The "already matched" strip is a real claim about his Stripe account, with
+  // real counts in it. It only appears when the API sends those counts.
+  const L=document.getElementById('legacy');
+  if(WB.legacy_note){L.innerHTML=`<div class="legacy"><div class="mt">${esc(WB.legacy_title||'Your existing Stripe prices are already matched')}</div><div class="ms">${esc(WB.legacy_note)}</div></div>`}
+  else L.innerHTML='';
+
+  drawPlansAdd();
+  if(CARDS.length&&!RO){
+    const first=CARDS.find(c=>c.state!=='confirmed')||CARDS[0];
+    const el=document.getElementById('card_'+first.lid); if(el)el.classList.add('open');
+  }
+  if(WB.status==='submitted'||WB.status==='reviewed'||WB.status==='applied'||WB.submitted_at)goReadOnly();
+  updProg();
+
+  // Linked into from the member workbook: ?from=workbook shows the way back,
+  // #plan-<card_key> opens straight onto one plan.
+  const q=new URLSearchParams(location.search);
+  if(q.get('from')){const b=document.getElementById('backlink');b.style.display='inline-block';b.href=safeReturn(q.get('return'))}
+  const m=(location.hash||'').match(/^#plan-(.+)$/);
+  if(m){const t=CARDS.find(c=>c.card_key===decodeURIComponent(m[1]));
+    if(t){const el=document.getElementById('card_'+t.lid);if(el){el.classList.add('open');el.scrollIntoView({block:'center'})}}}
+}
+/* A return URL from the query string is attacker-controllable, so only a
+   same-origin path is ever put in an href. */
+function safeReturn(u){
+  if(!u)return '#';
+  try{const p=new URL(u,location.origin);return p.origin===location.origin?p.pathname+p.search+p.hash:'#'}catch(e){return '#'}
+}
+
+function lockCard(el){
+  if(!el)return;
+  el.querySelectorAll('input,textarea').forEach(x=>{x.disabled=true});
+  el.querySelectorAll('.bchip,.cbtn,.addbtn,.arch,.rarch').forEach(x=>{x.disabled=true});
+}
+function goReadOnly(){
+  RO=true;
+  document.body.classList.add('ro');
+  const when=WB.submitted_at?new Date(WB.submitted_at):null;
+  const nice=when&&!isNaN(when)?when.toLocaleDateString(undefined,{month:'long',day:'numeric'})+' at '+when.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):'';
+  document.getElementById('donebar').innerHTML=
+    `<div class="donebar"><div class="dt">&#10003; Sent to BAM${nice?' on '+esc(nice):''}</div>
+     <div class="dd">Your answers are in and this page is now read only, so nothing can change under you while we work from it. You can still open every card to see exactly what you sent. Nothing is live yet: BAM checks it with you before any of it starts selling.</div></div>`;
+  document.getElementById('autonote').textContent='This is the copy you sent. If something is wrong, message BAM and we will reopen it for you.';
+  document.querySelectorAll('.bcard').forEach(lockCard);
+  paintSave();
+  updProg();
+}
+
+function screen(title,body,retry){
+  document.getElementById('app').style.display='none';
+  const b=document.getElementById('boot');
+  b.style.display='';
+  b.innerHTML=`<h2>${title}</h2><p>${body}</p>`+(retry?'<button class="rtry" onclick="boot()">Try again</button>':'');
+}
+
+async function reload(quiet){
+  const r=await fetch('/api/workbook?token='+encodeURIComponent(TOKEN));
+  const j=await r.json();
+  if(j&&j.ok){const openKeys=CARDS.filter(c=>{const e=document.getElementById('card_'+c.lid);return e&&e.classList.contains('open')}).map(c=>c.card_key);
+    ingest(j);render();
+    openKeys.forEach(k=>{const c=CARDS.find(x=>x.card_key===k);if(c){const e=document.getElementById('card_'+c.lid);if(e)e.classList.add('open')}});}
+  else if(!quiet)throw new Error((j&&j.error)||'not found');
+}
+
+async function boot(){
+  if(!TOKEN){
+    screen('This link is missing its code',
+      'The address needs the personal code BAM sent you on the end of it, like <code>?t=...</code>. Open the link from your message again rather than typing the address, and if it still does not work, reply to BAM and we will send you a fresh one.');
+    return;
+  }
+  screen('Opening your workbook','One moment.');
+  let res,json;
+  try{ res=await fetch('/api/workbook?token='+encodeURIComponent(TOKEN)); }
+  catch(e){
+    screen('We could not reach BAM',
+      'Your phone or computer looks offline. Nothing is lost. Check your connection and try again.',true);
+    return;
+  }
+  try{ json=await res.json(); }catch(e){ json=null }
+  if(!json){
+    screen('Something went wrong at our end',
+      'The page loaded but our server sent back something we could not read (status '+res.status+'). Nothing you do here is lost. Try again, and if it keeps happening send BAM this message.',true);
+    return;
+  }
+  if(json.ok===false||!json.workbook){
+    if(res.status===404||json.error==='not found'){
+      screen('We do not recognise this link',
+        'This workbook link is not one we know, or it has been replaced by a newer one. Reply to BAM and we will send you a fresh link.');
+    }else{
+      screen('We could not open your workbook',esc(json.error||('Status '+res.status))+'. Reply to BAM and we will sort it out.',true);
+    }
+    return;
+  }
+  ingest(json);
+  render();
+}
+boot();
+</script>
+</body>
+</html>

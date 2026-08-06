@@ -176,3 +176,83 @@ So the card could only ever come back empty. Under the no-partial-submit ruling 
 **Card count now 7:** sales tax, 4 plans, discount codes, anything else. Down from 9 (special deals to the member workbook, add-ons cut).
 Verified in the rendered page: 7 cards, no console errors, ADDONS and addonCardHTML gone, tax and codes cards intact, send gating correct at 7 and at 0 remaining.
 
+
+## Seeding facts verified live 2026-08-04 (MEMBER MANAGEMENT III), before building the workbook
+
+Queried rather than assumed, because the seed writes what these say.
+
+| Fact | Value | Consequence |
+|---|---|---|
+| `offer_prices` rows for SJ | **0** | Plans do NOT live in `offer_prices`. They are inside `offers.data.pricing.pricing_offerings` jsonb on offer `4d15a274`. So a plan card's target is `target_table='offers'`, `target_id=4d15a274`, `target_field='pricing.pricing_offerings[<i>]'` - NOT an `offer_prices` row. The schema comment guessed `offer_prices`; the seed must not. |
+| `offer_options` rows for SJ | 0 | Same |
+| `clients.tax_config` | **NULL** | The tax card's `current_value` is null, so ANY answer Lij gives is a change. Correct, and it is why the card exists. |
+| `clients.time_zone` | `America/Los_Angeles` | Confirmations render from this |
+
+### ⚠️ OPEN, and Lij sees it first: which name goes at the top of the page
+
+The approved mockup header reads **"3D BASKETBALL PREP"**. The database holds three names and **none of them is that**:
+
+| Column | Value |
+|---|---|
+| `business_name` | BAM San Jose |
+| `public_name` | By Any Means San Jose |
+| `legal_name` | 3D Prep LLC |
+| `owner_name` | Elijah De Guzman |
+
+The handoff records his business as "3D Basketball Prep", which is where the mockup got it. `public_name` = "By Any Means San Jose" is plausibly one of the **35 of 41 academies wrongly showing "BY ANY MEANS"** recorded in the wordmark note - the wordmark is supposed to be decided in the BRANDING DECK, which San Jose has not been through.
+
+This is not cosmetic. It is the first thing Lij reads on a page asking him to confirm his own prices, and a wrong business name there costs confidence before he answers anything. **Needs Zoran's call**; until then the page renders the mockup's approved wording and the API returns it explicitly rather than deriving it from whichever column happens to be populated.
+
+
+### Ruling: the workbook header reads "By Any Means San Jose" (Zoran, 2026-08-04)
+Chosen over the mockup's "3D Basketball Prep" and over the legal "3D Prep LLC", **with the wordmark warning stated in the question and chosen anyway**, so it is a decision and not an oversight.
+
+The reading that makes it coherent: **the workbook is a BAM-sent artifact.** It arrives from us, it asks him to confirm what our system will sell on his behalf, and it is one of exactly two links he ever receives from us. BAM branding on a BAM page is right even though his own business trades as 3D.
+
+Consequences for the build:
+- The page takes the name from the API as `academy_name`, sourced from `clients.public_name`. **It is not hardcoded**, so when the branding deck settles San Jose's wordmark the page follows automatically with no code change.
+- The mockup's hardcoded "3D BASKETBALL PREP" string is therefore removed rather than re-pointed.
+- This does NOT resolve the wider wordmark question for the other 34 academies. It is one page's header, decided once.
+
+
+### Correction 2026-08-05: Elementary DOES have prepay options, and our rule was applied inconsistently
+Zoran asked why we said Elementary Academy is $200. **The $200 is right** - Jenny Chung and Ted Miranda each pay exactly that every 4 weeks, against live Stripe prices. But answering the question exposed a gap.
+
+His Stripe holds a complete Elementary ladder that the 2026-08-01 ruling recorded as "no commitments":
+
+| Rung | Price | Interval | Subscribers |
+|---|---|---|---|
+| Month to month | $200 | 4 week | 2 |
+| **3 Months** | **$499** | 12 week | **0** |
+| **6 Months** | **$999** | 24 week | **0** |
+
+It was missed because the match only adopted prices with LIVE SUBSCRIBERS. **But we did not apply that rule consistently:** Academy 1x/week's $425 and $875 also have zero subscribers and we DID include them. Same situation, two different answers, and the difference was invisible because nobody compared the two decisions.
+
+**Ruling (Zoran, 2026-08-05): add both.** Not selling something he deliberately set up is a quiet loss. They enter as `proposed` with `current_value` NULL, so adopting them is a real change he has to confirm.
+
+**Rule for skill 1, and this is the transferable part:** the coverage gate asks whether every IN-USE price is classified. That is necessary and not sufficient - it is blind to a price the academy built and has never sold. A second sweep must ask the opposite question: *which coherent product ladders exist in their account that our plans do not offer?* His account holds 119 prices, most of them old one-offs, so the signal is a ladder whose intervals and discount shape MATCH the academy's other plans, not merely an unused price.
+
+### Correction: the "new" badge made a false claim about his own Stripe
+The badge read *"Options marked new are proposed by BAM and are not in your Stripe yet."* That is untrue of every rung it was applied to: Elementary $499/$999 and 1x/week $425/$875 all EXIST in his Stripe and have simply never sold. The flag is derived from `current_value` being null, which means *the portal has never stored this* - a different and narrower fact than the sentence claimed. Copy corrected to "ones we are proposing to sell for you", which is true whatever his Stripe holds. Same shape as the tax chip and the dead Send button: a claim wider than the thing that produced it.
+
+
+### Correction 2026-08-05: NOSETUP never existed. We invented it.
+Zoran asked what the NOSETUP discount code does. Read his live Stripe through the direct-key transport to answer:
+
+| Read from his account | Result |
+|---|---|
+| Coupons | **1** - `club`, $100 off, duration **forever**, created 2025-06-27, **times_redeemed 0** |
+| Promotion codes (the thing a customer types) | **0** |
+| Anything named NOSETUP | **none** |
+| Active subscriptions carrying any discount | **0 of 20** |
+
+The string "NOSETUP" appears in **no source file** - not the catalog, roster or customer list. It appears exactly once in our entire record, as part of a field name **we wrote**: `waived_via_NOSETUP_coupon_or_credit` in the fee scan. The scan hedged honestly between coupon and credit; we took the coupon half, gave it a name, and then put that name in front of the client as a fact.
+
+**What is actually true:** the $40 fee was waived 3 times, and **we do not know how**. That is now an open question for Lij rather than an answer we assert.
+
+**Ruling (Zoran, 2026-08-05): put `club` in.** The codes card now carries his one real coupon - `club`, Dollar off, $100, Every payment - with `current_value` NULL because our side has never stored it.
+
+Two things to carry:
+- **`club` is $100 off FOREVER, not once.** On a $250 plan that is $150/month for the life of the membership. It has never been used and there is no promotion code, so nobody can self-apply it - but a new system that starts honouring coupons automatically would inherit it silently.
+- **The failure shape, for skill 1:** a field NAME we chose became evidence. Nothing lied; nobody checked. The rule is that a value shown to a client must trace to THEIR data, not to a label in our own notes. Grep the client's own export for any identifier before putting it on a page they will read.
+

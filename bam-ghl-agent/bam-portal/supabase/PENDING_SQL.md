@@ -11,6 +11,14 @@ session that APPLIES them (Zoran, locally, via the Supabase CLI).
 row here in the same commit as the migration.** Remote sessions can never
 apply - always add your row. Rule lives in `bam-portal/CLAUDE.md`.
 
+## ✅ APPLIED 2026-08-05 by MEMBER MANAGEMENT III
+
+`20260805T003000_workbook_extras.sql` - two additive columns found while building the page and API, both applied via Supabase MCP and **read back verified** (`workbook_answers.current_value jsonb`, `workbook_cards.meta jsonb`).
+
+Both are deliberately kept OUT of `workbook_answers` as decisions. `current_value` exists because three values matter and not two: what the portal stores today, what we showed the owner, and what he sent back. Comparing only the last two makes a card he merely confirmed read as "no change" while it silently renames the plan. `meta` holds presentation facts ("9 members pay on this plan today", the Live-in-Stripe pill) that a computed fact must never be able to serialize as something the owner confirmed.
+
+The API tolerates `meta` being absent (catches PostgREST 42703 and omits it), so an environment without this migration degrades to a page missing the context strip rather than erroring.
+
 ## ✅ APPLIED 2026-08-04 by MEMBER MANAGEMENT III (Zoran tried to run `/pending-sql` himself; it is a Claude Code command, not a shell one, so it errored in his terminal and the orchestrator applied it via Supabase MCP instead)
 
 `20260804T230000_workbooks.sql` - the owner-workbook capture schema. **Read back and verified, not trusted:** `workbooks` (16 cols, 3 indexes), `workbook_cards` (9 cols, 2 indexes), `workbook_answers` (14 cols, 4 indexes); RLS enabled and **0 policies** on all three, which is the intended service-role-only shape.

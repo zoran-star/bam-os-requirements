@@ -106,6 +106,24 @@
   <!-- ══ IN FLIGHT ══ -->
   <h2 class="sec">In flight right now</h2>
 
+  <div class="item now">
+    <div class="ih"><h3>Where San Jose actually is</h3><span class="pill p-now">step 3 of 9</span></div>
+    <p style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.9">
+      1. Connect his Stripe &nbsp;<b style="color:#2e7d32">DONE, proven</b><br>
+      2. Match his prices &nbsp;<b style="color:#2e7d32">DONE</b><br>
+      3. Send him a PRICE workbook &nbsp;<b style="color:#8a6d1f">BUILT, not sent &#8592; here</b><br>
+      4. He confirms his prices<br>
+      5. <b>STAFF REVIEW</b> &nbsp;<b style="color:#b3261e">NOT BUILT</b><br>
+      6. Apply it to live pricing &nbsp;<b style="color:#b3261e">NOT BUILT</b><br>
+      7. Send him a MEMBER workbook &nbsp;designed, not built<br>
+      8. Seed his 20 members<br>
+      9. Write the 3 skills &nbsp;last, from the real run
+    </p>
+    <p class="where"><b>What staff review is:</b> your rule is that nothing Lij touches goes live by itself. He confirms, a human checks, then it applies. That check is step 5, and it does not exist yet - so today his answers would land in a table nobody can see without writing SQL.</p>
+    <p class="where"><b>Why it earns its place:</b> his tax answer re-prices EVERY athlete while a plan change costs one plan, so they cannot sit in one flat list. Confirming a card he never edits RENAMES three of his four plans, because his names and ours differ. And anything he adds is a request someone has to actually create.</p>
+  </div>
+
+
   <div class="item done">
     <div class="ih"><h3>Production can read his key back</h3><span class="pill p-done">PROVEN, live</span></div>
     <p>The last unproven link is now proven. Production decrypted Lij's key and used it against his real Stripe: <b>checked 1, ok 1, outcome ready</b>. <b>San Jose is connected end to end</b>, not connected on paper.</p>
@@ -141,10 +159,11 @@
   <h2 class="sec">Still to build, in order</h2>
 
   <div class="item next">
-    <div class="ih"><h3>1 &#183; Price workbook</h3><span class="pill p-you">you are looking at it</span></div>
-    <p>The page Lij uses to confirm his prices. <b><a href="sj-price-workbook-mockup-v1.html">Open the mockup</a></b>. <b>Down from 9 cards to 7</b>, both cuts on your call: <b>special deals</b> moved to the member workbook, and <b>add-ons cut outright</b> because he sells none, so that card could only ever answer "none".</p>
-    <p class="where">Two defects were also fixed first. The <b>Send button used to be dead with no reason given</b>; it now says "Confirm the remaining 7 cards to send" beside it, on hover, and flashes if he presses it anyway. And <b>"add another length" defaulted to 12 months</b>, the one length our system cannot store. Now 3 months.</p>
-    <p class="where"><b>Blocked by:</b> your approval, nothing else.</p>
+    <div class="ih"><h3>1 &#183; Price workbook</h3><span class="pill p-now">approved, being built</span></div>
+    <p>The page Lij uses to confirm his prices. <b>You approved the design</b> at 7 cards, down from 9: special deals moved to the member workbook, add-ons cut because he sells none.</p>
+    <p class="where"><b>Somewhere to save his answers: DONE and live.</b> The page and the part that saves are both built and are now being wired together, then attacked by fresh agents before you or Lij see anything.</p>
+    <p class="where"><b>Three real defects found while building</b>, and one of them was mine: I added a message explaining why the Send button was greyed out, tested it, and reported it working. My test clicked the button from code. <b>A real finger cannot click a greyed-out button at all</b>, so the message never once appeared. Found by testing with a real mouse. Fixed.</p>
+    <p class="where">The other two: the "you save $151" comparison row <b>kept showing the old price</b> while he typed a new one, and removing the $40 fee would have <b>silently put it back</b>.</p>
   </div>
 
   <div class="item next">
