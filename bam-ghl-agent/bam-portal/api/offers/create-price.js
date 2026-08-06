@@ -200,7 +200,11 @@ export const CADENCES = {
   "3_calendar_months": { interval: "month", interval_count: 3 },
   "6_calendar_months": { interval: "month", interval_count: 6 },
 };
-function normCadence(v) {
+// Exported (2026-08-06) for the same reason as termToInterval/cadenceFromLength:
+// the workbook's dry-run preview must state the SAME rhythm the mint will
+// choose, and a second copy of this normalisation is a fork on a money path.
+// Behaviour unchanged; named export only.
+export function normCadence(v) {
   const raw = v == null ? "" : String(v).trim().toLowerCase();
   if (!raw) return null;
   if (Object.prototype.hasOwnProperty.call(CADENCES, raw)) return raw;
@@ -229,7 +233,9 @@ function normCadence(v) {
 //      rather than minting on a guess.
 //   3. Otherwise the proposed shape, and failing that the term's standard shape -
 //      byte-identically what this endpoint minted before cadence existed.
-function recurringFor(term, cadence, proposed) {
+// Exported (2026-08-06): the workbook's rehearsal answers "what would the mint
+// bill this on" by calling THE decision, not a reimplementation of it.
+export function recurringFor(term, cadence, proposed) {
   const termIv = termToInterval(term);
   if (termIv.recurring === null) return null;
   if (cadence && Object.prototype.hasOwnProperty.call(CADENCES, cadence)) return CADENCES[cadence];

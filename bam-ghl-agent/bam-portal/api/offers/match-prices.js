@@ -95,7 +95,9 @@ async function fetchLiveSubs(stripeAccount) {
 
 // Product names can't be expanded inline (depth limit), so fetch them once and
 // map id → name. One or two list calls for a typical academy.
-async function fetchProductNames(stripeAccount) {
+// Exported (2026-08-06) for the workbook rehearsal's live-Stripe read: reusing
+// this one pass is the non-fork answer to naming the prices it finds.
+export async function fetchProductNames(stripeAccount) {
   const map = {};
   let startingAfter = null;
   for (let page = 0; page < 10; page++) {

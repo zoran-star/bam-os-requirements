@@ -2175,16 +2175,23 @@ async function doApplyStaff(req, body) {
 // second copy of that math is a fork on a money path. Still lazy relative to the
 // MODULE: an owner autosave never drags the matcher's dependency tree in.
 async function loadPriceMachinery() {
-  let mod;
+  let matcher, pricer, stripe;
   try {
-    mod = await import("./offers/match-prices.js");
+    matcher = await import("./offers/match-prices.js");
+    // The mint's OWN cadence resolution and THE Stripe seam ride the same lazy
+    // load, for the same reason buildOfferTargets does: the rehearsal answers
+    // "what would the mint bill this on" and "does this price already exist"
+    // by calling the decision and the transport the mint will use, never a
+    // second copy of either. A failed load is the same 503 BEFORE any write.
+    pricer = await import("./offers/create-price.js");
+    stripe = await import("./_stripe-transport.js");
   } catch {
     throw bad("the phase 3 preview could not load api/offers/match-prices.js in this environment, so apply stopped before writing anything", 503, "price_machinery_unavailable");
   }
-  if (typeof mod.buildOfferTargets !== "function" && typeof mod.buildOfferTargetsReport !== "function") {
+  if (typeof matcher.buildOfferTargets !== "function" && typeof matcher.buildOfferTargetsReport !== "function") {
     throw bad("the phase 3 preview needs buildOfferTargets exported from api/offers/match-prices.js - it is not exported yet, so apply stopped before writing anything", 503, "price_machinery_unavailable");
   }
-  return mod;
+  return { matcher, pricer, stripe };
 }
 
 // The targets plus the WITHHELD joining fees, from one build. The report export
@@ -2246,7 +2253,7 @@ async function phase3Preview(clientId, mod) {
   // a crash, and the writes that already landed stand.
   let targets, withheld, withheldNote;
   try {
-    ({ targets, withheld, withheldNote } = await buildTargetsWithReport(mod, clientId));
+    ({ targets, withheld, withheldNote } = await buildTargetsWithReport(mod.matcher, clientId));
   } catch (e) {
     // A sentence our own machinery wrote, about a commitment length - no
     // credential material travels this path. Counts are NULL rather than zero:
@@ -2277,11 +2284,12 @@ async function phase3Preview(clientId, mod) {
       + "&select=source_offer_id,source_offer_price_key,billing_cadence,sort_order&order=sort_order.asc",
       "offer_prices billing_cadence"
     ),
-    // The academy row itself, for the READINESS surface below (tax_state). Read
-    // fresh here rather than trusted from the apply's earlier state, because
-    // the tax write in phase b landed BEFORE this preview runs and the state
-    // reported must be the state the mint would actually see.
-    readForPreview(`clients?id=eq.${enc(clientId)}&select=tax_config&limit=1`, "clients tax_config"),
+    // The academy row itself, for the READINESS surface below (tax_state) and
+    // for the live Stripe read (stripe_connect_account_id). Read fresh here
+    // rather than trusted from the apply's earlier state, because the tax
+    // write in phase b landed BEFORE this preview runs and the state reported
+    // must be the state the mint would actually see.
+    readForPreview(`clients?id=eq.${enc(clientId)}&select=tax_config,stripe_connect_account_id&limit=1`, "clients tax_config"),
   ]);
   const catalog = catalogRead.rows;
   const previewOffers = offersRead.rows;
@@ -2307,6 +2315,56 @@ async function phase3Preview(clientId, mod) {
     else taxState = "never_asked";
   }
 
+  // ── THE LIVE STRIPE READ, read-only, through THE seam (D7) ────────────────
+  // The rehearsal used to answer match-vs-mint from the pricing_catalog table
+  // alone - a snapshot that can be stale or empty while the academy's real
+  // Stripe already carries the price. So the dry run now reads the LIVE
+  // active prices through _stripe-transport.stripeFetch, which routes San
+  // Jose's direct key or a Connect header without this caller ever asking
+  // which it got. GETs only: the harnesses throw STRIPE WAS WRITTEN TO on
+  // anything else, and that tripwire is proven live by MUTATE=stripewrite.
+  //
+  // FAIL LOUD, three outcomes: "read" / "not_connected" / "could_not_read".
+  // It must be impossible to read exists:false out of a failed read - a
+  // swallowed failure here says "mint them all" against real cards
+  // (MUTATE=stripequietfail).
+  let livePrices = null, productNames = null, stripeError = null;
+  let stripeCheck;
+  const acct = clientRead.state === "read"
+    ? String((clientRead.rows[0] || {}).stripe_connect_account_id || "").trim()
+    : "";
+  if (clientRead.state !== "read") {
+    stripeCheck = "could_not_read";
+    stripeError = "the academy row could not be read, so this run cannot say which Stripe account to look in. Do not treat would-mint counts as real until this reads.";
+  } else if (!acct) {
+    stripeCheck = "not_connected";
+  } else {
+    try {
+      livePrices = [];
+      let after = null;
+      for (let page = 0; page < 10; page++) {   // cap ~1000 prices; an academy past that is a conversation
+        const qs = new URLSearchParams({ active: "true", limit: "100" });
+        if (after) qs.set("starting_after", after);
+        const r = await mod.stripe.stripeFetch(`/prices?${qs.toString()}`, { stripeAccount: acct });
+        const data = (r && r.data) || [];
+        livePrices.push(...data);
+        if (!r || !r.has_more || !data.length) break;
+        after = data[data.length - 1].id;
+      }
+      stripeCheck = "read";
+      // Names are cosmetic: a failed products pass leaves them null without
+      // demoting the EXISTENCE answer, which really was read.
+      try { productNames = await mod.matcher.fetchProductNames(acct); } catch { productNames = null; }
+    } catch (e) {
+      // Logged, never forwarded: it is a throw we did not write, and the
+      // transport's own guards have already kept key material out of it.
+      console.error("workbook: the phase 3 preview could not read live Stripe prices -", String((e && e.message) || e));
+      livePrices = null;
+      stripeCheck = "could_not_read";
+      stripeError = "the academy's live Stripe prices could not be read, so this run cannot say which targets already exist. Do not treat would-mint counts as real until this reads.";
+    }
+  }
+
   // REPORT-ONLY shape. The live mint (when it exists) goes through
   // create-price.js recurringFor, which also honors declared week rhythms and
   // per-row billing_cadence overrides; this only describes the STANDARD shape
@@ -2322,12 +2380,12 @@ async function phase3Preview(clientId, mod) {
     return { interval: null, recurring: null };   // render whatever arrived; match nothing
   };
 
-  // THE DECLARED RHYTHM, best effort, so staff SEE it in the rehearsal: San
-  // Jose's "3 Months (12 Weeks)" bills his real members every 12 weeks, and a
-  // mint on 3 calendar months would put new signups on a different clock
-  // forever. The commitment is joined back by its price and its week count is
-  // read off the label only when that join is unambiguous.
-  const declaredWeeksFor = (t) => {
+  // THE DECLARED LENGTH LABEL, joined back so the rehearsal can resolve the
+  // rhythm the way the MINT does: San Jose's "3 Months (12 Weeks)" bills his
+  // real members every 12 weeks, and a mint on 3 calendar months would put new
+  // signups on a different clock forever. The commitment is joined by its
+  // price, and the label is used only when that join is unambiguous.
+  const declaredLengthFor = (t) => {
     if (!/^\d+_months$/.test(String(t.term || ""))) return null;
     for (const o of previewOffers) {
       const offerings = (((o.data || {}).pricing) || {}).pricing_offerings || [];
@@ -2337,14 +2395,25 @@ async function phase3Preview(clientId, mod) {
           (c) => c && Math.round(parseFloat(c.price) * 100) === Number(t.base_cents)
         );
         if (hits.length !== 1) return null;
-        const w = String(hits[0].length || "").toLowerCase().match(/(\d+)\s*week/);
-        return w ? +w[1] : null;
+        return hits[0].length == null ? null : String(hits[0].length);
       }
     }
     return null;
   };
 
-  // ── WHAT THE MINT WOULD ACTUALLY HONOUR, as far as this side can know it ──
+  // The rhythm sentence a human reads, with its SOURCE attached, because "every
+  // 12 weeks" from a typed row and "every 12 weeks" from a label are different
+  // claims to go verify.
+  const rhythmSentence = (rec, source) => {
+    const src = source === "typed_row" ? "from the typed offer_prices row"
+      : source === "length_label" ? "from the week count the length label declares"
+        : "from the term's calendar shape";
+    if (rec === null) return "the mint would bill this once, as a one-time line, never a subscription";
+    const unit = Number(rec.interval_count) === 1 ? rec.interval : `${rec.interval_count} ${rec.interval}s`;
+    return `the mint would bill this every ${unit} (${src})`;
+  };
+
+  // ── WHAT THE MINT WOULD ACTUALLY HONOUR - answered, no longer hedged ──────
   //
   // create-price.js recurringFor decides in this order: an explicit request
   // cadence, then the TYPED offer_prices row, then the length label, then the
@@ -2357,12 +2426,14 @@ async function phase3Preview(clientId, mod) {
   // ascending, because an unordered pick can change between two identical reads.
   // Anything looser and the two disagree about money.
   //
-  // WHAT IT STILL CANNOT KNOW, said out loud instead of asserted: CADENCES and
-  // cadenceFromLength are not exported from create-price.js, so this side cannot
-  // tell a declared 12-week rhythm (in the vocabulary, minted on weeks) from a
-  // declared 8-week one (not in it, warned about and minted on calendar months).
-  // A second copy of the cadence table here would be a fork on a money path, so
-  // the gap is NAMED rather than filled in with a guess that reads as a fact.
+  // The hedge this used to carry ("the cadence vocabulary is not exported, so
+  // this preview cannot say") is GONE because the gap it named was closed:
+  // normCadence, cadenceFromLength and recurringFor are exported from
+  // create-price.js now, so each target's billing_rhythm below is computed by
+  // THE SAME functions the mint will call, with its source attached. A label
+  // that declares a week count the vocabulary cannot honour is stated as a
+  // FALLBACK to the calendar shape, because that is what cadenceFromLength
+  // returning null means at mint time - stated, never guessed.
   // MUTATE=previewlies.
   // DESTRUCTURED, NOT `const pair = ...row.source_offer_price_key...`, and that
   // is not a style choice. scripts/credential-header-scan.mjs treats any
@@ -2377,15 +2448,48 @@ async function phase3Preview(clientId, mod) {
     const pair = `${String(onOffer || "")}|${String(forKey || "")}`;
     if (!typedCadence.has(pair)) typedCadence.set(pair, String(rhythm));   // sort_order asc: the first is the one
   }
-  const CADENCE_UNKNOWABLE = "this preview cannot say which billing rhythm the mint will use: create-price.js resolves it from a cadence vocabulary that is not exported. Treat a rhythm below as something to check before the live mint, not as what will happen.";
+  // A live Stripe price matches a target when the AMOUNT and the RECURRING
+  // SHAPE both agree with what the mint would create - a one-time target
+  // matches only a price with no recurring block at all. Amount alone is not a
+  // match: a $2,186.41 price billed every 4 weeks is not the 12-month prepay,
+  // it is a different product at a coincidental number.
+  const sameRecurring = (price, want) => (want == null
+    ? price.recurring == null
+    : !!price.recurring
+      && String(price.recurring.interval) === String(want.interval)
+      && Number(price.recurring.interval_count) === Number(want.interval_count));
 
   const rows = targets.map((t) => {
     const shape = shapeFor(t.term);
     const hit = !canCompare || shape.interval == null ? null : (catalog.find(
       (r) => Number(r.amount_cents) === Number(t.allin_cents) && String(r.interval) === shape.interval
     ) || null);
-    const weeks = offersRead.state === "read" ? declaredWeeksFor(t) : null;
+    const lenLabel = offersRead.state === "read" ? declaredLengthFor(t) : null;
+    const weeksM = lenLabel ? String(lenLabel).toLowerCase().match(/(\d+)\s*week/) : null;
+    const weeks = weeksM ? +weeksM[1] : null;
     const typed = typedCadence.get(`${String(t.offer_id || "")}|${String(t.key || "")}`);
+    // THE MINT'S OWN RESOLUTION, called rather than copied: typed row first,
+    // then the label's week count, then the term's calendar shape - each step
+    // through the exported functions the mint itself uses.
+    const typedCad = typed === undefined ? null : mod.pricer.normCadence(typed);
+    const lenCad = typedCad ? null : mod.pricer.cadenceFromLength(lenLabel);
+    const cadence = typedCad || lenCad;
+    const mintRecurring = mod.pricer.recurringFor(t.term, cadence, null);
+    const source = typedCad ? "typed_row" : (lenCad ? "length_label" : "term_shape");
+    // Live-Stripe existence, only ever answered off a read that HAPPENED:
+    // null means "this run cannot say", and it must be impossible to read
+    // exists:false out of a failed read.
+    let stripeInfo = null;
+    if (stripeCheck === "read") {
+      const live = livePrices.find((p) => Number(p.unit_amount) === Number(t.allin_cents) && sameRecurring(p, mintRecurring)) || null;
+      stripeInfo = live ? {
+        exists: true,
+        price_id: live.id,
+        currency: live.currency || null,
+        interval: live.recurring ? `${live.recurring.interval_count} ${live.recurring.interval}` : "one_time",
+        product_name: (productNames && typeof live.product === "string" && productNames[live.product]) || null,
+      } : { exists: false };
+    }
     return {
       key: t.key,
       label: t.label,
@@ -2396,18 +2500,27 @@ async function phase3Preview(clientId, mod) {
       fee_label: t.fee_label || null,
       interval: shape.interval,
       recurring: shape.recurring,
-      ...(weeks == null ? {} : {
-        declared_weeks: weeks,
-        rhythm_note: `the commitment length declares a ${weeks}-week billing rhythm. ${CADENCE_UNKNOWABLE}`,
-      }),
-      ...(typed === undefined ? {} : {
-        typed_cadence: typed,
-        typed_cadence_note: `offer_prices already carries billing_cadence "${typed}" for this key, and a typed row OUTRANKS the length label at mint time, so this is the rhythm to check first. ${CADENCE_UNKNOWABLE}`,
-      }),
+      ...(weeks == null ? {} : { declared_weeks: weeks }),
+      ...(typed === undefined ? {} : { typed_cadence: typed }),
+      // THE REAL RHYTHM, with its source - computed by the mint's own exported
+      // functions, so the rehearsal and the mint cannot disagree about a clock.
+      billing_rhythm: {
+        recurring: mintRecurring,
+        source,
+        sentence: rhythmSentence(mintRecurring, source),
+      },
+      // A declared week count the vocabulary cannot honour is a FALLBACK the
+      // mint will really take - stated, not guessed at.
+      ...(weeks != null && !cadence ? {
+        rhythm_fallback: `the length label declares a ${weeks}-week rhythm that is not in the mint's cadence vocabulary, so the mint will FALL BACK to the term's calendar shape. Set billing_cadence on the offer_prices row if the weekly clock is the real one.`,
+      } : {}),
+      stripe: stripeInfo,
       matched: hit ? { stripe_price_id: hit.stripe_price_id, tier: hit.tier, amount_cents: hit.amount_cents, display_name: hit.display_name || null } : null,
       // A COMPARISON WE COULD NOT MAKE IS NULL, NOT "yes it needs minting".
       // With the catalog unread, `needs_mint: true` is a claim about a table
       // nobody opened - and acting on it mints a price that already exists.
+      // (Two different questions ride each row on purpose: `matched`/
+      // `needs_mint` ask the CATALOG snapshot, `stripe` asks the LIVE account.)
       needs_mint: canCompare ? !hit : null,
     };
   });
@@ -2484,6 +2597,13 @@ async function phase3Preview(clientId, mod) {
     would_mint: canCompare ? rows.filter((r) => r.needs_mint === true).length : null,
     withheld_fees: withheld ? withheld.length : null,
     tax_state: taxState,
+    // THE LIVE-STRIPE ANSWER. Counts are NULL, never zero, when the read did
+    // not happen: "nothing exists yet" and "we could not look" are different
+    // answers, and acting on the wrong one mints duplicates against real cards.
+    stripe_check: stripeCheck,
+    ...(stripeError ? { stripe_error: stripeError } : {}),
+    exists_in_stripe: stripeCheck === "read" ? rows.filter((r) => r.stripe && r.stripe.exists === true).length : null,
+    would_mint_new: stripeCheck === "read" ? rows.filter((r) => r.stripe && r.stripe.exists === false).length : null,
     catalog: catalogRead.state === "read" ? (catalog.length ? "read" : "empty") : catalogRead.state,
     ...(canCompare ? {} : {
       could_not_compare: "the price catalog could not be read, so nothing here says whether these prices already exist. Do NOT mint from this run: minting against an unread catalog is how duplicate Stripe prices get made.",
@@ -2493,7 +2613,6 @@ async function phase3Preview(clientId, mod) {
       could_not_scan_offers: "the offers could not be read, so this run cannot say whether any commitment length is unsellable, and no declared billing rhythm is shown.",
     }),
     typed_cadence_source: cadenceRead.state,
-    cadence_caveat: CADENCE_UNKNOWABLE,
   };
 }
 

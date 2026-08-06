@@ -166,7 +166,7 @@
  * Measured 2026-08-06, after the rehearsal-round-1 builds through D6 (withheld
  * fee report, Variant A codes guard, confirmed-no tax, registration number,
  * duration scope sentence, every-card-counts). Unmutated ALL PASS
- * (135 assertions).
+ * (135 assertions; 137 after the D7 live-Stripe checks joined H5).
  * typingisapproving -> 17 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 5, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -583,6 +583,10 @@ process.env.SUPABASE_URL = SB_BASE;
 process.env.VITE_SUPABASE_URL = SB_BASE;
 process.env.SUPABASE_SERVICE_ROLE_KEY = "stub-service-key";
 delete process.env.SUPABASE_SERVICE_KEY;
+// The rehearsal's live-Stripe read routes through the transport seam; with no
+// client_stripe_direct row in the stub it takes the Connect path, which needs
+// a platform key in env.
+process.env.STRIPE_CONNECT_SECRET_KEY = "sk_stub_platform_key";
 
 const TOKEN = "wbk_tok_contract";
 // The STAFF credential. Nothing the owner's page ever sends carries it, which is
@@ -590,7 +594,8 @@ const TOKEN = "wbk_tok_contract";
 const STAFF_BEARER = "staff-session-" + "contract-Kp3";
 const OFFER_ID = "off1";
 const COLUMNS = {
-  clients: ["id", "public_name", "business_name", "tax_config", "tax_registration_number"],
+  clients: ["id", "public_name", "business_name", "tax_config", "tax_registration_number", "stripe_connect_account_id"],
+  client_stripe_direct: ["client_id", "status", "secret_key_enc", "secret_key_last4", "publishable_key", "stripe_account_id", "capabilities", "key_last_verified_at"],
   staff: ["id", "user_id", "name", "email"],
   offers: ["id", "client_id", "status", "title", "type", "data"],
   workbooks: ["id", "client_id", "kind", "token", "status", "submitted_at", "reviewed_at", "snapshot", "created_at", "updated_at"],
@@ -773,7 +778,7 @@ const OFFER_DATA = () => ({
 function reset() {
   seq = 0;
   DB = {
-    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null }],
+    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null, stripe_connect_account_id: "acct_1RDtSMK6ZS1cqefu" }],
     staff: [{ id: "staff-1", user_id: "user-1", name: "Zoran", email: "zoran@byanymeansbball.com" }],
     offers: [{ id: OFFER_ID, client_id: "sj", status: "active", title: "Training", type: "training", data: OFFER_DATA() }],
     pricing_catalog: [],
@@ -881,7 +886,15 @@ async function router(url, init = {}) {
       ? json({ id: "user-1", email: "zoran@byanymeansbball.com" })
       : json({ msg: "invalid" }, 401);
   }
-  if (u.startsWith("https://api.stripe.com/")) throw new Error(`STRIPE WAS CALLED: ${method} ${u} - nothing in this pass may talk to Stripe`);
+  // The rehearsal may READ Stripe (D7); anything else still throws, so the
+  // no-writes gate survives, sharper. This harness serves an empty price list
+  // - existence assertions live in api/_workbook-apply.test.mjs, whose fixture
+  // carries live prices; here the claim is only that the read happens, is a
+  // GET, and fails loud when it cannot.
+  if (u.startsWith("https://api.stripe.com/")) {
+    if (method !== "GET") throw new Error(`STRIPE WAS WRITTEN TO: ${method} ${u} - the rehearsal may READ Stripe, never write it`);
+    return json({ object: "list", data: [], has_more: false });
+  }
   if (!u.startsWith(`${SB_BASE}/rest/v1/`)) throw new Error(`UNSTUBBED CALL: ${method} ${u}`);
   // The runtime builds a Headers object out of init.headers and its validator
   // throws quoting the whole value; keeping that here means the credential guard
@@ -1799,6 +1812,13 @@ console.log("\n── H5. the rehearsal describes work in the page's own key voc
   check(Array.isArray(whs), `the apply response carries withheld_signup_fees as DATA (saw ${JSON.stringify(whs)})`);
   check((Array.isArray(whs) && whs.length > 0) === pageLoose,
     `and its presence matches the page's own loose-code state (page loose ${pageLoose}, withheld ${Array.isArray(whs) ? whs.length : "MISSING"})`);
+
+  // D7: the live-Stripe read happened, read-only, and with this harness's
+  // empty account every target honestly reads as would-mint.
+  check(PH3.stripe_check === "read" && PH3.exists_in_stripe === 0 && PH3.would_mint_new === (PH3.targets || []).length,
+    `the rehearsal read LIVE Stripe (stripe_check ${JSON.stringify(PH3.stripe_check)}, ${PH3.exists_in_stripe} exist, ${PH3.would_mint_new} to mint of ${(PH3.targets || []).length})`);
+  check((PH3.targets || []).length > 0 && (PH3.targets || []).every((t) => t.billing_rhythm && typeof t.billing_rhythm.sentence === "string" && t.billing_rhythm.recurring !== undefined),
+    "and every target states its real billing rhythm with a source, no hedge");
 }
 
 console.log("\n── H6. rollback puts back exactly what he was looking at ──");

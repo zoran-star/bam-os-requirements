@@ -157,6 +157,10 @@ process.env.SUPABASE_URL = SB_BASE;
 process.env.VITE_SUPABASE_URL = SB_BASE;
 process.env.SUPABASE_SERVICE_ROLE_KEY = "stub-service-key";
 delete process.env.SUPABASE_SERVICE_KEY;
+// The transport the live-Stripe read routes through needs a platform key; the
+// stub has no client_stripe_direct row, so every call takes the Connect path
+// (platform key + Stripe-Account header) - which is exactly the assertion.
+process.env.STRIPE_CONNECT_SECRET_KEY = "sk_stub_platform_key";
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -336,8 +340,8 @@ const PREVIEWLIES = [
       "offer_prices billing_cadence"
     ),`,
    `    Promise.resolve({ state: "read", rows: [] }),   // (control previewlies) the typed row is never read`],
-  ["        rhythm_note: `the commitment length declares a ${weeks}-week billing rhythm. ${CADENCE_UNKNOWABLE}`,",
-   "        rhythm_note: `the commitment length declares a ${weeks}-week billing rhythm; the mint resolves it through create-price.js cadence rules`,   // (control previewlies)"],
+  [`    const typedCad = typed === undefined ? null : mod.pricer.normCadence(typed);`,
+   `    const typedCad = null;   // (control previewlies) the typed row no longer outranks the label`],
 ];
 
 const LATELOAD = [
@@ -380,11 +384,29 @@ const TAXREGNOWHERE = [[
   `  if (f === "tax_registration_number") return { kind: "taxreg" };`,
   `  // (control taxregnowhere) the field has no home`]];
 
+// The live-Stripe read's catch swallows the failure into "nothing exists": a
+// dead read reports exists:false everywhere and zero counts, which is "mint
+// them all" said with false confidence against real cards.
+const STRIPEQUIETFAIL = [[
+  `      livePrices = null;
+      stripeCheck = "could_not_read";`,
+  `      livePrices = [];                    // (control stripequietfail)
+      stripeCheck = "read";               // the failure is swallowed into "nothing exists"`]];
+
+// One POST sneaks into the read loop. The harness's WRITTEN-TO throw must
+// fire, proving the no-write tripwire is live - observable as the whole read
+// degrading to could_not_read instead of answering.
+const STRIPEWRITE = [[
+  "        const r = await mod.stripe.stripeFetch(`/prices?${qs.toString()}`, { stripeAccount: acct });",
+  "        await mod.stripe.stripeFetch(\"/prices\", { method: \"POST\", body: { unit_amount: 1 }, stripeAccount: acct });   // (control stripewrite)\n        const r = await mod.stripe.stripeFetch(`/prices?${qs.toString()}`, { stripeAccount: acct });"]];
+
 const EDITS = {
   applybeforereview: APPLYBEFOREREVIEW,
   feewithheldsilently: FEEWITHHELDSILENTLY,
   noisnull: NOISNULL,
   taxregnowhere: TAXREGNOWHERE,
+  stripequietfail: STRIPEQUIETFAIL,
+  stripewrite: STRIPEWRITE,
   taxaftermint: TAXAFTERMINT,
   snapshotoverwrite: SNAPSHOTOVERWRITE,
   snapfilteronly: SNAPFILTERONLY,
@@ -423,7 +445,10 @@ const TOKEN = "wbk_" + "tok_" + "applySanJose";
 const STAFF_BEARER = "staff-session-" + "bearer-Kp3";
 
 const COLUMNS = {
-  clients: ["id", "public_name", "business_name", "tax_config", "tax_registration_number"],
+  clients: ["id", "public_name", "business_name", "tax_config", "tax_registration_number", "stripe_connect_account_id"],
+  // The transport's direct-row lookup: no rows here, so every academy routes
+  // through Connect - the caller must not be able to tell, and does not ask.
+  client_stripe_direct: ["client_id", "status", "secret_key_enc", "secret_key_last4", "publishable_key", "stripe_account_id", "capabilities", "key_last_verified_at"],
   staff: ["id", "user_id", "name", "email"],
   offers: ["id", "client_id", "status", "title", "type", "data"],
   workbooks: ["id", "client_id", "kind", "token", "status", "expires_at", "sent_at", "submitted_at", "reviewed_at", "applied_at", "snapshot", "created_by", "created_by_name", "created_at", "updated_at"],
@@ -480,7 +505,7 @@ let seq = 0;
 function reset() {
   seq = 0;
   DB = {
-    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null }],
+    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null, stripe_connect_account_id: "acct_1RDtSMK6ZS1cqefu" }],
     staff: [{ id: "staff-1", user_id: "user-1", name: "Zoran", email: "zoran@byanymeansbball.com" }],
     offers: [{ id: "off1", client_id: "sj", status: "active", title: "Training", type: "training", data: OFFER_DATA() }],
     workbooks: [
@@ -590,6 +615,30 @@ function project(table, rows, params) {
   return rows.map((r) => Object.fromEntries(cols.map((c) => [c, r[c] === undefined ? null : r[c]])));
 }
 
+// ── THE LIVE STRIPE FIXTURE (D7) ─────────────────────────────────────────────
+// Four of the fixture's seven post-apply targets already exist live - amounts
+// AND recurring shapes both matching what the mint would create - including
+// the 12-week rung, so the rhythm half of the match is exercised. One decoy
+// sits at the 12-month prepay's exact amount on a 4-week clock: amount alone
+// must never read as existence. GETs are served from here; ANY other method
+// still throws, which keeps the no-writes gate and makes it sharper
+// (MUTATE=stripewrite proves the tripwire is live).
+const STRIPE_PRICES = [
+  { id: "price_live_ele_m", object: "price", unit_amount: 21875, currency: "usd", product: "prod_ele", recurring: { interval: "week", interval_count: 4 } },
+  { id: "price_live_two_m", object: "price", unit_amount: 27344, currency: "usd", product: "prod_two", recurring: { interval: "week", interval_count: 4 } },
+  { id: "price_live_two_3m", object: "price", unit_amount: 60047, currency: "usd", product: "prod_two", recurring: { interval: "week", interval_count: 12 } },
+  { id: "price_live_fee", object: "price", unit_amount: 4375, currency: "usd", product: "prod_fee", recurring: null },
+  // The decoy: right amount, wrong clock. Not the 12-month prepay.
+  { id: "price_live_decoy", object: "price", unit_amount: 218641, currency: "usd", product: "prod_ele", recurring: { interval: "week", interval_count: 4 } },
+];
+const STRIPE_PRODUCTS = [
+  { id: "prod_ele", name: "Elementary Academy" },
+  { id: "prod_two", name: "Academy 2x/week" },
+  { id: "prod_fee", name: "Joining fee" },
+];
+const STRIPE_READS = [];           // every GET, with its headers, for the right-account assertion
+const STRIPE_FAIL = new Set();     // "prices" -> GET /v1/prices answers 503
+
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url);
   const method = String(init.method || "GET").toUpperCase();
@@ -597,7 +646,16 @@ globalThis.fetch = async (url, init = {}) => {
   new Headers(init.headers || {});
   const json = (v, status = 200) => new Response(JSON.stringify(v), { status, headers: { "content-type": "application/json" } });
 
-  if (u.startsWith("https://api.stripe.com/")) throw new Error(`STRIPE WAS CALLED: ${method} ${u} - nothing in this pass may talk to Stripe`);
+  if (u.startsWith("https://api.stripe.com/")) {
+    if (method !== "GET") throw new Error(`STRIPE WAS WRITTEN TO: ${method} ${u} - the rehearsal may READ Stripe, never write it`);
+    STRIPE_READS.push({ url: u, headers: init.headers || {} });
+    if (u.includes("/v1/prices")) {
+      if (STRIPE_FAIL.has("prices")) return json({ error: { message: "the stub database went away mid-read" } }, 503);
+      return json({ object: "list", data: STRIPE_PRICES, has_more: false });
+    }
+    if (u.includes("/v1/products")) return json({ object: "list", data: STRIPE_PRODUCTS, has_more: false });
+    return json({ object: "list", data: [], has_more: false });
+  }
   if (u.startsWith(`${SB_BASE}/auth/v1/`)) {
     const bearer = String((init.headers || {}).Authorization || "");
     if (bearer !== `Bearer ${STAFF_BEARER}`) return json({ msg: "invalid" }, 401);
@@ -884,11 +942,14 @@ console.log("\n── 4. apply: gated, ordered, dry by default ──");
   ok(!!two3 && two3.allin_cents === 60047 && JSON.stringify(two3.recurring) === JSON.stringify({ interval: "month", interval_count: 3 }),
     "the 3-month rung previews on the 3-month clock with the NEW 549 price, taxed");
   // THE RHYTHM San Jose actually bills on. "3 Months (12 Weeks)" declares a
-  // 12-week clock; his real members ride it, and the rehearsal must show it.
-  ok(!!two3 && two3.declared_weeks === 12 && /12-week billing rhythm/.test(String(two3.rhythm_note)),
-    `the declared 12-week rhythm is visible on the 3-month rung ("${two3 && two3.rhythm_note}")`);
-  ok(!!twoM && twoM.declared_weeks === undefined,
-    "while the monthly target carries no declared rhythm - its label has no week count");
+  // 12-week clock; his real members ride it, and the rehearsal now STATES it
+  // as the mint's answer - computed by the mint's own exported functions,
+  // with its source attached.
+  ok(!!two3 && two3.declared_weeks === 12 && two3.billing_rhythm && two3.billing_rhythm.source === "length_label"
+    && JSON.stringify(two3.billing_rhythm.recurring) === JSON.stringify({ interval: "week", interval_count: 12 }),
+    `the declared 12-week rhythm IS the mint's answer on the 3-month rung ("${two3 && two3.billing_rhythm && two3.billing_rhythm.sentence}")`);
+  ok(!!twoM && twoM.declared_weeks === undefined && twoM.billing_rhythm && twoM.billing_rhythm.source === "term_shape",
+    "while the monthly target rides the term's own shape - its label has no week count");
   // The OPEN term vocabulary: a 12-month rung previews on a 12-month calendar
   // clock, not collapsed to the 4-week default and not to 6_months.
   const ele12 = byKey["Elementary Academy|12_months"];
@@ -1152,15 +1213,18 @@ console.log("\n── 10. a read that FAILED is never reported as a read that fo
   reset();
 }
 
-console.log("\n── 11. the preview does not promise a rhythm it cannot verify ──");
+console.log("\n── 11. the rehearsal states the REAL billing rhythm, with its source ──");
 {
   reset();
   approveAll();
-  // The typed row the MINT would obey, which the preview never used to read.
-  DB.offer_prices.push({ id: "op1", tenant_id: "sj", source_offer_id: "off1", source_offer_price_key: "Academy 2x/week|3_months", billing_cadence: "12_weeks", is_active: true, is_routable: true, sort_order: 0 });
+  // A typed row that DIFFERS from the label: the label declares 12 weeks, the
+  // row says 3 calendar months. The mint honours the typed row, so the
+  // rehearsal must say month x3 sourced from the row - never average the two,
+  // never hedge that it cannot know (the cadence machinery is exported now).
+  DB.offer_prices.push({ id: "op1", tenant_id: "sj", source_offer_id: "off1", source_offer_price_key: "Academy 2x/week|3_months", billing_cadence: "3_calendar_months", is_active: true, is_routable: true, sort_order: 0 });
   // A superseded row on the same key, deactivated rather than deleted - exactly
   // what offers-sync leaves behind, and exactly what a looser scope would read.
-  DB.offer_prices.push({ id: "op0", tenant_id: "sj", source_offer_id: "off1", source_offer_price_key: "Academy 2x/week|3_months", billing_cadence: "3_calendar_months", is_active: false, is_routable: false, sort_order: 1 });
+  DB.offer_prices.push({ id: "op0", tenant_id: "sj", source_offer_id: "off1", source_offer_price_key: "Academy 2x/week|3_months", billing_cadence: "12_weeks", is_active: false, is_routable: false, sort_order: 1 });
   // A label declaring a rhythm the mint's cadence vocabulary does not contain.
   row("workbook_answers", "a-ele-c0-len").answered = "2 Months (8 Weeks)";
   row("workbook_answers", "a-ele-c0-len").proposed = "2 Months (8 Weeks)";
@@ -1169,18 +1233,20 @@ console.log("\n── 11. the preview does not promise a rhythm it cannot verify
   const p3 = r.body.phase3;
   const byKey = Object.fromEntries(p3.targets.map((t) => [t.key, t]));
   const two3 = byKey["Academy 2x/week|3_months"] || {};
-  ok(two3.typed_cadence === "12_weeks",
-    `the preview READS the typed offer_prices row - the thing that actually outranks the label at mint time (saw ${JSON.stringify(two3.typed_cadence)})`);
-  ok(/OUTRANKS the length label/.test(String(two3.typed_cadence_note)) && noEmDash(String(two3.typed_cadence_note)),
-    `and says which way the priority runs ("${two3.typed_cadence_note}")`);
-  ok(p3.typed_cadence_source === "read", `and reports where that came from (${p3.typed_cadence_source})`);
+  ok(two3.typed_cadence === "3_calendar_months" && p3.typed_cadence_source === "read",
+    `the preview READS the typed offer_prices row, scoped exactly as the mint scopes it (saw ${JSON.stringify(two3.typed_cadence)}, table ${p3.typed_cadence_source})`);
+  ok(!!two3.billing_rhythm && two3.billing_rhythm.source === "typed_row"
+    && JSON.stringify(two3.billing_rhythm.recurring) === JSON.stringify({ interval: "month", interval_count: 3 }),
+    `and the rhythm is the TYPED row's month x3 though the label says 12 weeks (${JSON.stringify(two3.billing_rhythm && two3.billing_rhythm.recurring)})`);
+  ok(/every 3 months/.test(String(two3.billing_rhythm && two3.billing_rhythm.sentence)) && /typed offer_prices row/.test(String((two3.billing_rhythm || {}).sentence)) && noEmDash(String((two3.billing_rhythm || {}).sentence)),
+    `in a sentence that names its source ("${(two3.billing_rhythm || {}).sentence}")`);
 
   const ele2 = byKey["Elementary Academy|2_months"] || {};
-  ok(ele2.declared_weeks === 8, `an 8-week label still SHOWS its declared rhythm (saw ${JSON.stringify(ele2.declared_weeks)})`);
-  ok(/cannot say which billing rhythm/.test(String(ele2.rhythm_note)) && !/the mint resolves it/.test(String(ele2.rhythm_note)),
-    `but the note no longer promises the mint will honour it ("${ele2.rhythm_note}")`);
-  ok(typeof p3.cadence_caveat === "string" && /not exported/.test(p3.cadence_caveat) && noEmDash(p3.cadence_caveat),
-    "and the rehearsal carries the caveat once, at the top, whether or not any row declares a rhythm");
+  ok(ele2.declared_weeks === 8 && !!ele2.billing_rhythm && ele2.billing_rhythm.source === "term_shape"
+    && JSON.stringify(ele2.billing_rhythm.recurring) === JSON.stringify({ interval: "month", interval_count: 2 }),
+    `an 8-week label FALLS BACK to the calendar shape - the vocabulary cannot honour it (${JSON.stringify(ele2.billing_rhythm && ele2.billing_rhythm.recurring)})`);
+  ok(/FALL BACK/.test(String(ele2.rhythm_fallback)) && noEmDash(String(ele2.rhythm_fallback)),
+    `and the fallback is STATED, not guessed at ("${ele2.rhythm_fallback}")`);
   reset();
 }
 
@@ -1370,6 +1436,56 @@ console.log("\n── 17. the tax registration number lands on the academy row �
   const r2 = await staffPost({ action: "apply", workbook_id: "wb1" });
   ok(r2.body.ok === true && DB.clients[0].tax_registration_number === "KEEP-ME",
     `a blank answer writes nothing - the stored number survives (saw ${JSON.stringify(DB.clients[0].tax_registration_number)})`);
+  reset();
+}
+
+console.log("\n── 18. the dry run answers match-vs-mint from LIVE Stripe, read-only ──");
+{
+  reset();
+  approveAll();
+  STRIPE_READS.length = 0;
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  const p3 = r.body.phase3;
+  ok(p3.stripe_check === "read", `the live read happened (stripe_check ${JSON.stringify(p3.stripe_check)})`);
+  ok(STRIPE_READS.length > 0 && STRIPE_READS.every((c) => (c.headers || {})["Stripe-Account"] === "acct_1RDtSMK6ZS1cqefu"),
+    `every Stripe call was a GET carrying the Stripe-Account header for the right account (${STRIPE_READS.length} reads, saw ${JSON.stringify(((STRIPE_READS[0] || {}).headers || {})["Stripe-Account"])})`);
+  ok(p3.exists_in_stripe === 4 && p3.would_mint_new === 2,
+    `4 of the 6 targets already exist live, 2 would mint new (saw ${JSON.stringify(p3.exists_in_stripe)}/${JSON.stringify(p3.would_mint_new)})`);
+  const byKey = Object.fromEntries(p3.targets.map((t) => [t.key, t]));
+  const two3 = byKey["Academy 2x/week|3_months"] || {};
+  ok(!!two3.stripe && two3.stripe.exists === true && two3.stripe.price_id === "price_live_two_3m" && two3.stripe.interval === "12 week",
+    `the 12-week rung matched the live price ON ITS RHYTHM, named by price_id (${JSON.stringify(two3.stripe)})`);
+  const ele12 = byKey["Elementary Academy|12_months"] || {};
+  ok(!!ele12.stripe && ele12.stripe.exists === false,
+    `the 12-month prepay does NOT match the decoy at the same amount on a 4-week clock (${JSON.stringify(ele12.stripe)})`);
+  const eleM = byKey["Elementary Academy|monthly"] || {};
+  ok(!!eleM.stripe && eleM.stripe.exists === true && eleM.stripe.product_name === "Elementary Academy",
+    `and a hit carries its product name (${JSON.stringify(eleM.stripe && eleM.stripe.product_name)})`);
+  reset();
+
+  // ── FAIL LOUD: a dead read can never say exists:false ─────────────────────
+  reset();
+  approveAll();
+  STRIPE_FAIL.add("prices");
+  const bad = await staffPost({ action: "apply", workbook_id: "wb1" });
+  STRIPE_FAIL.delete("prices");
+  const bp3 = bad.body.phase3 || {};
+  ok(bp3.stripe_check === "could_not_read" && typeof bp3.stripe_error === "string"
+    && /Do not treat would-mint counts as real/.test(bp3.stripe_error) && noEmDash(bp3.stripe_error),
+    `a failed read says so out loud ("${bp3.stripe_error}")`);
+  ok(bp3.exists_in_stripe === null && bp3.would_mint_new === null,
+    `counts are NULL, never zero (saw ${JSON.stringify(bp3.exists_in_stripe)}/${JSON.stringify(bp3.would_mint_new)})`);
+  ok(Array.isArray(bp3.targets) && bp3.targets.length > 0 && bp3.targets.every((t) => t.stripe === null),
+    `and every per-target stripe is null - exists:false cannot come out of a failed read (${(bp3.targets || []).length} targets)`);
+  reset();
+
+  // ── not connected is its own answer ───────────────────────────────────────
+  reset();
+  approveAll();
+  DB.clients[0].stripe_connect_account_id = null;
+  const nc = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(nc.body.phase3.stripe_check === "not_connected" && nc.body.phase3.exists_in_stripe === null,
+    `a missing account id reports not_connected with counts null (saw ${JSON.stringify(nc.body.phase3.stripe_check)})`);
   reset();
 }
 
