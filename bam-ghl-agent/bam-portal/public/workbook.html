@@ -529,7 +529,8 @@ function addProblem(kind,v){
   const s=x=>typeof x==='string'?x.trim():'';
   const n=x=>typeof x==='number'&&isFinite(x)?x:null;
   if(kind==='plan')return !s(v.title)?'Please give the plan a name before adding it.'
-    :(n(v.price)===null||n(v.price)<0)?'Please add a price for this plan before adding it.':'';
+    :(n(v.price)===null||n(v.price)<0)?'Please add a price for this plan before adding it.'
+    :(String(v.billing_cycle||'')==='Other'&&!s(v.billing_cycle_other))?'Please say how often this plan bills before adding it.':'';
   if(kind==='length')return (n(v.months)===null||!Number.isInteger(v.months)||v.months<1||v.months>120)
     ?'Please say how many months this length runs for.'
     :(n(v.price)===null||n(v.price)<0)?'Please add a price for this length before adding it.':'';
@@ -1470,15 +1471,26 @@ const ADD_COPY={
         hint:'We will set this code up for you and check it with you first. It does not start working by adding it here.'}
 };
 function addFieldsHTML(lid,kind){
-  if(kind==='plan')return `
+  if(kind==='plan'){
+    /* The selected cycle is whatever pickCyc stored, defaulting to "every 4
+       weeks" as before - it has to be read here rather than hardcoded on chip
+       3, because picking "something else" redraws this box and the redraw must
+       not lose the selection. */
+    const sel=has(ADDOPEN[lid+'_cyc'])?ADDOPEN[lid+'_cyc']:3;
+    return `
     <div class="addgrid">
       <input class="bb-input" id="af_title_${lid}" placeholder="Summer 1x/week" style="max-width:220px">
       <span style="font-weight:800;color:var(--gold-ink)">$</span>
       <input class="bb-input" id="af_price_${lid}" type="number" inputmode="decimal" placeholder="150" style="max-width:110px;font-weight:800">
     </div>
     <div class="addgrid" style="margin-top:8px">
-      ${CYCLES.map((c,j)=>`<button class="bchip sm" data-cyc="${j}" onclick="pickCyc('${lid}',${j})" ${j===3?'style="background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700"':''}>${c}</button>`).join('')}
-    </div>`;
+      ${CYCLES.map((c,j)=>`<button class="bchip sm" data-cyc="${j}" onclick="pickCyc('${lid}',${j})" ${j===sel?'style="background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700"':''}>${c}</button>`).join('')}
+    </div>
+    ${sel===6?`<div class="addgrid" style="margin-top:8px">
+      <span class="ml">How often exactly?</span>
+      <input class="bb-input" id="af_cycother_${lid}" placeholder="e.g. every 6 weeks, per term" style="max-width:240px">
+    </div>`:''}`;
+  }
   if(kind==='length')return `
     <div class="addgrid">
       <input class="bb-input" id="af_months_${lid}" type="number" inputmode="numeric" placeholder="3" style="max-width:90px;font-weight:800">
@@ -1492,7 +1504,19 @@ function addFieldsHTML(lid,kind){
     </div>`;
 }
 function pickCyc(lid,j){
+  const was=has(ADDOPEN[lid+'_cyc'])?ADDOPEN[lid+'_cyc']:3;
   ADDOPEN[lid+'_cyc']=j;
+  /* Crossing the "something else" boundary changes WHICH inputs exist, so the
+     box is redrawn - carrying his typed name and price across, because a
+     redraw that eats the plan name he just typed reads as the page losing his
+     work. Inside either regime the chips just restyle, exactly as before. */
+  if((was===6)!==(j===6)){
+    const keep={};
+    ['af_title_'+lid,'af_price_'+lid,'af_cycother_'+lid].forEach(id=>{const e=document.getElementById(id);if(e)keep[id]=e.value});
+    redrawAdds(lid);
+    Object.entries(keep).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v});
+    return;
+  }
   document.querySelectorAll('#addbox_'+lid+' [data-cyc]').forEach(b=>{
     const on=+b.dataset.cyc===j;
     b.style.cssText=on?'background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700':'';
@@ -1502,16 +1526,28 @@ function pickCyc(lid,j){
    no coercion, so "150" and 150 are different answers to it. */
 function readAdd(lid,kind){
   const g=id=>{const e=document.getElementById(id);return e?e.value:''};
-  if(kind==='plan')return {kind:'plan',title:g('af_title_'+lid).trim(),
-    price:g('af_price_'+lid)===''?null:+g('af_price_'+lid),
-    billing_cycle:CYCLES_W[has(ADDOPEN[lid+'_cyc'])?ADDOPEN[lid+'_cyc']:3]};
+  if(kind==='plan'){
+    const cyc=has(ADDOPEN[lid+'_cyc'])?ADDOPEN[lid+'_cyc']:3;
+    return {kind:'plan',title:g('af_title_'+lid).trim(),
+      price:g('af_price_'+lid)===''?null:+g('af_price_'+lid),
+      billing_cycle:CYCLES_W[cyc],
+      /* Only when the cycle IS Other: a follow-up on a cycle he did not pick
+         would be a passenger key staff have to puzzle over. Field name per the
+         FIELD MAP (docs/plans/sj-price-match-log.md, sections 1-3). */
+      ...(cyc===6?{billing_cycle_other:g('af_cycother_'+lid).trim()}:{})};
+  }
   if(kind==='length')return {kind:'length',
     months:g('af_months_'+lid)===''?null:+g('af_months_'+lid),
     price:g('af_price_'+lid)===''?null:+g('af_price_'+lid)};
   return {kind:'code',code:g('af_code_'+lid).trim()};
 }
 function addSummary(v){
-  if(v.kind==='plan')return {n:v.title||'(no name)',d:money(v.price)+' '+String(v.billing_cycle||'').toLowerCase()};
+  /* "Other" is a chip, not a cadence: with the follow-up captured, the summary
+     renders what he actually typed. '$85 other' must be impossible. */
+  if(v.kind==='plan')return {n:v.title||'(no name)',
+    d:money(v.price)+' '+(String(v.billing_cycle||'')==='Other'&&String(v.billing_cycle_other||'').trim()
+      ?String(v.billing_cycle_other).trim()
+      :String(v.billing_cycle||'').toLowerCase())};
   if(v.kind==='length')return {n:v.months+(v.months===1?' month':' months'),d:money(v.price)+' paid up front'};
   return {n:v.code||'(no code)',d:'discount code'};
 }

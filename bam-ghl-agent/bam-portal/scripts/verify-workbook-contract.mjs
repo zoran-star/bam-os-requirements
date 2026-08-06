@@ -166,7 +166,7 @@
  * Measured 2026-08-06, after the rehearsal-round-1 builds through D6 (withheld
  * fee report, Variant A codes guard, confirmed-no tax, registration number,
  * duration scope sentence, every-card-counts). Unmutated ALL PASS
- * (135 assertions; 137 after the D7 live-Stripe checks joined H5; 142 after the D2 fee-line section). feelineflat -> 4.
+ * (135 assertions; 137 after the D7 live-Stripe checks joined H5; 142 after the D2 fee-line section; 148 after the G1 follow-up section). feelineflat -> 4, othernofollowup -> 3.
  * typingisapproving -> 17 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 5, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -421,6 +421,12 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   taxregnowhere: [[
     `  if (f === "tax_registration_number") return { kind: "taxreg" };`,
     `  // (control taxregnowhere) the field has no home`]],
+  // The server drops the Other-cycle follow-up requirement, so the two halves
+  // stop refusing in the same sentence - the page refuses, the API stores the
+  // riddle.
+  othernofollowup: [[
+    `    : String(v.billing_cycle || "") === "Other" && !str(v.billing_cycle_other) ? "Please say how often this plan bills before adding it." : ""),`,
+    `    : ""),   // (control othernofollowup) the follow-up requirement is gone`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -1009,7 +1015,7 @@ const RETURNS = [
   "submitAdd", "removeAddition", "flushAll", "idxOf", "monthsOf", "sameShape", "val", "ansOf",
   "planModel", "taxModel", "codeModel", "priceKeys", "addSummary", "readAdd", "addProblem",
   "capReason", "pillOf", "additionsOf", "hasAdditionFields", "sendBlocked", "drawPlan",
-  "openAdd", "applyEverything", "appliesEverything", "setTax", "drawCodes",
+  "openAdd", "applyEverything", "appliesEverything", "setTax", "drawCodes", "pickCyc",
   "drawLadder", "prevOpts", "TYPES", "TYPES_W", "CYCLES", "CYCLES_W", "AFTER", "AFTER_W",
   "YESNO_W", "CHARGE_W", "DUR", "KIND", "ADDOPEN", "MAX_ADD_PER_CARD",
 ].join(", ");
@@ -1402,6 +1408,49 @@ console.log("\n── F2. an addition: a request, never a write ──");
   check(!DB.workbook_answers.some((r) => r.id === gone), "remove: a hard delete, so nothing survives on the staff 'needs creating' list");
   check(page.additionsOf(cardOf("plans")).length === 1, "remove: and the page drops it only because the server said it was gone");
   agree("after a removal", await serverRemaining());
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F4. THE "SOMETHING ELSE" CADENCE GETS ITS FOLLOW-UP (G1)
+// A plan added with billing_cycle Other and no follow-up is a request staff
+// cannot act on - '$85 other' is a riddle. Both halves must refuse it in the
+// SAME sentence, and the summary must render the typed cadence, never 'other'.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F4. 'something else' asks how often, on both halves ──");
+{
+  const plansLid = lidOf("plans");
+  page.openAdd(plansLid);
+  byId("af_title_" + plansLid).value = "Skills clinic";
+  byId("af_price_" + plansLid).value = "85";
+  page.pickCyc(plansLid, 6);                      // the real "something else" chip
+  check(!!byId("af_cycother_" + plansLid), "picking 'something else' makes the follow-up box exist");
+  check(byId("af_title_" + plansLid).value === "Skills clinic" && byId("af_price_" + plansLid).value === "85",
+    "and the redraw carried his typed name and price across");
+
+  const attempt = page.readAdd(plansLid, "plan");
+  const pageSentence = page.addProblem("plan", attempt);
+  const direct = await callApi({ action: "add", card_key: "plans", what: "plan", answered: attempt });
+  check(pageSentence === "Please say how often this plan bills before adding it."
+    && direct.ok === false && direct.error === pageSentence,
+    `both halves refuse with the SAME sentence ("${pageSentence}" / "${direct.error}")`);
+
+  byId("af_cycother_" + plansLid).value = "every 6 weeks";
+  await page.submitAdd(plansLid, "plan");
+  await settle();
+  const stored = DB.workbook_answers.filter((r) => r.card_id === "c-plans").map((r) => r.answered)
+    .find((v) => v && v.title === "Skills clinic");
+  check(!!stored && stored.billing_cycle === "Other" && stored.billing_cycle_other === "every 6 weeks",
+    `the stored request carries the follow-up (${JSON.stringify(stored)})`);
+  const summary = page.addSummary(stored || {});
+  check(/every 6 weeks/.test(summary.d) && !/\bother\b/i.test(summary.d),
+    `and the rendered summary says the cadence, never 'other' ("${summary.d}")`);
+  check(/every 6 weeks/.test(byId("card_" + plansLid).outerHTML),
+    "the addition list on his screen renders the follow-up text");
+
+  // Take the probe back so the flow's counts stay the fixture's own.
+  const probe = page.additionsOf(cardOf("plans")).find((a) => a.answered && a.answered.title === "Skills clinic");
+  await page.removeAddition(plansLid, probe.id);
+  await settle();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

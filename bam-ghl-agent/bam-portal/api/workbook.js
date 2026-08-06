@@ -286,8 +286,14 @@ function deriveTarget(mine, all) {
 }
 
 const ADD_KINDS = {
+  // The billing_cycle_other requirement is BYTE-IDENTICAL to the page's
+  // addProblem sentence (the page promises "the API's own sentences,
+  // verbatim"): a plan added with cycle "Other" and no follow-up is a request
+  // staff cannot act on - '$85 other' is a riddle, not a cadence.
+  // MUTATE=othernofollowup.
   plan: (v) => (!str(v.title) ? "Please give the plan a name before adding it."
-    : num(v.price) === null || num(v.price) < 0 ? "Please add a price for this plan before adding it." : ""),
+    : num(v.price) === null || num(v.price) < 0 ? "Please add a price for this plan before adding it."
+    : String(v.billing_cycle || "") === "Other" && !str(v.billing_cycle_other) ? "Please say how often this plan bills before adding it." : ""),
   length: (v) => (num(v.months) === null || !Number.isInteger(v.months) || v.months < 1 || v.months > 120
     ? "Please say how many months this length runs for."
     : num(v.price) === null || num(v.price) < 0 ? "Please add a price for this length before adding it." : ""),

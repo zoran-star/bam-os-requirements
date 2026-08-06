@@ -461,6 +461,12 @@ const ADDKEEPSCONFIRM = [[
   `  const retire = false; // (control addkeepsconfirm) adding does not retire the approval
   const confirmedAt = card.confirmed_at;`]];
 
+// The Other-cycle follow-up requirement is gone, so '$85 other' - a request
+// staff cannot act on - stores as if it were complete.
+const OTHERNOFOLLOWUP = [[
+  `    : String(v.billing_cycle || "") === "Other" && !str(v.billing_cycle_other) ? "Please say how often this plan bills before adding it." : ""),`,
+  `    : ""),   // (control othernofollowup) the follow-up requirement is gone`]];
+
 const EDITS = {
   partialsubmit: PARTIALSUBMIT, confirmblind: CONFIRMBLIND,
   confirmnomaterialize: CONFIRMNOMATERIALIZE, submittededitable: SUBMITTEDEDITABLE,
@@ -470,6 +476,7 @@ const EDITS = {
   addforeign: ADDFOREIGN, payloadtarget: PAYLOADTARGET, addcap: ADDCAP,
   addsubmitted: ADDSUBMITTED, addconfirmed: ADDCONFIRMED, ghostremove: GHOSTREMOVE,
   emptycardsdontcount: EMPTYCARDSDONTCOUNT, countsflag: COUNTSFLAG, addkeepsconfirm: ADDKEEPSCONFIRM,
+  othernofollowup: OTHERNOFOLLOWUP,
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
 };
@@ -1510,6 +1517,22 @@ console.log("\n── the mint whitelist: a question added after seeding can gro
     ok(r.status === 404 && /does not belong to this card/.test(String(r.body.error)),
       `a null-id save of ${field} on the ${key} card still refuses with the existing sentence ("${r.body.error}")`);
   }
+  reset();
+}
+
+console.log("\n── the add-a-plan cadence follow-up: 'Other' must say how often ──");
+{
+  reset();
+  DB.workbook_cards.push({ id: "c-plans", workbook_id: "wb1", card_key: "plans", title: "Anything missing?", sort_order: 3, state: "untouched", confirmed_at: null });
+  // A plan billed on a cadence the chip list cannot name, with the follow-up
+  // missing: staff cannot create '$85 other' by hand, so it is a riddle, not
+  // a request, and it refuses in the page's own promised sentence.
+  const bad = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Skills clinic", price: 85, billing_cycle: "Other" } });
+  ok(bad.status === 400 && bad.body.error === "Please say how often this plan bills before adding it.",
+    `an Other cycle with no follow-up refuses, sentence verbatim ("${bad.body.error}")`);
+  const good = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Skills clinic", price: 85, billing_cycle: "Other", billing_cycle_other: "every 6 weeks" } });
+  ok(good.status === 200 && good.body.ok === true && good.body.answer.answered.billing_cycle_other === "every 6 weeks",
+    `with the follow-up it stores, carrying the text (${JSON.stringify(good.body.answer && good.body.answer.answered)})`);
   reset();
 }
 
