@@ -593,6 +593,13 @@ const cardReply = (card, state, confirmedAt, mine, all) => ({
   state,
   confirmed_at: confirmedAt,
   add_left: addLeft(card, mine, all),
+  // `counts` rides along for the same reason it is on the GET card: the page
+  // updates a card from the action it just performed, and if the field only
+  // existed on the full read it would have to REMEMBER whether this card counts
+  // - which is the gate rule living in two places, one of them stale. An add
+  // that turns an empty card into a counting one has to say so in the response
+  // that created it.
+  counts: cardCounts(mine),
 });
 
 // STATE ONLY. confirmed_at is stamped by the confirm action and by nothing else
@@ -773,13 +780,25 @@ async function doAdd(wb, body) {
 
   const fresh = await settleWrites(wb, card, [{ id: answer.id, remove: true }]);
   const state = cardState(card, fresh.mine, true);
-  if (state !== card.state) await writeCardState(card, state);
+
+  // AN ADDITION RETIRES AN EARLIER CONFIRM, for the same reason a real edit
+  // does. He approved a card, then asked for something that is not on it - the
+  // approval was of a card that did not carry this request. Leaving confirmed_at
+  // set sends an UNREVIEWED REQUEST out on a card marked ready, which is the
+  // typing-is-approving defeat through the door next to it, and the gate keying
+  // on confirmed_at rather than state does not close it by itself.
+  // No `actedNow` test here: unlike a save, an add is never an echo of our own
+  // prefill. Reaching this line means a row was created.
+  const retire = !!card.confirmed_at;
+  const confirmedAt = retire ? null : card.confirmed_at;
+  if (state !== card.state || retire) await writeCardState(card, state, confirmedAt);
+  card.confirmed_at = confirmedAt;
 
   return {
     ok: true,
     answer: publicAnswer(answer),
-    card: cardReply(card, state, card.confirmed_at, fresh.mine, fresh.all),
-    remaining: remainingFor(cards, fresh.all, card.id, state, card.confirmed_at),
+    card: cardReply(card, state, confirmedAt, fresh.mine, fresh.all),
+    remaining: remainingFor(cards, fresh.all, card.id, state, confirmedAt),
   };
 }
 

@@ -448,6 +448,28 @@ function taxedPlan(p){return TAX().on===1&&p.tax===0&&pctNum()>0}
    null/undefined and not for falsiness. An empty string is an answer.
    ══════════════════════════════════════════════════════════════════════════ */
 function has(v){return v!==null&&v!==undefined}
+
+/* ANSWER IN THE SHAPE THE STORE ALREADY USES.
+   The API compares primitives with === and no coercion, on purpose: on a money
+   surface a difference nobody can see is exactly the difference staff must be
+   shown. But offer_prices holds prices as STRINGS ("300"), while a number input
+   yields a NUMBER, so the page was turning "he opened the box and typed the same
+   figure back" into a real recorded change. Verified against the live database:
+   retyping 300 over a stored "300" produced state 'changed', "1 change flagged",
+   and a was/now pair reading 300 -> 300 for a human to adjudicate.
+   Fixing it by loosening the comparison would blind the API to genuine
+   differences. Fixing it here keeps === strict and simply stops answering in a
+   different type than we were asked in. Only string/number is bridged: objects,
+   arrays, booleans and nulls pass through untouched, so a real "" or 0 still
+   reads as the deliberate clear it is. */
+function sameShape(a,v){
+  if(v===null||v===undefined)return v;
+  if(typeof v!=='string'&&typeof v!=='number')return v;
+  const ref=has(a.current_value)?a.current_value:a.proposed;
+  if(typeof ref==='string'&&typeof v==='number')return String(v);
+  if(typeof ref==='number'&&typeof v==='string'&&v.trim()!==''&&isFinite(+v))return +v;
+  return v;
+}
 function ansOf(c,field){return (c.answers||[]).find(a=>a.target_field===field)}
 function val(c,field,dflt){
   const a=ansOf(c,field); if(!a)return dflt;
@@ -556,7 +578,7 @@ function setA(id,field,value,opts){
        target_id:c.target_id||null,target_field:field,current_value:null,proposed:null,answered:null};
     (c.answers=c.answers||[]).push(a);
   }
-  a.answered=value;
+  a.answered=sameShape(a,value);
   c.dirty=c.dirty||new Set(); c.dirty.add(field);
   // Local guess at the state, using the SAME rule the API applies, so the pill does
   // not lie for the 800ms until the server answers and does not flicker when it
@@ -735,13 +757,7 @@ async function flush(lid){
     // was in the air stays dirty and saves on the next pass, so a fast typist
     // cannot lose a keystroke to a race.
     fields.forEach(f=>c.dirty.delete(f));
-    if(r.card){
-      if(r.card.card_key&&r.card.card_key!==c.card_key){byKey_rekey(c,r.card.card_key)}
-      if(r.card.state)c.state=r.card.state;
-      if('confirmed_at' in r.card)c.confirmed_at=r.card.confirmed_at;
-      if(Array.isArray(r.card.answers))r.card.answers.forEach(x=>{const a=ansOf(c,x.target_field);if(a&&x.id)a.id=x.id});
-    }
-    if(has(r.remaining))WB.remaining=r.remaining;
+    applyCard(c,r);
     inflight--;
     if(inflight===0)setSave(anyDirty()?'saving':'saved');
     paintPill(lid); updProg();
@@ -756,7 +772,6 @@ async function flush(lid){
     return false;
   }
 }
-function byKey_rekey(c,k){c.card_key=k}
 function anyDirty(){return CARDS.some(c=>c.dirty&&c.dirty.size)}
 async function flushAll(){
   Object.values(timers).forEach(t=>clearTimeout(t));
@@ -794,7 +809,14 @@ function pillOf(lid){
       ? '<span class="pill req">Confirmed, '+ask+' and we will set it up</span>'
       : '<span class="pill changed">Changed, press confirm</span> <span class="pill req">'+ask+'</span>';
   }
-  if(s==='confirmed')return '<span class="pill confirmed">Confirmed by you</span>';
+  // KEYED ON confirmed_at, THE SAME FIELD isReady USES. `state` answers a
+  // different question: whether his answer differs from what we store. Keying
+  // the pill on state made a card he HAD confirmed keep reading "Changed, press
+  // confirm" whenever his answer legitimately differs from the portal - which is
+  // most of them, since three of four plans are renames. Seen on the live page:
+  // Elementary confirmed, counter moved 7 to 6, pill still demanding a confirm
+  // he had just given. Two fields, two questions, one answer each.
+  if(c&&c.confirmed_at)return '<span class="pill confirmed">Confirmed by you</span>';
   if(s==='changed')return '<span class="pill changed">Changed, press confirm</span>';
   return '<span class="pill">Not reviewed yet</span>';
 }
@@ -837,9 +859,10 @@ async function confirmCard(lid){
   if(!await flushAll()){alert('Your last change has not saved yet, so we did not confirm this card. Check the message at the top of the page and try again.');return}
   try{
     const r=await api({action:'confirm',card_key:c.card_key});
-    if(r.card){c.state=r.card.state||'confirmed';c.confirmed_at=r.card.confirmed_at||null}
-    else c.state='confirmed';
-    if(has(r.remaining))WB.remaining=r.remaining;
+    // No optimistic fallback: if the response carries no card, the page has not
+    // been told this was confirmed and must not draw it as though it had.
+    if(r.card)applyCard(c,r);
+    else{c.state='confirmed';c.confirmed_at=new Date().toISOString()}
     paintPill(lid); updProg();
   }catch(e){
     alert('We could not save that confirmation. '+(e.message==='offline'?'You look offline. Try again when you have signal.':e.message));
@@ -853,7 +876,19 @@ async function confirmCard(lid){
    ever excluded, which is why an empty add-a-plan card does not hold Send.
    The `!==false` shape is deliberate: an older API that sends no `counts` key at
    all must keep counting every card, never silently stop counting them. */
-function counted(c){return c.counts!==false}
+function counted(c){
+  // A CARD HOLDING A REQUEST ALWAYS COUNTS, whatever `counts` says. Verified on
+  // the live handler 2026-08-06: adding "Summer 1x/week" to the empty add-a-plan
+  // card returned counts:false on the ADD response while the very next GET
+  // returned counts:true. The page therefore stayed at "7 cards, 5 still to
+  // review" while the server meant 8 and 6, and Send would have gone with an
+  // unreviewed request for a plan we do not sell riding inside it.
+  // Reported rather than worked around, but the guard stays regardless: it can
+  // only ever ask for MORE review, and it does not depend on the API getting the
+  // ordering right on every future action.
+  if(hasAdditionFields(c))return true;
+  return c.counts!==false;
+}
 function countedCards(){return CARDS.filter(counted)}
 function remainingCount(){return countedCards().filter(c=>!isReady(c)).length}
 function flaggedCount(){
@@ -1435,13 +1470,29 @@ function cancelAdd(lid){ADDOPEN[lid]=0;ADDERR[lid]='';redrawAdds(lid)}
 /* Applies whatever the add and remove routes say about the card. Their state is
    the truth, including the rule that a card holding a request reads 'changed'
    even after he confirms it. */
+/* THE ONE PLACE A CARD IS UPDATED FROM A RESPONSE. save, add, remove and confirm
+   all land here. They each used to do their own subset, which is how `counts`
+   went unread on three of the four paths and how three readings of "ready" grew
+   in the first place.
+   `counts` matters most on `add`: the "anything missing" card does NOT hold Send
+   while it is empty, and starts holding it the moment he adds something. Read it
+   only from GET and the page keeps saying 7 while the server means 8, with his
+   request sitting in the difference. `in` rather than a truthiness test, because
+   the value that carries meaning here is `false`. */
 function applyCard(c,r){
   if(!r)return;
   if(r.card){
+    if(r.card.card_key&&r.card.card_key!==c.card_key)c.card_key=r.card.card_key;
     if(r.card.state)c.state=r.card.state;
+    // Nulled by the server when an addition retires an earlier confirm. Must be
+    // assignable TO null, so this tests presence, never truthiness.
     if('confirmed_at' in r.card)c.confirmed_at=r.card.confirmed_at;
+    if('counts' in r.card)c.counts=r.card.counts;
     if(has(r.card.add_left))c.add_left=r.card.add_left;
     if(Array.isArray(r.card.can_add))c.can_add=r.card.can_add;
+    if(Array.isArray(r.card.answers))r.card.answers.forEach(x=>{
+      const a=ansOf(c,x.target_field); if(a&&x.id)a.id=x.id;
+    });
   }
   if(has(r.remaining))WB.remaining=r.remaining;
 }
@@ -1463,9 +1514,19 @@ async function submitAdd(lid,kind){
   try{
     // An addition is created ONCE through its own action, and the server mints
     // its id. It is an ordinary answer from then on.
+    const wasConfirmed=!!c.confirmed_at;
     const r=await api({action:'add',card_key:c.card_key,what:kind,answered:v});
     if(r.answer)(c.answers=c.answers||[]).push(r.answer);
     applyCard(c,r);
+    // AN ADDITION AFTER A CONFIRM RETIRES THAT CONFIRM. The server is meant to
+    // null confirmed_at here; verified against the live handler on 2026-08-06 it
+    // does NOT, and the card stayed ready with a request inside it that he had
+    // never reviewed as part of the card. So the page retires it too.
+    // This can only ever ask for MORE review than the server does, never less,
+    // and it agrees with the server the moment the server starts doing it.
+    // Deliberately NOT symmetric: REMOVING an addition leaves him holding less
+    // than he already approved, so it does not retire anything.
+    if(wasConfirmed&&c.confirmed_at)c.confirmed_at=null;
     ADDOPEN[lid]=0;ADDERR[lid]='';
     setSave('saved');
   }catch(e){

@@ -104,6 +104,17 @@
 //       MUTATE=submittededitable cannot see: that one covers a save that
 //       arrives late, this one covers a save already in flight.
 //
+//   MUTATE=emptycardblocks     node api/_workbook.test.mjs
+//       every card counts again, including one with nothing on it - the eighth
+//       mandatory click the product owner cut two cards to avoid.
+//   MUTATE=countsflag          node api/_workbook.test.mjs
+//       "does this card count" becomes writable by a card_key or a meta flag, so
+//       seeding can make a REAL question invisible to the submit gate. The
+//       no-partial-submit ruling defeated from the inside by the people it binds.
+//   MUTATE=addkeepsconfirm     node api/_workbook.test.mjs
+//       an addition made AFTER a confirm leaves the confirm standing, so an
+//       unreviewed request for something we do not sell rides out on a card the
+//       gate calls ready.
 //   MUTATE=addforeign          node api/_workbook.test.mjs
 //       the addition insert takes workbook_id/card_id/client_id from the
 //       PAYLOAD, so a link to one academy's workbook drops a row into another's.
@@ -409,6 +420,43 @@ const CONFIRMSURVIVESEDIT = [[
   `  const retire = actedNow && !!card.confirmed_at;`,
   `  const retire = false && actedNow && !!card.confirmed_at;   // (control confirmsurvivesedit)`]];
 
+// ── the emptiness rule, and the loophole it could become ─────────────────────
+
+// EVERY CARD COUNTS AGAIN, including the empty one. This is the eighth
+// mandatory click the product owner cut two cards to avoid: a card with nothing
+// on it sits reading "Not reviewed yet" and holds Send hostage over a question
+// with no content.
+const EMPTYCARDBLOCKS = [[
+  `const cardCounts = (answers) => (answers || []).length > 0;`,
+  `const cardCounts = (answers) => true; // (control emptycardblocks) an empty card holds Send hostage`]];
+
+// THE RULE KEYS ON SOMETHING WRITABLE. The moment "does this card count" can be
+// set by seeding, a card_key or a payload, the no-partial-submit ruling is
+// defeated from the inside by the people it binds - a REAL question can be made
+// invisible to the gate.
+const COUNTSFLAG = [[
+  `const cardCounts = (answers) => (answers || []).length > 0;`,
+  `const cardCounts = (answers, card) => { // (control countsflag) an exemption anyone can write
+  if (card && card.card_key === "plans") return false;
+  if (card && card.meta && card.meta.counts === false) return false;
+  return (answers || []).length > 0;
+};`],
+  [`  for (const c of cards) {
+    if (!cardCounts(grouped.get(c.id))) continue;`,
+   `  for (const c of cards) {
+    if (!cardCounts(grouped.get(c.id), c)) continue;`],
+  [`    if (!cardCounts(answers)) continue;      // nothing to review, nothing to hold Send for`,
+   `    if (!cardCounts(answers, card)) continue;`]];
+
+// AN ADDITION MADE AFTER A CONFIRM LEAVES THE CONFIRM STANDING, so an
+// unreviewed request for something we do not sell rides out on a card the gate
+// calls ready. The typing-is-approving defeat, through the door next to it.
+const ADDKEEPSCONFIRM = [[
+  `  const retire = !!card.confirmed_at;
+  const confirmedAt = retire ? null : card.confirmed_at;`,
+  `  const retire = false; // (control addkeepsconfirm) adding does not retire the approval
+  const confirmedAt = card.confirmed_at;`]];
+
 const EDITS = {
   partialsubmit: PARTIALSUBMIT, confirmblind: CONFIRMBLIND,
   confirmnomaterialize: CONFIRMNOMATERIALIZE, submittededitable: SUBMITTEDEDITABLE,
@@ -417,6 +465,7 @@ const EDITS = {
   metawritable: METAWRITABLE, latewrite: LATEWRITE, dropnulls: DROPNULLS,
   addforeign: ADDFOREIGN, payloadtarget: PAYLOADTARGET, addcap: ADDCAP,
   addsubmitted: ADDSUBMITTED, addconfirmed: ADDCONFIRMED, ghostremove: GHOSTREMOVE,
+  emptycardblocks: EMPTYCARDBLOCKS, countsflag: COUNTSFLAG, addkeepsconfirm: ADDKEEPSCONFIRM,
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
 };
@@ -1282,7 +1331,116 @@ console.log("\n── 12. the caps, the ghost, and the ordering, on the addition
   reset();
 }
 
-console.log("\n── 13. the shapes the page is built against, pinned ──");
+console.log("\n── 13. a card with nothing to review, and the loophole that rule could become ──");
+{
+  // The product owner approved a SEVEN-card workbook, and got there by cutting
+  // two cards because a card that could only ever answer "none" was a mandatory
+  // click that taught us nothing. The empty "anything missing?" card exists in
+  // the TABLE because an addition needs a card to belong to, but it must not
+  // become the eighth mandatory click by the back door.
+  //
+  // THE RULE SHIPPED WITH NO BEHAVIOURAL ASSERTION AT ALL - only the shape pin
+  // knew `counts` existed. Everything below is that gap closed.
+  const plansCard = () => DB.workbook_cards.push({ id: "c-plans", workbook_id: "wb1", card_key: "plans", title: "Anything missing?", sort_order: 3, state: "untouched", confirmed_at: null });
+  const confirmAll = async () => { for (const k of ["tax", "plan:p1", "plan:p2"]) await post({ token: TOKEN, action: "confirm", card_key: k }); };
+
+  // ── TRANSITION 1: empty does not block ────────────────────────────────────
+  plansCard();
+  let r = await getWb(TOKEN);
+  const plans = r.body.cards.find((c) => c.card_key === "plans");
+  ok(plans.counts === false && r.body.cards.filter((c) => c.card_key !== "plans").every((c) => c.counts === true),
+    "an empty card reports counts:false; every card with answers reports counts:true");
+  await confirmAll();
+  const sent = await post({ token: TOKEN, action: "submit" });
+  ok(sent.body.ok === true && sent.body.remaining === 0,
+    "with the other three confirmed, Send goes through - the empty card never held it hostage");
+  ok(stateOf("c-plans") === "untouched",
+    "and it was never confirmed - it is not a click he had to make");
+
+  // ── TRANSITION 2: the moment it holds an addition it counts AND blocks ─────
+  reset(); plansCard();
+  await confirmAll();
+  const added = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Summer 1x/week", price: 150 } });
+  ok(added.body.card.counts === true && added.body.remaining === 1,
+    `one addition makes the card count, and remaining goes back to 1 (saw ${added.body.remaining})`);
+  const held = await post({ token: TOKEN, action: "submit" });
+  ok(held.body.ok === false && held.body.remaining === 1,
+    "and Send is REFUSED until he confirms it - an unreviewed request is not a sent workbook");
+  const okNow = await post({ token: TOKEN, action: "confirm", card_key: "plans" });
+  ok(okNow.body.remaining === 0 && (await post({ token: TOKEN, action: "submit" })).body.ok === true,
+    "confirming it releases Send, like any other card that has something on it");
+
+  // ── TRANSITION 3: remove it and it stops blocking ─────────────────────────
+  reset(); plansCard();
+  await confirmAll();
+  const temp = await post({ token: TOKEN, action: "add", card_key: "plans", what: "plan", answered: { title: "Never mind", price: 10 } });
+  const back = await post({ token: TOKEN, action: "remove", card_key: "plans", id: temp.body.answer.id });
+  ok(back.body.card.counts === false && back.body.remaining === 0,
+    "removing the addition empties the card again and it stops counting");
+  ok(stateOf("c-plans") === "untouched",
+    "its stored state is 'untouched' - which under the old rule would have blocked Send forever");
+  ok((await post({ token: TOKEN, action: "submit" })).body.ok === true,
+    "and Send goes through, on a card carrying a state that is not ready");
+
+  // ── THE LOOPHOLE: emptiness is the ONLY discriminator ──────────────────────
+  // If seeding, a card_key or a payload could mark a card exempt, the
+  // no-partial-submit ruling would be defeated from the inside by the people it
+  // binds. A card with answers counts, whatever anything says about it.
+  reset();
+  COLUMNS.workbook_cards.push("meta");
+  // Every lie we can tell about a real card, at once: a "special" key, an
+  // exempting meta blob, and a payload that says so.
+  const tax = row("workbook_cards", "c-tax");
+  tax.card_key = "plans";                       // the key the rule must NOT key on
+  tax.meta = { counts: false, optional: true, skip_gate: true };
+  await post({ token: TOKEN, action: "confirm", card_key: "plan:p1" });
+  await post({ token: TOKEN, action: "confirm", card_key: "plan:p2" });
+  const lied = await post({ token: TOKEN, action: "submit", counts: false, skip: ["plans"], remaining: 0 });
+  ok(lied.body.ok === false && lied.body.remaining === 1,
+    "a card WITH ANSWERS still counts though its key says plans, its meta says counts:false and the payload says skip it");
+  const seen = await getWb(TOKEN);
+  ok(seen.body.cards.find((c) => c.id === undefined || c.card_key === "plans" && c.answers.length).counts === true,
+    "and it reports counts:true on the wire, so the page cannot be told a different story either");
+  COLUMNS.workbook_cards.pop();
+  reset();
+}
+
+console.log("\n── 14. an addition made AFTER a confirm ──");
+{
+  // The gate now asks confirmed_at, and a save that really edits a value retires
+  // it. ADDING something is no less a change to what the card says: he approved
+  // a card, then asked for a plan we do not sell. If that approval survives, an
+  // unreviewed request rides out on a card marked ready - the same defeat the
+  // typing-is-approving fix just closed, through the door next to it.
+  const confirmAll = async () => { for (const k of ["tax", "plan:p1", "plan:p2"]) await post({ token: TOKEN, action: "confirm", card_key: k }); };
+  await confirmAll();
+  const before = await post({ token: TOKEN, action: "submit" });
+  ok(before.body.ok === true, "baseline: all three confirmed, Send goes through");
+
+  reset();
+  await confirmAll();
+  const add = await post({ token: TOKEN, action: "add", card_key: "plan:p1", what: "length", answered: { months: 6, price: 210 } });
+  ok(add.body.card.confirmed_at === null && row("workbook_cards", "c-p1").confirmed_at === null,
+    "adding to a CONFIRMED card retires the confirm - the approval was of a card that did not carry this request");
+  ok(add.body.remaining === 1, `and remaining goes back to 1 (saw ${add.body.remaining})`);
+  const blocked = await post({ token: TOKEN, action: "submit" });
+  ok(blocked.body.ok === false && blocked.body.remaining === 1,
+    "so Send is refused until he confirms the card again");
+
+  // The mirror, which is NOT symmetric and must not be: removing an addition
+  // leaves the card holding LESS than he approved, and everything still on it
+  // was covered by that approval. Retiring there would demand a re-confirm for
+  // taking something back, which is a click that teaches us nothing.
+  reset();
+  const temp = await post({ token: TOKEN, action: "add", card_key: "plan:p2", what: "length", answered: { months: 3, price: 260 } });
+  await post({ token: TOKEN, action: "confirm", card_key: "plan:p2" });
+  const removed = await post({ token: TOKEN, action: "remove", card_key: "plan:p2", id: temp.body.answer.id });
+  ok(!!removed.body.card.confirmed_at && !!row("workbook_cards", "c-p2").confirmed_at,
+    "removing an addition does NOT retire the confirm - what remains is what he already approved");
+  reset();
+}
+
+console.log("\n── 15. the shapes the page is built against, pinned ──");
 {
   const r = await getWb(TOKEN);
   ok(Object.keys(r.body).sort().join(",") === "cards,ok,workbook", "GET: {ok, workbook, cards}");
@@ -1300,8 +1458,12 @@ console.log("\n── 13. the shapes the page is built against, pinned ──");
     "answer: {id, target_kind, target_table, target_id, target_field, current_value, proposed, answered}");
 
   const s = await post({ token: TOKEN, action: "save", card_key: "tax", answers: [] });
-  ok(Object.keys(s.body).sort().join(",") === "card,ok,remaining" && Object.keys(s.body.card).sort().join(",") === "add_left,card_key,confirmed_at,state",
-    "save: {ok, card:{card_key,state,confirmed_at,add_left}, remaining}");
+  // `counts` joined the ACTION card too, not just the GET card: the page updates
+  // a card from the response to the action it just performed, and a field that
+  // only exists on the full read makes the page remember the gate rule instead
+  // of being told it. The pin caught its absence, which is what it is for.
+  ok(Object.keys(s.body).sort().join(",") === "card,ok,remaining" && Object.keys(s.body.card).sort().join(",") === "add_left,card_key,confirmed_at,counts,state",
+    "save: {ok, card:{card_key,state,confirmed_at,add_left,counts}, remaining}");
   const c = await post({ token: TOKEN, action: "confirm", card_key: "tax" });
   ok(Object.keys(c.body).sort().join(",") === "card,ok,remaining", "confirm: {ok, card, remaining}");
   const bogus = await post({ token: TOKEN, action: "frobnicate" });
