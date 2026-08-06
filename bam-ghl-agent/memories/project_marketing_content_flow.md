@@ -346,7 +346,11 @@ tickets table - systems moved to the Website V2 queue and legacy handoffs were
 being bulk-closed unexecuted (GWA/Pro Precision/Major Hoops, Jul 27-30, empty
 message trails). Content ticket context now stores `systems_v2_ticket_id`.
 Client Slack confirm is explicit now (the legacy insert trigger no longer
-fires). return-to-systems still PATCHes its legacy origin ticket - correct for
+fires). GOTCHA #4 (2026-08-06): v2_tickets has a SOURCE check constraint
+(icon-chat|inbox-flag|editor|import|billing|staff|offer-flow) - the first
+live send 23514'd on source 'content-handoff'; now 'staff' (provenance =
+context.funnel_content_ticket_id). The pg_constraint-before-INSERT rule
+applies to v2 tables too. return-to-systems still PATCHes its legacy origin ticket - correct for
 round-trips that START from a legacy systems ticket; revisit if systems stops
 using the legacy tab entirely. Prime By Design lesson: a reopened origin
 assigned to a non-systems person is invisible to the team - the edited clips

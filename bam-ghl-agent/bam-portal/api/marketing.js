@@ -1807,7 +1807,11 @@ async function handleContentTickets(req, res) {
           assignee_role: "systems",
           assigned_to: null,
           title: `Add funnel content: ${label}`.slice(0, 200),
-          source: "content-handoff",
+          // v2_tickets_source_check whitelist: icon-chat | inbox-flag | editor |
+          // import | billing | staff | offer-flow. "content-handoff" 23514'd on
+          // first live use (2026-08-06) - the 4th check-constraint bite; always
+          // read pg_constraint before inserting into a table this file doesn't own.
+          source: "staff",
           intake: { notes: howText, files: finals },
           context: { funnel_content_ticket_id: ticket.id },
           created_by: null,
