@@ -174,6 +174,11 @@
  *       shared emptiness rule loses its trim, so a direct POST of
  *       `applies_to: [" "]` confirms on the server while the page promised a
  *       refusal - the coupon it scopes still applying to EVERYTHING. F7.
+ *   MUTATE=noncanonicalindex        API. classifyIndexed's one-spelling check
+ *       becomes `if (false)`, so a direct POST of `codes.00.applies_to` mints
+ *       a TWIN row for logical code 0. F5's direct-404 pin catches it; the
+ *       page-side positive pin proves the real page only ever emits canonical
+ *       spellings, so the refusal can never refuse the page.
  *
  * Measured 2026-08-06, after the full rehearsal-round-1 build (Steps 1-12:
  * withheld fee report, Variant A codes guard, confirmed-no tax, registration
@@ -185,7 +190,8 @@
  * previously said 162 while the run printed 167; the recorded total had
  * drifted and is trued up here. That pass took it 167 -> 174 (F5, D1) ->
  * 176 (D3) -> 179 (F6, D2) -> 181 (D4); the 2026-08-06 whitespace pass took
- * it 181 -> 184 (F7)).
+ * it 181 -> 184 (F7), and its Step 2 (canonical indexes + mint ceiling)
+ * 184 -> 186 (F5's direct-404 and page-canonical pins)).
  * typingisapproving -> 18 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 10, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -217,14 +223,15 @@
  * catches 4), monthsunbounded -> 3 (measured 2026-08-06, R4: section J's
  * review refusal, apply refusal and untouched-offer pins; the same pin
  * catches 2 in api/_workbook-apply.test.mjs),
- * codesunmintable -> 5 (measured 2026-08-06, D1 fix pass: section F5's
- * save/mint/target/keys/confirm pins - the live defect reproduced end to
- * end; the same pin catches 6 in api/_workbook.test.mjs),
- * codesmintany -> 3 (measured 2026-08-06, D1 fix pass; was 1 until the D4
- * banner pins joined F5 - with the allowlist gutted, codes.0.hacker MINTS,
- * the page's flush succeeds, and both failure-banner assertions trip too;
- * re-measured in the full closeout sweep, same date; the same pin catches 4
+ * codesunmintable -> 6 (RE-MEASURED 2026-08-06, Step 2 pass: was 5 - F5's
+ * save/mint/target/keys/confirm pins, the live defect reproduced end to
+ * end; the Step 2 one-row pin joined the same door; the same pin catches 18
  * in api/_workbook.test.mjs),
+ * codesmintany -> 4 (RE-MEASURED 2026-08-06, Step 2 pass: was 1 until the D4
+ * banner pins joined F5 - with the allowlist gutted, codes.0.hacker MINTS,
+ * the page's flush succeeds, and both failure-banner assertions trip too -
+ * then 3, and F5's Step 2 direct-404 pin joined (codes.00 MINTS under it);
+ * the same pin catches 10 in api/_workbook.test.mjs),
  * refusedaddwipes -> 6 (measured 2026-08-06, D2 fix pass: F6's survive and
  * succeed-with-preserved-values pins plus F4's carry-across and its
  * downstream follow-up pins - the wipe breaks the F4 flow too, which is why
@@ -236,7 +243,13 @@
  * still refuses, so the catch is the server accepting what the page
  * promised it would refuse; the same pin catches 4 in
  * api/_coupon-guardrails.test.mjs, 2 in api/_workbook.test.mjs and 4 in
- * api/_workbook-apply.test.mjs).
+ * api/_workbook-apply.test.mjs),
+ * noncanonicalindex -> 1 (measured 2026-08-06, Step 2 pass: F5's direct-404
+ * pin - the page-canonical positive pin stays green because the real page
+ * cannot emit the spelling; the same pin catches 6 in
+ * api/_workbook.test.mjs. MUTATE=mintuncapped, the mint ceiling's control,
+ * lives ONLY in api/_workbook.test.mjs, where it catches 1 - this flow has
+ * no 90-row card).
  * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
  * flow never submits an inverted band because the page guard refuses it in
  * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
@@ -555,6 +568,16 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   blankkeysrestrict: [[
     `import { cleanAppliesTo } from "./_coupon-guardrails.js";`,
     `import { cleanAppliesTo } from "./.mutant-contract-guardrails.js";   // (control blankkeysrestrict)`]],
+  // classifyIndexed's one-spelling check becomes `if (false)`, so a direct
+  // POST of `codes.00.applies_to` mints a TWIN row for logical code 0 again.
+  // F5's direct-404 pin has to catch it; the page-side positive pin proves
+  // the real page never emits a non-canonical spelling, so the refusal can
+  // never refuse the page. (MUTATE=mintuncapped, the mint ceiling's control,
+  // lives ONLY in api/_workbook.test.mjs - this flow has no 90-row card, and
+  // building one would prove nothing the direct gate does not already pin.)
+  noncanonicalindex: [[
+    `  if (String(index) !== m[1]) {`,
+    `  if (false) {   // (control noncanonicalindex) every spelling is an address`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -1795,6 +1818,22 @@ console.log("\n── F5. the SJ-shaped codes card grows its missing rows throug
   check(foreign.ok === false && foreign.error === "that answer does not belong to this card",
     `a null-id save of codes.0.hacker still refuses byte-for-byte ("${foreign.error}")`);
 
+  // ── Step 2 (2026-08-06): one spelling per address, same direct-POST door ──
+  // `+m[1]` collapses "00" and "0" into one number but the mint dedupes rows
+  // by the exact target_field string, so `codes.00.applies_to` used to mint a
+  // TWIN row for logical code 0. MUTATE=noncanonicalindex.
+  // The save-payload log is SNAPSHOTTED first: everything in it so far came
+  // from the real page or from canonical harness probes, and the deliberately
+  // non-canonical direct POST below must not end up inside its own tripwire.
+  const savedCodeFields = [...new Set(API_CALLS
+    .filter((c) => c.body && c.body.action === "save" && Array.isArray(c.body.answers))
+    .flatMap((c) => c.body.answers.map((a) => String((a || {}).target_field || "")))
+    .filter((f) => f.startsWith("codes.")))];
+  const twinSave = await callApi({ action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.00.applies_to", answered: ["x"] }] });
+  check(twinSave.ok === false && twinSave.error === "that answer does not belong to this card"
+    && DB.workbook_answers.filter((r) => r.card_id === "c-codes" && /^codes\.0+\.applies_to$/.test(r.target_field)).length === 1,
+    `a direct POST of codes.00.applies_to refuses 404 and logical code 0 keeps ONE row ("${twinSave.error}")`);
+
   // ── D4, through the REAL page: the failure banner claims only what it knows.
   // After D1 a genuinely foreign field is still the reachable 404, and the
   // banner must name the field rather than guess a cause. This doubles as the
@@ -1810,6 +1849,15 @@ console.log("\n── F5. the SJ-shaped codes card grows its missing rows throug
     "a save the server refuses fails loud through the real page");
   check(/codes\.0\.hacker/.test(sjPage.SAVE.msg) && !/cannot add brand new items/.test(sjPage.SAVE.msg),
     `and the banner names the field it could not save, claiming no cause ("${sjPage.SAVE.msg}")`);
+
+  // ── Step 2's regression tripwire against the PAGE: every codes.* field the
+  // real page ever put in a save payload (snapshotted above, before the
+  // deliberately non-canonical harness probe) is canonically spelled, so
+  // refusing non-canonical spellings can never refuse the page. codeIndices
+  // does `s.add(+m[1])` on rows the API itself sent and setA builds
+  // 'codes.'+i+'.'+f from those numbers - this asserts that stays true.
+  check(savedCodeFields.length > 0 && savedCodeFields.every((f) => /^codes\.(?:0|[1-9]\d*)\./.test(f)),
+    `every codes.* field the REAL page ever saved is canonically spelled (${savedCodeFields.join(", ")})`);
 
   // Put the fixture back and reboot the main page off it, so every later
   // section reads the state it always did.

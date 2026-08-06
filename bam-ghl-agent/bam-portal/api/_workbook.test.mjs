@@ -155,8 +155,17 @@
 //       imports a mutant guardrails copy); the SAME pin is carried by
 //       api/_coupon-guardrails.test.mjs, api/_workbook-apply.test.mjs and
 //       scripts/verify-workbook-contract.mjs.
+//   MUTATE=noncanonicalindex   node api/_workbook.test.mjs
+//       classifyIndexed's one-spelling check becomes `if (false)`, so
+//       `codes.00.applies_to` is a VALID address distinct from
+//       `codes.0.applies_to` again - the mint dedupes by exact string and
+//       creates a twin row for one logical answer.
+//   MUTATE=mintuncapped        node api/_workbook.test.mjs
+//       the mint ceiling comparison becomes `>= Infinity`, so a scripted loop
+//       of null-id saves creates rows without end - the addition caps'
+//       denial-of-service reasoning, defeated through the mint door.
 //
-// TWENTY-SIX controls: twenty-four over the route in three families, plus the
+// TWENTY-EIGHT controls: twenty-six over the route in three families, plus the
 // seed-side seeduntrimmed and the guardrails-side blankkeysrestrict above. The route's: PRODUCT rules (partialsubmit,
 // confirmblind, confirmnomaterialize, submittededitable, echoacts, orphanmint,
 // metawritable, dropnulls, addconfirmed, ghostremove, blankadd,
@@ -178,14 +187,15 @@
 // proof in CI, which runs every name and greps for the banner):
 //   seeduntrimmed -> 4 failures (the padded, whitespace-only and newline/tab
 //                    mapper pins, and the tAgeStrOrEmpty round trip)
-//   codesunmintable -> 13 failures (re-measured 2026-08-06, whitespace pass:
-//                    was 7 after the D1/D3 sections; the confirm-guard part-2
-//                    battery's six null-id saves go through the same mint
-//                    door, so its five shape pins and the padded-key pin all
-//                    trip too)
-//   codesmintany  -> 4 failures (measured 2026-08-06, D1 fix pass: the five
-//                    byte-for-byte refusals minus the plan-card one, which
-//                    mintableOn still refuses on its own)
+//   codesunmintable -> 18 failures (re-measured 2026-08-06, twice: 7 -> 13
+//                    when the whitespace pass's confirm-guard part-2 battery
+//                    joined the same mint door, 13 -> 18 when the Step 2
+//                    mint-door section's canonical-save, ceiling and row
+//                    pins joined it too)
+//   codesmintany  -> 10 failures (re-measured 2026-08-06, Step 2 pass: was 4;
+//                    with the allowlist gutted the non-canonical spellings
+//                    MINT, so the twin refusals, the one-row pin, the flood
+//                    pin and the two new battery refusals all trip)
 //   serverconfirmsuntargeted -> 7 failures (re-measured 2026-08-06, whitespace
 //                    pass: was 2; the confirm-guard part-2 battery's five
 //                    verbatim refusals run through the same D3 guard)
@@ -196,6 +206,15 @@
 //                    api/_coupon-guardrails.test.mjs, 4 in
 //                    api/_workbook-apply.test.mjs, 2 in
 //                    scripts/verify-workbook-contract.mjs)
+//   noncanonicalindex -> 6 failures (measured 2026-08-06, Step 2 pass: the
+//                    codes.00/codes.000 twin refusals, the one-row pin, the
+//                    33-variant flood pin and the two battery entries; the
+//                    same pin catches 1 in scripts/verify-workbook-contract
+//                    .mjs - its direct-POST 404)
+//   mintuncapped  -> 1 failure (measured 2026-08-06, Step 2 pass: the
+//                    91st-row cap-sentence pin, DB pinned at 90. This control
+//                    lives ONLY here - the contract flow has no 90-row card,
+//                    and building one would prove nothing this pin does not)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -532,6 +551,21 @@ const OTHERNOFOLLOWUP = [[
   `    : String(v.billing_cycle || "") === "Other" && !str(v.billing_cycle_other) ? "Please say how often this plan bills before adding it." : ""),`,
   `    : ""),   // (control othernofollowup) the follow-up requirement is gone`]];
 
+// MUTATE=noncanonicalindex  the one-spelling check in classifyIndexed becomes
+// `if (false)`, so `codes.00.applies_to` is a VALID address distinct from
+// `codes.0.applies_to` again - the mint dedupes by exact string and creates a
+// twin row for one logical answer.
+const NONCANONICALINDEX = [[
+  `  if (String(index) !== m[1]) {`,
+  `  if (false) {   // (control noncanonicalindex) every spelling is an address`]];
+
+// MUTATE=mintuncapped  the mint ceiling comparison becomes `>= Infinity`, so
+// the mint branch creates rows without end again - the denial-of-service the
+// addition caps exist to stop, through the door next to them.
+const MINTUNCAPPED = [[
+  `          if (mine.filter((a) => !isAddition(a)).length >= MAX_MINT_ROWS_PER_CARD) {`,
+  `          if (mine.filter((a) => !isAddition(a)).length >= Infinity) {   // (control mintuncapped) no ceiling`]];
+
 // MUTATE=blankkeysrestrict  the ONE emptiness rule loses its trim. The pinned
 // line lives in api/_coupon-guardrails.js, so the control writes a mutant
 // guardrails copy (below) and the workbook copy under test imports THAT - the
@@ -555,6 +589,7 @@ const EDITS = {
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
   blankkeysrestrict: BLANKKEYSRESTRICT,   // + a mutant _coupon-guardrails.js copy, written below
+  noncanonicalindex: NONCANONICALINDEX, mintuncapped: MINTUNCAPPED,
   seeduntrimmed: [],   // pins scripts/seed-sj-age-rows.mjs, not workbook.js - see below
 };
 
@@ -1730,19 +1765,99 @@ console.log("\n── the mint whitelist, codes cards: every CODE_T leaf can gro
 
   // FAIL-CLOSED DID NOT WEAKEN. Everything outside the CODE_T leaves keeps
   // today's refusal, byte for byte: an unknown leaf, an inherited property, an
-  // index past the bound, a codes field on a plan card, and the unindexed leaf
-  // name on the codes card itself.
+  // index past the bound, a codes field on a plan card, the unindexed leaf
+  // name on the codes card itself - and (Step 2) the non-canonical index
+  // spellings, which are two addresses for one answer.
   for (const [key, field] of [
     ["codes", "codes.0.hacker"],
     ["codes", "codes.0.constructor"],
     ["codes", "codes.200000.applies_to"],
     ["plan:p1", "codes.0.applies_to"],
     ["codes", "applies_to"],
+    ["codes", "codes.00.applies_to"],
+    ["codes", "codes.01.code"],
   ]) {
     const r = await post({ token: TOKEN, action: "save", card_key: key, answers: [{ id: null, target_field: field, answered: "x" }] });
     ok(r.status === 404 && r.body.error === "that answer does not belong to this card",
       `a null-id save of ${field} on the ${key} card still refuses byte-for-byte ("${r.body.error}")`);
   }
+  reset();
+}
+
+console.log("\n── the mint door: one spelling per address, and a ceiling on rows ──");
+{
+  // Step 2 (2026-08-06): `+m[1]` collapsed "00" and "0" into the same number,
+  // but the mint dedupes by the exact target_field STRING - so
+  // `codes.00.applies_to` minted a TWIN row for logical code 0. And the mint
+  // branch had no row cap at all, so a scripted loop of null-id saves could
+  // create rows without end on a no-login link. classifyIndexed now refuses
+  // every non-canonical spelling and the mint door carries the caps.
+  // MUTATE=noncanonicalindex / MUTATE=mintuncapped.
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  let seedAt = 0;
+  const codeRow = (field, proposed) => DB.workbook_answers.push({
+    id: "a-code-" + (++seedAt), workbook_id: "wb1", card_id: "c-codes", client_id: "sj",
+    target_kind: "price_row", target_table: "offers", target_id: "off1",
+    target_field: field, current_value: null, proposed: proposed === undefined ? null : proposed,
+    answered: null, applied_at: null, created_at: `2026-08-04T00:01:${String(seedAt).padStart(2, "0")}Z`,
+  });
+  codeRow("codes.0.code", "SIBLING10");
+  codeRow("codes.0.kind", "Percent off");
+  codeRow("codes.0.value", "10");
+  codeRow("codes.0.duration", "Every payment");
+  codeRow("codes.0.once_per_customer", "yes");
+
+  // ── (i) the tester's exact repro: the twin cannot mint ────────────────────
+  const save = (field, answered) => post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: field, answered }] });
+  const before = DB.workbook_answers.length;
+  const rCanon = await save("codes.0.applies_to", ["Academy 2x/week|monthly"]);
+  const rTwin = await save("codes.00.applies_to", ["Academy 2x/week|monthly"]);
+  const rTwin2 = await save("codes.000.applies_to", ["Academy 2x/week|monthly"]);
+  const rows0 = DB.workbook_answers.filter((a) => a.card_id === "c-codes" && /^codes\.0+\.applies_to$/.test(a.target_field));
+  ok(rCanon.status === 200 && rCanon.body.ok === true, "codes.0.applies_to (the one spelling) mints and saves");
+  for (const [f, r] of [["codes.00.applies_to", rTwin], ["codes.000.applies_to", rTwin2]]) {
+    ok(r.status === 404 && r.body.error === "that answer does not belong to this card",
+      `${f} refuses byte-for-byte ("${r.body.error}")`);
+  }
+  ok(rows0.length === 1 && DB.workbook_answers.length === before + 1,
+    `EXACTLY ONE row exists for logical code 0 afterwards (${rows0.length} row; DB ${before} -> ${DB.workbook_answers.length})`);
+
+  // ── (ii) a flood of spelled variants in ONE save mints nothing ────────────
+  const beforeFlood = DB.workbook_answers.length;
+  const variants = Array.from({ length: 33 }, (_, i) => ({ id: null, target_field: `codes.${"0".repeat(i + 2)}.applies_to`, answered: ["x"] }));
+  const flood = await post({ token: TOKEN, action: "save", card_key: "codes", answers: variants });
+  ok(flood.status === 404 && DB.workbook_answers.length === beforeFlood,
+    `one save carrying 33 spelled-variant items refuses without minting any of them (DB ${beforeFlood} -> ${DB.workbook_answers.length})`);
+
+  // ── (iv) the size cap, at the same door as the ADD path's ─────────────────
+  const big = await save("codes.1.code", "x".repeat(2001));
+  ok(big.status === 400 && big.body.error === "That is too long to add here. Please shorten it, or tell us the details directly."
+    && big.body.code === "add_too_long"
+    && !DB.workbook_answers.some((a) => a.card_id === "c-codes" && a.target_field === "codes.1.code"),
+    `a 2001-char answered value on a mintable field refuses with the ADD sentence verbatim ("${big.body.error}") and mints nothing`);
+
+  // ── (iii) the ceiling: 90 rows and not one more ───────────────────────────
+  // Seeded straight into the stub: ten codes' worth of rows minus one leaf,
+  // which is 89 - the largest card the ceiling still admits a mint on.
+  reset();
+  DB.workbook_cards.push({ id: "c-codes", workbook_id: "wb1", card_key: "codes", title: "Discount codes", sort_order: 3, state: "untouched", confirmed_at: null });
+  const LEAVES = ["code", "kind", "value", "duration", "duration_months", "applies_to", "expires_at", "max_redemptions", "once_per_customer"];
+  seedAt = 0;
+  for (let i = 0; i < 10; i++) {
+    for (const leaf of LEAVES) {
+      if (i === 9 && leaf === "once_per_customer") continue;   // 89 rows, one short
+      codeRow(`codes.${i}.${leaf}`, null);
+    }
+  }
+  const countRows = () => DB.workbook_answers.filter((a) => a.card_id === "c-codes").length;
+  ok(countRows() === 89, `the fixture holds 89 non-addition rows (${countRows()})`);
+  const at90 = await save("codes.9.once_per_customer", "yes");
+  ok(at90.status === 200 && at90.body.ok === true && countRows() === 90,
+    `the 90th row still mints - ten fully-answered codes is above any real card (rows ${countRows()})`);
+  const over = await save("codes.10.code", "EXTRA");
+  ok(over.status === 400 && over.body.error === "This card cannot take any more answers. Tell BAM directly and we will sort it out." && countRows() === 90,
+    `the 91st refuses with the cap sentence verbatim ("${over.body.error}") and the DB is pinned at ${countRows()} rows`);
   reset();
 }
 

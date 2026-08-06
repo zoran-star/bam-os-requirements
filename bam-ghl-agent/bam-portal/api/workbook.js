@@ -290,6 +290,20 @@ function canMint(cardKey, field) {
 const MAX_ADD_PER_CARD = 6;
 const MAX_ADD_PER_WORKBOOK = 20;
 const MAX_ADD_CHARS = 2000;
+// THE MINT CEILING (the same denial-of-service reasoning, through the mint
+// door). The additions caps above never covered the answer-mint path, so a
+// scripted loop of null-id saves could create rows without end - and the
+// 200-index space would allow ~1,800 legitimate-looking addresses per card.
+// Why 90: the honest ceiling is codes on the card times the 9 CODE_T leaves.
+// The ADD path already rules 6 additions per card the honest maximum, our
+// largest real seed (San Jose) is 1 code at 5 rows, so 10 fully-answered
+// codes (90 rows) sits comfortably above any real card while staying 20x
+// below what the index space would otherwise permit. Counting the card's
+// non-addition rows (seeded plus minted) rather than a mint ledger keeps the
+// bound recomputable from the DB alone. Tax and plan mints are structurally
+// bounded (1 and 2 fields) but sit under the same ceiling for free.
+// MUTATE=mintuncapped.
+const MAX_MINT_ROWS_PER_CARD = 90;
 
 // The minimum an addition must carry to be ACTIONABLE. Staff have to be able to
 // create the thing by hand from this row alone, so a plan with no price is not a
@@ -736,6 +750,18 @@ async function doSave(wb, body) {
       if (canMint(card.card_key, field)) {
         row = mine.find((a) => a.target_field === field) || null;
         if (!row) {
+          // A ROW IS ABOUT TO BE CREATED, so the creation caps stand at this
+          // door the way they stand at doAdd's: the row ceiling (see
+          // MAX_MINT_ROWS_PER_CARD, with the additions caps) and the ADD
+          // path's value cap, byte-for-byte in its sentence, because a row
+          // cap is not a byte cap. An UPDATE to an existing row takes the
+          // ordinary save path below, untouched.
+          if (mine.filter((a) => !isAddition(a)).length >= MAX_MINT_ROWS_PER_CARD) {
+            throw bad("This card cannot take any more answers. Tell BAM directly and we will sort it out.");
+          }
+          if (JSON.stringify((item || {}).answered === undefined ? null : (item || {}).answered).length > MAX_ADD_CHARS) {
+            throw bad("That is too long to add here. Please shorten it, or tell us the details directly.", 400, "add_too_long");
+          }
           const sib = mine.find((a) => !isAddition(a) && a.target_table);
           if (sib) {
             const created = await sb(`workbook_answers?select=${ANSWER_SELECT}`, {
@@ -1584,6 +1610,19 @@ function classifyIndexed(kind, table, m, what) {
   const index = +m[1];
   if (!own(table, leaf)) {
     return { kind: "unknown", why: `${JSON.stringify(leaf)} is not a ${what} field the apply step knows how to write, so it is refused rather than aimed at a guessed key in the offer` };
+  }
+  // THE INDEX HAS ONE SPELLING. `+m[1]` collapses "00" and "0" into the same
+  // number, but the mint path dedupes rows by the exact target_field STRING -
+  // so `codes.00.applies_to` used to mint a TWIN row for logical code 0, two
+  // rows for one answer that review then adjudicated separately. The real page
+  // can only emit canonical indexes (codeIndices/rungIndices do `+m[1]` on
+  // rows the API itself sent), so refusing every other spelling costs nothing
+  // and closes the twin at its root: canMint reuses classifyField, so the
+  // non-canonical save 404s before a row exists. Placed AFTER the leaf check
+  // and BEFORE the bound check, so both existing refusal sentences stay
+  // byte-identical and first in priority. MUTATE=noncanonicalindex.
+  if (String(index) !== m[1]) {
+    return { kind: "unknown", why: `${JSON.stringify(m[0])} spells ${what} number ${index + 1} as ${JSON.stringify(m[1])} rather than ${JSON.stringify(String(index))}, and two spellings of one address are two rows for one answer` };
   }
   if (!(index <= MAX_LIST_INDEX)) {
     return { kind: "unknown", why: `${JSON.stringify(m[0])} aims at ${what} number ${index + 1}, past the ${MAX_LIST_INDEX + 1} this can address. A row that far out is a typo or a script, and padding a plan out to it is a write nobody asked for` };
