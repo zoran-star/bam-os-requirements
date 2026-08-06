@@ -771,10 +771,13 @@ async function flush(lid){
   const c=card(lid); if(!c||!c.dirty||!c.dirty.size)return true;
   const fields=[...c.dirty];
   const payload=fields.map(f=>{const a=ansOf(c,f);return {id:a?a.id:null,target_field:f,answered:a?a.answered:null}});
-  // Whether this batch tries to CREATE something (a rung, a code, a whole plan the
-  // owner added) rather than answer a question we asked. The API does not accept
-  // creates yet, so a failure here has a known cause worth saying plainly instead
-  // of echoing a validation string at an academy owner.
+  // Whether this batch carries a null id - a field the seed never made a row
+  // for. Most of those MINT server-side now (the canMint whitelist grew the
+  // tax, plan-age and codes fields), so "no id" no longer means "the API
+  // cannot store this" and the old banner's guessed cause ("this page cannot
+  // add brand new items yet") became a wrong claim. When one of these fails,
+  // the banner below says only what this code actually knows: WHICH fields,
+  // and that the change is not stored.
   const creating=payload.some(p=>!p.id);
   inflight++; setSave('saving');
   try{
@@ -793,7 +796,7 @@ async function flush(lid){
     setSave('error', e.message==='offline'
       ? 'You look offline. Your typing is still on screen, nothing is lost.'
       : creating
-        ? 'This page cannot add brand new items yet, so the one you just added is not stored. Everything you changed on the questions we asked you is saved. Tell BAM what you wanted to add and we will add it for you.'
+        ? 'We could not save your answer for '+fields.join(', ')+'. That change is not stored yet. Try again, or tell BAM directly.'
         : e.message);
     return false;
   }

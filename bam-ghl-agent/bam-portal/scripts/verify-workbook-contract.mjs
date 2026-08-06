@@ -214,7 +214,9 @@
  * refusedaddwipes -> 6 (measured 2026-08-06, D2 fix pass: F6's survive and
  * succeed-with-preserved-values pins plus F4's carry-across and its
  * downstream follow-up pins - the wipe breaks the F4 flow too, which is why
- * both probe cleanups are guarded so the banner still prints).
+ * both probe cleanups are guarded so the banner still prints),
+ * bannerblamesadds -> 2 (measured 2026-08-06, D4 fix pass: section A's and
+ * F5's names-the-field banner pins).
  * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
  * flow never submits an inverted band because the page guard refuses it in
  * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
@@ -327,6 +329,12 @@ const PAGE_CONTROLS = {
     else if(charged.length)
       bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee when you pay up front for \${lens(charged)}.\`);`,
     `    if(p.feeOnBase===0)bits.push(\`Plus a one-time \${money(p.feeAmt)} joining fee.\`);   // (control feelineflat)`]],
+  // The save-failure banner goes back to its guessed cause: "this page cannot
+  // add brand new items yet" - a wrong claim now that the mint whitelist
+  // accepts most null-id saves - instead of naming the fields it failed on.
+  bannerblamesadds: [[
+    `        ? 'We could not save your answer for '+fields.join(', ')+'. That change is not stored yet. Try again, or tell BAM directly.'`,
+    `        ? 'This page cannot add brand new items yet, so the one you just added is not stored. Everything you changed on the questions we asked you is saved. Tell BAM what you wanted to add and we will add it for you.'   // (control bannerblamesadds)`]],
   // The restore half of redrawAddsKeep is a no-op again, so every refusal
   // redraw wipes the owner's typed name and price - the D2 defect back.
   refusedaddwipes: [[
@@ -1242,7 +1250,13 @@ check(page.CARDS.map((c) => c.card_key).join(",") === wire.cards.map((c) => c.ca
   await page.flushAll();
   await settle();
   check(DB.workbook_answers.length === before, "a save that would CREATE a row writes nothing (creation is the add action, on both sides)");
-  check(page.SAVE.state === "error" && /cannot add brand new items yet/.test(page.SAVE.msg), "and the page says so in its own words instead of showing him a validation string");
+  // D4: the banner claims only what the code has in hand - the failed fields -
+  // never a guessed cause. The old sentence ("cannot add brand new items yet")
+  // became a wrong claim the moment the mint whitelist started accepting most
+  // null-id saves. MUTATE=bannerblamesadds.
+  console.log(`  NOTE  the banner reads: "${page.SAVE.msg}"`);
+  check(page.SAVE.state === "error" && /commitments\.9\.length/.test(page.SAVE.msg) && !/cannot add brand new items/.test(page.SAVE.msg),
+    `and the banner names the field it could not save, claiming no cause ("${page.SAVE.msg}")`);
 }
 await page.boot();          // back to a clean page; nothing was written
 await settle();
@@ -1733,6 +1747,22 @@ console.log("\n── F5. the SJ-shaped codes card grows its missing rows throug
   const foreign = await callApi({ action: "save", card_key: "codes", answers: [{ id: null, target_field: "codes.0.hacker", answered: "x" }] });
   check(foreign.ok === false && foreign.error === "that answer does not belong to this card",
     `a null-id save of codes.0.hacker still refuses byte-for-byte ("${foreign.error}")`);
+
+  // ── D4, through the REAL page: the failure banner claims only what it knows.
+  // After D1 a genuinely foreign field is still the reachable 404, and the
+  // banner must name the field rather than guess a cause. This doubles as the
+  // contract-side pin that D1's fail-closed refusal still fires through the
+  // page. Driven on the throwaway SJ page, so the stuck-dirty field it leaves
+  // behind is discarded with it. MUTATE=bannerblamesadds.
+  sjPage.setA(codesLid, "codes.0.hacker", "x");
+  TIMERS.clear();
+  const failedFlush = await sjPage.flushAll();
+  await settle();
+  console.log(`  NOTE  the banner reads: "${sjPage.SAVE.msg}"`);
+  check(failedFlush === false && sjPage.SAVE.state === "error",
+    "a save the server refuses fails loud through the real page");
+  check(/codes\.0\.hacker/.test(sjPage.SAVE.msg) && !/cannot add brand new items/.test(sjPage.SAVE.msg),
+    `and the banner names the field it could not save, claiming no cause ("${sjPage.SAVE.msg}")`);
 
   // Put the fixture back and reboot the main page off it, so every later
   // section reads the state it always did.
