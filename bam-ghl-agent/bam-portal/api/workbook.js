@@ -2,6 +2,16 @@ import { withSentryApiRoute } from "./_sentry.js";
 import { assertHeaderSafeCredential, safeFetch } from "./_header-safe-credential.js";
 import { cleanAppliesTo } from "./_coupon-guardrails.js";
 import { randomBytes } from "node:crypto";
+// THE MEMBER APPLY ENGINE reuses the off-card logic library (dates, methods, the
+// interval rules, the double-billing guard) and the shared system-item creator,
+// rather than forking any of it. See doApplyMember below.
+import {
+  isDateStr as ocIsDateStr, validateMethod as ocValidateMethod,
+  COLLECTION_METHODS as OC_METHODS, stopBillingItem, systemKeyForStopBilling,
+} from "./_off-card.js";
+import {
+  createSystemActionItem, systemKeyForTakeover, systemKeyForMissingPhone,
+} from "./_action-items.js";
 
 // Vercel Serverless Function - THE OWNER-FACING WORKBOOK, and the only surface
 // through which an academy owner touches what his academy sells.
@@ -1685,6 +1695,109 @@ function classifyField(field) {
     : { kind: "unknown", why: `${JSON.stringify(f)} is not a plan field the apply step knows how to write, so it is refused rather than aimed at a guessed key in the offer` };
 }
 
+// ── THE MEMBER FIELD MAP ─────────────────────────────────────────────────────
+//
+// A member workbook (kind='member') confirms an academy's existing paying
+// members. Its answers are target_kind='member_row', target_table='members',
+// and target_id is a PRE-SEEDED members.id shell (decision A) - so apply is a
+// true confirm, never a create. The value vocabulary, exactly like the price
+// side: the page answers in its own words and this table says what the row
+// stores and which translator judges it. Fail-closed and own-property only, the
+// same whitelist discipline PLAN_T/RUNG_T/CODE_T carry - a field name this table
+// does not know is a REFUSAL, never a write to a guessed members column.
+//
+// TWO FIELDS DO NOT LAND ON A members COLUMN, and the apply path routes them:
+//   athlete_age  -> member_field_values (decision B: the per-athlete store, so
+//                   two siblings on one sub keep their own age). Never a new
+//                   members column.
+//   next_payment -> NOT a members column at all. It anchors the off-card
+//                   arrangement and feeds the takeover item; it is carried, not
+//                   written to members.
+// off_card_method / off_card_method_note ride here because a member flagged
+// billing_mode='alternate' with no method is the decorative-flag failure the
+// off-card system exists to prevent: the flag excludes them from auto-charge, so
+// without a method nobody could ever collect. Alternate REQUIRES a method (fail
+// closed in phase 0), same rule set-off-card itself enforces.
+const V_OUTCOME = mkVocab(
+  ["confirmed", "stop_billing"],
+  {
+    "confirm": "confirmed", "still a member": "confirmed", "yes": "confirmed", "active": "confirmed",
+    "stop billing": "stop_billing", "not a member": "stop_billing", "left": "stop_billing",
+    "stop": "stop_billing", "cancel": "stop_billing", "no": "stop_billing",
+  }
+);
+const V_BILLING_MODE = mkVocab(
+  ["card", "alternate"],
+  {
+    "stripe": "card", "on card": "card", "card on file": "card",
+    "cash": "alternate", "e-transfer": "alternate", "etransfer": "alternate",
+    "off card": "alternate", "off-card": "alternate", "another way": "alternate",
+    "pays another way": "alternate", "manual": "alternate",
+  }
+);
+// The method chips. OC_METHODS is the off-card system's own canonical list
+// (cash / e_transfer / bank_transfer / cheque / other) - imported, never
+// re-typed, so the two surfaces cannot disagree about what a method is.
+const V_METHOD = mkVocab(
+  OC_METHODS,
+  {
+    "e-transfer": "e_transfer", "etransfer": "e_transfer", "email transfer": "e_transfer",
+    "bank": "bank_transfer", "bank transfer": "bank_transfer", "wire": "bank_transfer",
+    "check": "cheque", "chek": "cheque",
+  }
+);
+// A real calendar date or blank. Reuses the off-card date guard (isDateStr),
+// which round-trips the string so "2026-02-30" is refused rather than silently
+// rolled a day by JS Date - the exact bug the off-card build already closed.
+const tMemberDate = (v) => {
+  if (v === "" || v === null) return tOk(null);
+  return ocIsDateStr(v) ? tOk(String(v).slice(0, 10))
+    : tErr(`not a real calendar date written YYYY-MM-DD: ${JSON.stringify(v)}`);
+};
+// A whole number of cents, or blank. This is a CARRIED, read-only pre-seed fact
+// (what the member already pays, read from their Stripe subscription) - never a
+// members column, never edited, never used to change what they pay. It exists so
+// the coverage panel can show an amount and an off-card arrangement for an
+// uncovered member can still be anchored. Coverage NEVER matches on it (identity
+// only); see memberPriceCovered.
+const tCentsOrNull = (v) => {
+  if (v === "" || v === null) return tOk(null);
+  if (typeof v === "number" && Number.isInteger(v) && v >= 0) return tOk(v);
+  if (typeof v === "string" && /^\d+$/.test(v.trim()) && v.trim() === v) return tOk(parseInt(v, 10));
+  return tErr(`not a whole number of cents: ${JSON.stringify(v)}`);
+};
+const MEMBER_T = {
+  athlete_name: tText,
+  athlete_age: tAgeStrOrEmpty,          // -> member_field_values, not a column
+  stripe_price_id: tText,
+  offer_id: tText,
+  plan: tText,
+  amount_cents: tCentsOrNull,           // carried read-only pre-seed fact, not a column
+  next_payment: tMemberDate,            // -> off-card anchor / takeover, not a column
+  outcome: tChip(V_OUTCOME, "member outcome"),
+  billing_mode: tChip(V_BILLING_MODE, "billing mode"),
+  parent_name: tText,
+  parent_phone: tText,
+  off_card_method: tChip(V_METHOD, "payment method"),
+  off_card_method_note: tText,
+};
+// The columns MEMBER_T leafs write straight onto the members row (name, plan,
+// contact, status-driving). The three that do NOT (age, next_payment, and the
+// two off_card_* which drive the arrangement) are handled by their own paths and
+// are listed here so the write loop can tell "a members column" from "carried".
+const MEMBER_COLUMN = {
+  athlete_name: "athlete_name", parent_name: "parent_name", parent_phone: "parent_phone",
+  stripe_price_id: "stripe_price_id", offer_id: "offer_id", plan: "plan",
+};
+function classifyMemberField(field) {
+  const f = String(field || "");
+  if (f === "notes") return { kind: "manual" };
+  if (f.startsWith(ADD_PREFIX)) return { kind: "manual" };
+  return own(MEMBER_T, f)
+    ? { kind: "member", leaf: f, t: MEMBER_T[f] }
+    : { kind: "unknown", why: `${JSON.stringify(f)} is not a member field the apply step knows how to write, so it is refused rather than aimed at a guessed members column` };
+}
+
 // Which pricing_offerings entry a plan card means. The card's TITLE answer
 // names it: current_value first (the name the offer stores today), then
 // answered/proposed for the rerun case where a previous apply already renamed
@@ -1802,6 +1915,10 @@ function approvalGate(cards, grouped) {
 async function doReviewStaff(req, body) {
   const { wb } = await resolveStaffForWorkbook(req, body);
   assertReviewable(wb);
+  // A member workbook is reviewed by its OWN grouping (stop-billing first, the
+  // coverage panel, member cards, the action items it will create), not the
+  // price grouping below. Branched here so the price review path is untouched.
+  if (wb.kind === "member") return doReviewMember(wb);
   const [{ cards }, { answers }] = await Promise.all([readCardsStaff(wb.id), readAnswersStaff(wb.id)]);
   const grouped = byCard(answers);
 
@@ -2012,6 +2129,13 @@ async function doApplyStaff(req, body) {
   if ((body || {}).dry_run === false) {
     throw bad("live apply arrives after the rehearsal - run the dry run until it is boring, then the Stripe write ships as its own reviewed step", 409, "live_apply_not_built");
   }
+
+  // MEMBER APPLY IS ITS OWN ENGINE. It is REAL for the portal DB (members,
+  // arrangements, action items) and DEFERRED at the Stripe seam (the archived
+  // price mint and the takeover sub), the deliberate difference from the price
+  // apply whose whole write is a dry preview. Branched after the dry_run:false
+  // refusal so the Stripe seam stays unfired here too.
+  if (wb.kind === "member") return doApplyMember({ user, wb, wbDegraded });
 
   const { cards, degraded } = await readCardsStaff(wb.id);
   const { answers, degraded: answersDegraded } = await readAnswersStaff(wb.id);
@@ -2875,6 +2999,611 @@ async function phase3Preview(clientId, mod) {
   };
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// ── THE MEMBER APPLY ENGINE ───────────────────────────────────────────────────
+//
+// A member workbook confirms an academy's existing paying members. Its review
+// and apply are their OWN grouping and their OWN write path (branched on
+// wb.kind), because a member's blast radius and the things it produces differ
+// from a price's: a wrong "stop billing" answer is a parent charged for months
+// after their kid quit, so stop-billing surfaces FIRST; every member must land
+// on a live or archived price (the HARD coverage gate); and apply's real output
+// is a queue of three action items a human then works.
+//
+// WHAT IS REAL AND WHAT IS DEFERRED. Member apply WRITES the portal DB for real:
+// members rows, member_field_values (age), member_billing_arrangements, and the
+// three action items. It is DEFERRED at the Stripe seam: it does NOT mint the
+// archived price for an uncovered member (that is a live Stripe write, routed to
+// the BAM queue per decision E) and does NOT create the takeover subscription
+// (the takeover item points at api/sorter/take-over.js, worked per member later).
+// This is the deliberate difference from the price apply, whose whole write is a
+// dry preview - the report says so plainly so nobody thinks members were not
+// really created.
+//
+// NOTHING IS FORKED. Coverage reads reuse readForPreview's three-outcome rule;
+// the off-card arrangement reuses api/_off-card.js (methods, dates, the
+// double-billing guard) and leaves first-collection generation to the ONE engine
+// that already runs it (the daily cron generateForArrangement); the action items
+// go through the shared createSystemActionItem.
+
+const MEMBER_SELECT = "id,client_id,athlete_name,parent_name,parent_phone,plan,status,"
+  + "stripe_price_id,offer_id,stripe_subscription_id,stripe_customer_id,billing_portal_owned,billing_mode";
+
+// The first value that is neither null/undefined nor "". An answer's effective
+// value wins over the pre-seeded shell; the shell fills a blank.
+const firstDefined = (...xs) => { for (const x of xs) if (!isBlank(x) && x !== "") return x; return undefined; };
+
+// COVERAGE: does a live or archived PORTAL price exist with this exact Stripe
+// price id? IDENTITY, never amount - Salvador's $200 on an old Pre Season price
+// must never file under Elementary just because Elementary is also $200. Reads
+// both the catalog and the offer_prices ladder, each through the three-outcome
+// rule: a read that FAILED is not a read that found nothing, and coverage on an
+// unread catalog would seed a member onto a price nobody confirmed exists.
+async function readMemberCoverage(clientId) {
+  const [catalogRead, opRead] = await Promise.all([
+    readForPreview(
+      `pricing_catalog?client_id=eq.${enc(clientId)}&select=stripe_price_id,amount_cents,currency`,
+      "pricing_catalog"
+    ),
+    readForPreview(`offer_prices?tenant_id=eq.${enc(clientId)}&select=stripe_price_id`, "offer_prices"),
+  ]);
+  const readable = catalogRead.state !== "could_not_read" && opRead.state !== "could_not_read";
+  const covered = new Set();
+  const amountByPrice = new Map();
+  const amountSet = new Set();   // catalog amounts, exposed ONLY so the amount-match control has one line to corrupt; production never matches on it
+  for (const r of catalogRead.rows) {
+    if (!r || !r.stripe_price_id) continue;
+    covered.add(String(r.stripe_price_id));
+    if (r.amount_cents != null) { amountByPrice.set(String(r.stripe_price_id), { amount_cents: r.amount_cents, currency: r.currency || "cad" }); amountSet.add(Number(r.amount_cents)); }
+  }
+  for (const r of opRead.rows) { if (r && r.stripe_price_id) covered.add(String(r.stripe_price_id)); }
+  return { readable, covered, amountByPrice, amountSet, catalogState: catalogRead.state, opState: opRead.state };
+}
+
+// IDENTITY, NEVER AMOUNT - the single most important correctness property of
+// this engine. A member is covered only when a portal price carries their EXACT
+// Stripe price id. Amount is deliberately not consulted: an amount collision (an
+// old Pre Season $200 price and a live Elementary $200 plan) is precisely how a
+// member lands on the wrong plan. `amountCents` is passed for the panels' sake
+// and is IGNORED here; MUTATE=amountmatch makes this line consult it and the
+// suite catches Salvador filing under Elementary. MUTATE=amountmatch.
+// eslint-disable-next-line no-unused-vars
+function memberPriceCovered(coverage, priceId, _amountCents) {
+  return !!priceId && coverage.covered.has(String(priceId));
+}
+
+// The Age custom-field def for this academy (member_field_values is typed by a
+// def). Matched by the canonical label/key the standard athlete fields seed
+// ("Athlete age" -> key athlete_age), then loosely by any "age" field. Null when
+// the academy has no such field yet - age then cannot be stored and apply says
+// so rather than guessing a column.
+async function resolveAgeFieldDef(clientId) {
+  const rows = await sb(`custom_field_defs?client_id=eq.${enc(clientId)}&archived=eq.false&select=id,key,label`).catch(() => null);
+  if (!Array.isArray(rows)) return null;
+  const norm = (s) => String(s == null ? "" : s).trim().toLowerCase();
+  return rows.find((d) => norm(d.label) === "athlete age" || norm(d.key) === "athlete_age")
+    || rows.find((d) => /(^|[^a-z])age([^a-z]|$)/.test(norm(d.label)) || /(^|_)age($|_)/.test(norm(d.key)))
+    || null;
+}
+
+// Is the off-card schema present? The arrangement write degrades gracefully when
+// it is not (billing_mode left unchanged, deferral reported) rather than 500ing
+// - and never marks a member off-card without the arrangement that gives the
+// flag a consequence.
+async function memberOffCardSchemaPresent() {
+  try { await sb(`member_billing_arrangements?select=id&limit=1`); return true; }
+  catch { return false; }
+}
+
+const memberWho = (m) => {
+  const parent = firstDefined(m.fields.parent_name, m.seed && m.seed.parent_name);
+  const athlete = firstDefined(m.fields.athlete_name, m.seed && m.seed.athlete_name);
+  if (parent && athlete) return `${parent} (${athlete})`;
+  return parent || athlete || "this member";
+};
+
+// One review row for a member answer, in the same shape the price side's
+// reviewItem carries but judged by classifyMemberField.
+function memberReviewItem(card, a) {
+  const eff = effective(a);
+  const cls = classifyMemberField(a.target_field);
+  const entry = {
+    answer_id: a.id,
+    card_key: card ? card.card_key : null,
+    target_kind: a.target_kind,
+    target_table: a.target_table,
+    target_id: a.target_id,
+    target_field: a.target_field,
+    current_value: orNull(a.current_value),
+    proposed: orNull(a.proposed),
+    answered: orNull(a.answered),
+    effective: orNull(eff),
+    is_change: !jsonEqual(a.current_value, eff),
+    apply_error: orNull(a.apply_error),
+  };
+  if (!isBlank(eff) && cls.kind === "member") {
+    const out = cls.t(eff);
+    if (out.ok) entry.will_write = out.value;
+    else entry.translation_error = refusalReason(out.error, a.target_field);
+  } else if (cls.kind === "unknown") {
+    entry.translation_error = refusalReason(cls.why, a.target_field);
+  }
+  return entry;
+}
+
+// The three action items a member descriptor implies, for the review preview.
+// Money-side blast radius orders them; each carries its typed system_key so the
+// skill shows the exact key apply will dedupe on.
+function memberItemsFor(g) {
+  const out = { takeover: null, missing_phone: null, stop_billing: null };
+  if (!g.member_id) return out;
+  if (g.billing_portal_owned !== true) out.takeover = { system_key: systemKeyForTakeover(g.member_id), member_id: g.member_id };
+  if (isBlank(g.parent.phone) || String(g.parent.phone).trim() === "") out.missing_phone = { system_key: systemKeyForMissingPhone(g.member_id), member_id: g.member_id };
+  if (g.outcome === "stop_billing") out.stop_billing = { system_key: systemKeyForStopBilling(g.member_id), member_id: g.member_id };
+  return out;
+}
+
+// ── member review: stop-billing first, coverage panel, member cards, items ────
+async function doReviewMember(wb) {
+  const [{ cards }, { answers }] = await Promise.all([readCardsStaff(wb.id), readAnswersStaff(wb.id)]);
+  const grouped = byCard(answers);
+
+  const memberIds = [...new Set(
+    answers.filter((a) => a.target_table === "members" && a.target_id && !isAddition(a)).map((a) => String(a.target_id))
+  )];
+  const seedRows = memberIds.length
+    ? (await sb(`members?id=in.(${memberIds.map(enc).join(",")})&client_id=eq.${enc(wb.client_id)}&select=${MEMBER_SELECT}`)) || []
+    : [];
+  const seedById = new Map(seedRows.map((m) => [String(m.id), m]));
+  const coverage = await readMemberCoverage(wb.client_id);
+
+  const stopBilling = [];   // FIRST: a parent charged after they left
+  const memberGroups = [];
+  const additions = [];
+  const notes = [];
+  const uncovered = [];
+  let coveredCount = 0, totalCount = 0, blockerCount = 0;
+  const itemsTakeover = [], itemsMissingPhone = [], itemsStop = [];
+
+  for (const card of cards) {
+    const mine = grouped.get(card.id) || [];
+    const isMemberCard = mine.some((a) => a.target_table === "members" && a.target_id && !isAddition(a));
+    for (const a of mine) {
+      if (isAddition(a)) { additions.push(memberReviewItem(card, a)); continue; }
+      if (a.target_field === "notes") { notes.push(memberReviewItem(card, a)); continue; }
+    }
+    if (!isMemberCard) continue;
+
+    const items = mine
+      .filter((a) => !isAddition(a) && a.target_field !== "notes")
+      .map((a) => memberReviewItem(card, a));
+    const targetId = String((mine.find((a) => a.target_table === "members" && a.target_id) || {}).target_id || "");
+    const seed = seedById.get(targetId) || {};
+    const effOf = (f) => { const a = mine.find((x) => x.target_field === f); return a ? effective(a) : undefined; };
+    const willOf = (f) => { const t = MEMBER_T[f]; const v = effOf(f); if (t && !isBlank(v)) { const o = t(v); return o.ok ? o.value : undefined; } return undefined; };
+
+    const priceId = firstDefined(willOf("stripe_price_id"), seed.stripe_price_id);
+    const family = firstDefined(willOf("plan"), willOf("offer_id"), seed.plan);
+    const outcome = willOf("outcome") || "confirmed";
+    const billingMode = willOf("billing_mode");
+    const carriedAmount = willOf("amount_cents");
+    const isCovered = memberPriceCovered(coverage, priceId, carriedAmount);
+    const familyNamed = !isBlank(family) && String(family).trim() !== "";
+    const catAmt = priceId ? coverage.amountByPrice.get(String(priceId)) : null;
+    const amt = catAmt || (carriedAmount != null ? { amount_cents: carriedAmount } : null);
+
+    totalCount += 1;
+    if (isCovered) coveredCount += 1;
+    else {
+      const blocker = !familyNamed;
+      if (blocker) blockerCount += 1;
+      uncovered.push({
+        member_id: targetId || null,
+        athlete_name: firstDefined(willOf("athlete_name"), seed.athlete_name) || null,
+        amount_cents: amt ? amt.amount_cents : null,
+        stripe_price_id: priceId || null,
+        family: familyNamed ? String(family) : null,
+        blocker,
+        ...(blocker
+          ? { why: "family not chosen - name the plan family so an archived price can be minted for this member" }
+          : { note: "an archived price under this family will be minted (deferred to the BAM queue); the member seeds now" }),
+      });
+    }
+
+    const g = {
+      card_key: card.card_key, title: card.title, sort_order: card.sort_order,
+      member_id: targetId || null, state: card.state,
+      confirmed_at: card.confirmed_at, approved_at: card.approved_at || null,
+      counts: cardCounts(mine),
+      changes: items.filter((i) => i.is_change).length,
+      parent: { name: firstDefined(willOf("parent_name"), seed.parent_name) || null, phone: firstDefined(willOf("parent_phone"), seed.parent_phone) || null },
+      athlete: { name: firstDefined(willOf("athlete_name"), seed.athlete_name) || null, age: willOf("athlete_age") ?? null },
+      plan: { was: orNull(seed.plan), family: familyNamed ? String(family) : null, stripe_price_id: priceId || null, covered: isCovered, amount_cents: amt ? amt.amount_cents : null },
+      next_payment: { was: null, now: willOf("next_payment") || null },
+      outcome,
+      billing_portal_owned: seed.billing_portal_owned === true,
+      off_card: billingMode === "alternate"
+        ? { method: willOf("off_card_method") || null, method_note: willOf("off_card_method_note") || null, anchor: willOf("next_payment") || null }
+        : null,
+      items,
+    };
+    const gi = memberItemsFor(g);
+    if (gi.takeover) itemsTakeover.push(gi.takeover);
+    if (gi.missing_phone) itemsMissingPhone.push(gi.missing_phone);
+    if (gi.stop_billing) itemsStop.push(gi.stop_billing);
+    if (outcome === "stop_billing") stopBilling.push(g); else memberGroups.push(g);
+  }
+
+  const { counted, unapproved } = approvalGate(cards, grouped);
+  const ready = unapproved.length === 0 && blockerCount === 0 && coverage.readable;
+  return {
+    ok: true,
+    workbook: {
+      id: wb.id, client_id: wb.client_id, kind: wb.kind, status: wb.status,
+      submitted_at: wb.submitted_at, reviewed_at: wb.reviewed_at || null,
+      snapshot_taken: wb.snapshot != null,
+    },
+    review: {
+      // ORDER IS THE POINT. Stop-billing first (a parent still being charged),
+      // then coverage (every member must land on a price), then the member cards,
+      // then the queue apply will create, then the hand-adjudication.
+      stop_billing: stopBilling,
+      coverage: {
+        covered: coveredCount, total: totalCount,
+        members_with_no_price: blockerCount,
+        readable: coverage.readable,
+        uncovered,
+        ...(coverage.readable ? {} : {
+          could_not_read: "the price rows (pricing_catalog / offer_prices) could not be read, so coverage cannot be verified. Apply refuses until this reads - a member seeded onto an unconfirmed price is the exact hole the coverage gate closes.",
+        }),
+      },
+      members: memberGroups,
+      action_items: { takeover: itemsTakeover, missing_phone: itemsMissingPhone, stop_billing: itemsStop },
+      additions,
+      notes,
+    },
+    gate: {
+      counted: counted.length,
+      approved: counted.length - unapproved.length,
+      unapproved_card_keys: unapproved,
+      members_with_no_price: blockerCount,
+      coverage_readable: coverage.readable,
+      ready_to_apply: ready,
+    },
+  };
+}
+
+// ── member apply: the ordered, mostly-real write ──────────────────────────────
+async function doApplyMember({ user, wb, wbDegraded }) {
+  const { cards, degraded } = await readCardsStaff(wb.id);
+  const { answers, degraded: answersDegraded } = await readAnswersStaff(wb.id);
+  if (degraded || wbDegraded || answersDegraded) {
+    throw bad("this environment has not run the workbook apply migration (20260806T063000), so apply cannot run here", 409);
+  }
+  const grouped = byCard(answers);
+
+  // THE GATE: every counted card approved, or nothing moves.
+  const { unapproved } = approvalGate(cards, grouped);
+  if (unapproved.length) {
+    throw bad(
+      `apply is refused: ${unapproved.length} card(s) are not approved yet (${unapproved.join(", ")}). Approve every card first - partial apply does not exist.`,
+      409, "unapproved_cards"
+    );
+  }
+
+  const cardById = new Map(cards.map((c) => [c.id, c]));
+
+  // ── phase 0: classify + translate EVERYTHING before writing ANYTHING ────────
+  const skipped = { additions: [], notes: [], already_applied: [], no_answer: [] };
+  const failures = [];
+  const refuse = (answerId, targetField, why) => failures.push({ answer_id: answerId, target_field: targetField, error: refusalReason(why, targetField) });
+
+  const members = new Map();   // member_id -> { targetId, card, fields:{leaf:value}, answerId:{leaf:id} }
+  const ensure = (id, card) => { if (!members.has(id)) members.set(id, { targetId: id, card, fields: {}, answerId: {} }); return members.get(id); };
+
+  for (const a of answers) {
+    const eff = effective(a);
+    const cls = classifyMemberField(a.target_field);
+    if (cls.kind === "manual") { (isAddition(a) ? skipped.additions : skipped.notes).push({ answer_id: a.id, target_field: a.target_field, effective: orNull(eff) }); continue; }
+    if (isBlank(eff)) { skipped.no_answer.push(a.id); continue; }
+    if (a.applied_at) { skipped.already_applied.push(a.id); continue; }
+    if (cls.kind === "unknown") { refuse(a.id, a.target_field, cls.why); continue; }
+    if (a.target_table !== "members") { refuse(a.id, a.target_field, `this pass only applies member rows, and this answer targets ${JSON.stringify(String(a.target_table || ""))}`); continue; }
+    if (!a.target_id) { refuse(a.id, a.target_field, "a member answer must name the pre-seeded members row it confirms (target_id), and this one does not"); continue; }
+    const out = cls.t(eff);
+    if (!out.ok) { refuse(a.id, a.target_field, out.error); continue; }
+    // A blank age with nothing stored writes nothing (mirrors the plan-age skip).
+    if (cls.leaf === "athlete_age" && out.value === "" && (isBlank(a.current_value) || a.current_value === "")) { skipped.no_answer.push(a.id); continue; }
+    const m = ensure(String(a.target_id), cardById.get(a.card_id));
+    m.fields[cls.leaf] = out.value;
+    m.answerId[cls.leaf] = a.id;
+  }
+
+  // The pre-seeded shells these cards confirm.
+  const ids = [...members.keys()];
+  const seedRows = ids.length
+    ? (await sb(`members?id=in.(${ids.map(enc).join(",")})&client_id=eq.${enc(wb.client_id)}&select=${MEMBER_SELECT}`)) || []
+    : [];
+  const seedById = new Map(seedRows.map((m) => [String(m.id), m]));
+
+  // Structural, still phase 0: the shell exists, and an alternate payer has a
+  // method AND an anchor. The flag without the collect obligation is the
+  // decorative-control failure, so it FAILS CLOSED here, before any write.
+  for (const [id, m] of members) {
+    const seed = seedById.get(id);
+    if (!seed) {
+      refuse(Object.values(m.answerId)[0] || null, `member:${id}`, `the pre-seeded member shell this card confirms (id ${id}) does not exist for this academy - members are seeded before the workbook opens, so apply confirms, it does not create`);
+      continue;
+    }
+    m.seed = seed;
+    if (m.fields.billing_mode === "alternate") {
+      if (isBlank(m.fields.off_card_method)) {
+        refuse(m.answerId.billing_mode || m.answerId.outcome || null, "off_card_method", "this member is marked as paying another way, but no payment method was given. An off-card member is excluded from auto-charge, so without a method nobody could ever collect - set cash / e-transfer / bank transfer / cheque / other.");
+      } else {
+        const mv = ocValidateMethod(m.fields.off_card_method, m.fields.off_card_method_note);
+        if (!mv.ok) refuse(m.answerId.off_card_method || null, "off_card_method", mv.error);
+      }
+      if (isBlank(m.fields.next_payment)) {
+        refuse(m.answerId.billing_mode || null, "next_payment", "this member pays another way but has no next payment date to anchor the collection to. That date is the one fact only the owner knows.");
+      }
+    }
+  }
+
+  if (failures.length) {
+    for (const f of failures) {
+      if (!f.answer_id) continue;
+      await sb(`workbook_answers?id=eq.${enc(f.answer_id)}&workbook_id=eq.${enc(wb.id)}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ apply_error: f.error, updated_at: nowIso() }),
+      }).catch(() => {});
+    }
+    return {
+      ok: false,
+      error: `${failures.length} answer(s) could not be turned into member records, so nothing was applied.`,
+      failures,
+    };
+  }
+
+  // ── phase 1: coverage resolution + THE HARD GATE ────────────────────────────
+  const coverage = await readMemberCoverage(wb.client_id);
+  if (!coverage.readable) {
+    throw bad(
+      "apply stopped before writing anything: the academy's price rows (pricing_catalog / offer_prices) could not be read, so coverage cannot be verified. Seeding a member onto a price nobody could confirm exists is exactly the state the coverage gate prevents.",
+      503, "coverage_unreadable"
+    );
+  }
+  const resolvedAmount = new Map();   // member_id -> { amount_cents, currency }
+  const uncovered = [];
+  let blockerCount = 0;
+  for (const [id, m] of members) {
+    const priceId = firstDefined(m.fields.stripe_price_id, m.seed.stripe_price_id);
+    const family = firstDefined(m.fields.plan, m.fields.offer_id, m.seed.plan);
+    const isCovered = memberPriceCovered(coverage, priceId, m.fields.amount_cents);
+    m.priceId = priceId ? String(priceId) : null;
+    m.covered = isCovered;
+    // Off-card amount comes from the matched portal price when covered, else the
+    // carried pre-seed amount - never from an amount-based coverage match.
+    if (isCovered && coverage.amountByPrice.has(String(priceId))) resolvedAmount.set(id, coverage.amountByPrice.get(String(priceId)));
+    else if (m.fields.amount_cents != null) resolvedAmount.set(id, { amount_cents: m.fields.amount_cents, currency: "cad" });
+    if (!isCovered) {
+      const familyNamed = !isBlank(family) && String(family).trim() !== "";
+      if (!familyNamed) blockerCount += 1;
+      uncovered.push({ member_id: id, stripe_price_id: priceId || null, family: familyNamed ? String(family) : null, blocker: !familyNamed });
+    }
+  }
+  if (blockerCount > 0) {
+    // 409, and nothing has been written - this is before the snapshot. The full
+    // list with amounts lives in the review coverage panel staff read first.
+    throw bad(
+      `apply is refused: ${blockerCount} member(s) have no portal price and no plan family chosen (members_with_no_price=${blockerCount}). Every member must land on a live or archived price; name the family for each uncovered member in the workbook, or the migration is not done. Nothing was written.`,
+      409, "members_with_no_price"
+    );
+  }
+
+  // ── phase 2: SNAPSHOT, first apply wins ─────────────────────────────────────
+  let snapshotState = "already";
+  if (wb.snapshot == null) {
+    const arrRead = ids.length
+      ? await readForPreview(`member_billing_arrangements?member_id=in.(${ids.map(enc).join(",")})&select=*`, "member arrangements")
+      : { state: "read", rows: [] };
+    if (arrRead.state === "could_not_read") {
+      throw bad(
+        "the snapshot could not read this academy's member arrangements, so apply stopped before writing anything. A photograph with a hole in it is worse than no apply: a later manual undo would restore a state that never existed.",
+        503, "snapshot_unreadable"
+      );
+    }
+    const photo = {
+      taken_at: nowIso(), taken_by: user.id, kind: "member",
+      members: seedRows.map((m) => ({ ...m })),
+      arrangements: arrRead.rows,
+    };
+    const landedSnap = await sb(`workbooks?id=eq.${enc(wb.id)}&snapshot=is.null&select=id`, {
+      method: "PATCH", headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ snapshot: photo, updated_at: nowIso() }),
+    });
+    snapshotState = (Array.isArray(landedSnap) && landedSnap.length) ? "taken" : "already";
+  }
+
+  const stamp = async (stampIds) => {
+    const list = (stampIds || []).filter(Boolean);
+    if (!list.length) return;
+    await sb(
+      `workbook_answers?workbook_id=eq.${enc(wb.id)}&id=in.(${list.map(enc).join(",")})&applied_at=is.null`,
+      { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ applied_at: nowIso(), apply_error: null, updated_at: nowIso() }) }
+    );
+  };
+
+  // ── phase 3: the members write (name / plan / contact / status) + age ───────
+  const ageDef = await resolveAgeFieldDef(wb.client_id);
+  const memberReports = [];
+  for (const [id, m] of members) {
+    const seed = m.seed;
+    const patch = {};
+    const wrote = [];
+    const stampIds = [];
+    for (const [leaf, col] of Object.entries(MEMBER_COLUMN)) {
+      if (!(leaf in m.fields)) continue;
+      stampIds.push(m.answerId[leaf]);
+      if (jsonEqual(seed[col], m.fields[leaf])) continue;   // the shell already says this
+      patch[col] = m.fields[leaf];
+      wrote.push({ target_field: leaf, to: m.fields[leaf] });
+    }
+    // Status is driven by outcome. stop_billing -> cancelling (the takeover /
+    // stop item does the Stripe cancel); confirmed -> live.
+    let statusWrote = null;
+    if ("outcome" in m.fields) {
+      stampIds.push(m.answerId.outcome);
+      if (m.fields.outcome === "stop_billing" && seed.status !== "cancelling") { patch.status = "cancelling"; statusWrote = "cancelling"; }
+      else if (m.fields.outcome === "confirmed" && seed.status !== "live") { patch.status = "live"; statusWrote = "live"; }
+    }
+    // A 'card' billing_mode lands here; 'alternate' is set by the off-card step
+    // below only when its arrangement actually lands (no decorative flag).
+    if (m.fields.billing_mode === "card") {
+      stampIds.push(m.answerId.billing_mode);
+      if (seed.billing_mode !== "card") { patch.billing_mode = "card"; wrote.push({ target_field: "billing_mode", to: "card" }); }
+    }
+    // next_payment for a NON-alternate member is confirmed here (it feeds the
+    // takeover item created in phase 5, which is idempotent). For an alternate
+    // member it is stamped with the arrangement below, so a deferred arrangement
+    // can still be created on a rerun.
+    if ("next_payment" in m.fields && m.fields.billing_mode !== "alternate") stampIds.push(m.answerId.next_payment);
+
+    if (Object.keys(patch).length) {
+      patch.updated_at = nowIso();
+      await sb(`members?id=eq.${enc(id)}&client_id=eq.${enc(wb.client_id)}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch),
+      });
+    }
+
+    // Age -> member_field_values (decision B), reusing the same upsert shape as
+    // api/custom-fields.js set-value. Left UNAPPLIED when the academy has no Age
+    // field, so seeding it later and rerunning lands the age.
+    let ageReport = null;
+    if ("athlete_age" in m.fields) {
+      if (ageDef) {
+        await sb(`member_field_values?on_conflict=member_id,field_id`, {
+          method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify([{ member_id: id, field_id: ageDef.id, value: Number(m.fields.athlete_age), updated_at: nowIso() }]),
+        });
+        ageReport = { field_id: ageDef.id, value: Number(m.fields.athlete_age) };
+        stampIds.push(m.answerId.athlete_age);
+      } else {
+        ageReport = { deferred: "this academy has no Age custom field yet (run api/custom-fields ?action=seed-standard). Age was not stored and the answer is left unapplied so a rerun lands it." };
+      }
+    }
+
+    await stamp(stampIds);
+    memberReports.push({
+      member_id: id, wrote, status: statusWrote, age: ageReport,
+      covered: m.covered, stripe_price_id: m.priceId,
+      ...(m.covered ? {} : { deferred_mint: "no portal price for this member's Stripe price id yet; an archived price mint under the named family is deferred to the BAM queue (v2_tickets). The member row is seeded." }),
+    });
+  }
+
+  // ── phase 4: off-card arrangements for alternate members ────────────────────
+  // Reuses api/_off-card.js (method validation already ran) and the shared
+  // stop-billing guard. First-collection generation is left to the ONE engine
+  // that runs it - the daily cron generateForArrangement over active
+  // arrangements - so nothing here is a second copy of the generator.
+  const arrangements = [];
+  const alternates = [...members].filter(([, m]) => m.fields.billing_mode === "alternate");
+  const offCardOk = alternates.length ? await memberOffCardSchemaPresent() : true;
+  for (const [id, m] of alternates) {
+    const amt = resolvedAmount.get(id);
+    if (!offCardOk) { arrangements.push({ member_id: id, deferred: "off-card tables are not migrated on this database; billing_mode left unchanged and no arrangement created." }); continue; }
+    if (!amt) { arrangements.push({ member_id: id, deferred: "no portal price amount for this member yet (price pending mint); the arrangement waits on the mint. billing_mode left unchanged so nothing is flagged off-card without a collection behind it." }); continue; }
+    const existing = await sb(`member_billing_arrangements?member_id=eq.${enc(id)}&status=in.(active,paused)&select=id&limit=1`).catch(() => []);
+    if (Array.isArray(existing) && existing[0]) { arrangements.push({ member_id: id, arrangement_id: existing[0].id, already: true }); continue; }
+    const row = {
+      client_id: wb.client_id, member_id: id,
+      athlete_name: firstDefined(m.fields.athlete_name, m.seed.athlete_name) || null,
+      parent_name: firstDefined(m.fields.parent_name, m.seed.parent_name) || null,
+      method: m.fields.off_card_method,
+      method_note: m.fields.off_card_method_note ? String(m.fields.off_card_method_note).trim() : null,
+      amount_cents: amt.amount_cents, currency: amt.currency || "cad",
+      offer_id: firstDefined(m.fields.offer_id, m.seed.offer_id) || null,
+      anchor_date: m.fields.next_payment,
+      grace_days: 3, lead_days: 3,
+      status: "active", source: "workbook",
+      created_by: user.id, created_by_name: null,
+    };
+    const created = await sb(`member_billing_arrangements`, {
+      method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(row),
+    }).catch((e) => { console.error("member apply: arrangement insert failed -", String((e && e.message) || e)); return null; });
+    const arr = Array.isArray(created) ? created[0] : created;
+    if (!arr || !arr.id) { arrangements.push({ member_id: id, deferred: "the arrangement row did not save; billing_mode left unchanged." }); continue; }
+    await sb(`members?id=eq.${enc(id)}&client_id=eq.${enc(wb.client_id)}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ billing_mode: "alternate", updated_at: nowIso() }),
+    });
+    await stamp([m.answerId.billing_mode, m.answerId.off_card_method, m.answerId.off_card_method_note, m.answerId.next_payment]);
+    arrangements.push({ member_id: id, arrangement_id: arr.id, method: row.method, anchor_date: row.anchor_date, amount_cents: row.amount_cents });
+  }
+
+  // ── phase 5: the three action items (idempotent on system_key) ──────────────
+  const items = { takeover: [], missing_phone: [], stop_billing: [] };
+  for (const [id, m] of members) {
+    const seed = m.seed;
+    const who = memberWho(m);
+    // TAKEOVER: the sub was created outside the portal (billing_portal_owned not
+    // true), so the portal cannot bill or cancel it directly. The item points at
+    // the existing takeover engine; the sub itself is created per member later.
+    if (seed.billing_portal_owned !== true) {
+      const { created } = await createSystemActionItem(sb, {
+        client_id: wb.client_id, system_key: systemKeyForTakeover(id),
+        title: `Take over ${who}'s subscription`,
+        description: [
+          `${who} is on a subscription created outside the portal, so the portal cannot bill or cancel it directly.`,
+          "Open this member in the portal and use Take over: it creates a replacement subscription at the exact same price, anchored to their next payment date, so they are never charged twice.",
+          "Then cancel the old subscription in your Stripe. The portal confirms it is gone and closes this item.",
+        ].join("\n"),
+      });
+      items.takeover.push({ member_id: id, system_key: systemKeyForTakeover(id), created });
+    }
+    // MISSING PHONE: the one missing-data item (names/ages resolve in the
+    // workbook itself).
+    const phone = firstDefined(m.fields.parent_phone, seed.parent_phone);
+    if (isBlank(phone) || String(phone).trim() === "") {
+      const { created } = await createSystemActionItem(sb, {
+        client_id: wb.client_id, system_key: systemKeyForMissingPhone(id),
+        title: `Add a phone number for ${who}`,
+        description: [
+          `We do not have a phone number for ${who}. It is the one piece of contact information the member workbook could not fill in.`,
+          "Open this member in the portal and add their parent's phone number.",
+        ].join("\n"),
+      });
+      items.missing_phone.push({ member_id: id, system_key: systemKeyForMissingPhone(id), created });
+    }
+    // STOP BILLING: from the "not a member" answer. Reuses the off-card spec,
+    // which returns null (nothing to stop) when there is no live sub.
+    if (m.fields.outcome === "stop_billing") {
+      const spec = stopBillingItem({ id, client_id: wb.client_id, stripe_subscription_id: seed.stripe_subscription_id, parent_name: firstDefined(m.fields.parent_name, seed.parent_name), athlete_name: firstDefined(m.fields.athlete_name, seed.athlete_name) });
+      if (spec) {
+        const { created } = await createSystemActionItem(sb, {
+          client_id: wb.client_id, system_key: spec.system_key, title: spec.title, description: spec.description, due_date: nowIso().slice(0, 10),
+        });
+        items.stop_billing.push({ member_id: id, system_key: spec.system_key, created });
+      } else {
+        items.stop_billing.push({ member_id: id, system_key: systemKeyForStopBilling(id), skipped: "no live Stripe subscription on this member, so there is nothing to stop." });
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    // DB writes are REAL; only the Stripe seam is deferred. Said plainly so
+    // nobody reads this as a dry run that created nothing.
+    db_writes: "real",
+    stripe_seam: "deferred - archived-price mints and takeover subscriptions are not created here",
+    status: wb.status,
+    snapshot: snapshotState,
+    coverage: { covered: memberReports.filter((r) => r.covered).length, total: members.size, uncovered, members_with_no_price: 0 },
+    members: memberReports,
+    arrangements,
+    action_items: items,
+    skipped,
+  };
+}
+
 // ── publish: refused, deliberately, with the gate in the contract ────────────
 async function doPublishStaff(req, body) {
   await resolveStaffForWorkbook(req, body);
@@ -2884,6 +3613,13 @@ async function doPublishStaff(req, body) {
 // ── rollback: restore from the photograph ────────────────────────────────────
 async function doRollbackStaff(req, body) {
   const { wb, wbDegraded } = await resolveStaffForWorkbook(req, body);
+  // A member snapshot photographs members + arrangements, not offers + tax, so
+  // this offer/tax restore would mis-read it - worst case null the client's
+  // tax_config from a key the member photo never held. Member rollback is a
+  // later pass; refuse plainly rather than restore the wrong shape.
+  if (wb.kind === "member") {
+    throw bad("member-workbook rollback is a later pass - this restore only understands the price photograph (offers + tax). The member apply's own report lists what it created for a manual undo.", 409, "member_rollback_not_built");
+  }
   if (wbDegraded) {
     throw bad("this environment has not run the workbook apply migration (20260806T063000), so there is no snapshot to restore from", 409);
   }
