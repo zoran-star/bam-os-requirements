@@ -42,6 +42,40 @@ export function extractJsonArray(data) {
   }
 }
 
+// Call Claude and return PLAIN TEXT, for the cases where the model's prose is
+// itself the product (the two-sentence ticket summary in a Slack DM) rather
+// than a structure to parse.
+//
+// Two differences from claudeJsonArray, both because the callers sit in a
+// notification path that must never stall or break a database mutation:
+//   - timeoutMs is enforced, so a slow Anthropic cannot hold a ticket write open
+//   - the caller is expected to treat a throw as "send without the summary"
+export async function claudeText({ apiKey, model, system, payload, maxTokens = 300, timeoutMs = 6000 }) {
+  if (!apiKey) throw Object.assign(new Error("ANTHROPIC_API_KEY not configured"), { status: 500 });
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages: [
+          { role: "user", content: typeof payload === "string" ? payload : JSON.stringify(payload) },
+        ],
+      }),
+      signal: ctl.signal,
+    });
+    if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const data = await res.json();
+    return (data?.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Call Claude and return a parsed JSON array.
 export async function claudeJsonArray({ apiKey, model, system, payload, maxTokens = 8192 }) {
   if (!apiKey) throw Object.assign(new Error("ANTHROPIC_API_KEY not configured"), { status: 500 });

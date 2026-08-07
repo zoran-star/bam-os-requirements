@@ -35,7 +35,7 @@ function timeLabel(iso) {
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-// ── the creative preview (post mode) ─────────────────────────
+// ── the creative preview (post + campaign modes) ─────────────
 function CreativePreview({ files }) {
   if (!Array.isArray(files) || !files.length) {
     return <div className="v2r-mkt-nofile">No finished creative attached yet.</div>;
@@ -113,6 +113,9 @@ export default function MarketingDrawer({
   const intake = ticket?.intake || {};
   const context = ticket?.context || {};
   const finals = Array.isArray(intake.final_files) ? intake.final_files : [];
+  // Raw library assets the CLIENT picked. Ids only, never files: count as context, never a download.
+  // Empty entries are dropped so corrupt intake cannot claim "2 assets picked" for [null, null].
+  const pickedAssets = Array.isArray(intake.asset_ids) ? intake.asset_ids.filter(Boolean).length : 0;
   const blockedBy = context.blocked_by || intake.blocked_by || null;
   const resolved = ticket?.status === "resolved" || ticket?.status === "closed";
   const archived = Array.isArray(intake.archived_asset_ids) && intake.archived_asset_ids.length > 0;
@@ -242,16 +245,36 @@ export default function MarketingDrawer({
     if (mode === "campaign") {
       const landing = intake.landing_page || intake.landing_url || intake.landing || "";
       return (
-        <div className="v2r-mkt-section">
-          <span className="v2r-microlabel v2r-mkt-drawer-label">New campaign</span>
-          <FieldRows rows={[
-            { k: "Offer", v: offer },
-            { k: "Sales preset", v: preset },
-            { k: "Spend", v: money(intake.spend ?? intake.budget ?? intake.new_spend), mono: true },
-            { k: "Landing page", v: landing, link: /^https?:\/\//i.test(String(landing)) },
-            { k: "Note", v: brief },
-          ]} />
-        </div>
+        <>
+          <div className="v2r-mkt-section">
+            <span className="v2r-microlabel v2r-mkt-drawer-label">Finished creative</span>
+            <CreativePreview files={finals} />
+            {/* Only when there is NO finished creative to show. asset_ids rides
+                along on every spawned Launch ticket (it is in the carry list in
+                api/v2-tickets.js), so rendering this under a preview put "those
+                are not the finished creative" directly beneath the thing that
+                IS the finished creative - the nearest antecedent was the video
+                the reader had just looked at, which is the opposite of what it
+                means. With no preview above it, the subject is unambiguous. */}
+            {finals.length === 0 && pickedAssets > 0 && (
+              <div className="v2r-mkt-hint">
+                {pickedAssets === 1
+                  ? "The academy picked 1 file from its library, which is not a finished creative."
+                  : `The academy picked ${pickedAssets} files from its library, which are not finished creatives.`}
+              </div>
+            )}
+          </div>
+          <div className="v2r-mkt-section">
+            <span className="v2r-microlabel v2r-mkt-drawer-label">New campaign</span>
+            <FieldRows rows={[
+              { k: "Offer", v: offer },
+              { k: "Sales preset", v: preset },
+              { k: "Spend", v: money(intake.spend ?? intake.budget ?? intake.new_spend), mono: true },
+              { k: "Landing page", v: landing, link: /^https?:\/\//i.test(String(landing)) },
+              { k: "Note", v: brief },
+            ]} />
+          </div>
+        </>
       );
     }
 
@@ -266,23 +289,28 @@ export default function MarketingDrawer({
         {rows.length ? <FieldRows rows={rows} /> : <div className="v2r-mkt-nofile">No structured intake on this ticket.</div>}
       </div>
     );
-  }, [ticket, mode, intake, finals]);
+  }, [ticket, mode, intake, finals, pickedAssets]);
 
   if (!ticket) return null;
+
+  // Same download control in every mode that shows the finished creative.
+  const downloadBtn = (
+    <button
+      type="button"
+      className="v2r-btn v2r-btn-secondary"
+      disabled={!finals.length || busy === "download"}
+      onClick={() => run("download", () => downloadFiles(finals))}
+    >
+      {busy === "download" ? "Downloading..." : "Download creative"}
+    </button>
+  );
 
   // ── footer actions (per mode) ──
   const footer = (
     <>
       {mode === "post" && (
         <>
-          <button
-            type="button"
-            className="v2r-btn v2r-btn-secondary"
-            disabled={!finals.length || busy === "download"}
-            onClick={() => run("download", () => downloadFiles(finals))}
-          >
-            {busy === "download" ? "Downloading..." : "Download creative"}
-          </button>
+          {downloadBtn}
           <button
             type="button"
             className="v2r-btn v2r-btn-primary"
@@ -317,15 +345,18 @@ export default function MarketingDrawer({
       )}
 
       {mode === "campaign" && (
-        <button
-          type="button"
-          className="v2r-btn v2r-btn-primary"
-          disabled={resolved || !!blockedBy || busy === "done"}
-          title={blockedBy ? "Blocked: landing page not live" : undefined}
-          onClick={() => run("done", () => api.setStatus(id, "resolved"), "Campaign launched, marked done.")}
-        >
-          {resolved ? "Launched" : busy === "done" ? "Launching..." : "Launch, mark done"}
-        </button>
+        <>
+          {downloadBtn}
+          <button
+            type="button"
+            className="v2r-btn v2r-btn-primary"
+            disabled={resolved || !!blockedBy || busy === "done"}
+            title={blockedBy ? "Blocked: landing page not live" : undefined}
+            onClick={() => run("done", () => api.setStatus(id, "resolved"), "Campaign launched, marked done.")}
+          >
+            {resolved ? "Launched" : busy === "done" ? "Launching..." : "Launch, mark done"}
+          </button>
+        </>
       )}
 
       {mode === "generic" && (
