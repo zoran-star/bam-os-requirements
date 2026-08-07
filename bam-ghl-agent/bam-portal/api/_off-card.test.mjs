@@ -21,11 +21,17 @@
 //      (api/_billing-cadence.js). MUTATE=hardcodedterms reinstates the old
 //      closed 3/6-month world and this section fails loudly, which is the exact
 //      requirement the ruling names.
-//   2. DUE DATES CANNOT DRIFT. Period n is measured from the ANCHOR, never
-//      stepped from the previous due date. JS month arithmetic clamps, so a
-//      Jan-31 monthly anchor stepped one period at a time slides to Mar 3, then
-//      Apr 3, then May 3, and the parent's pay day walks away from the pay day
-//      forever. Measured from the anchor, the 31st comes back.
+//   2. DUE DATES CANNOT DRIFT, AND NO MONTH IS SKIPPED OR DOUBLED. Period n is
+//      measured from the ANCHOR, never stepped from the previous due date, so
+//      the 31st comes back rather than walking away. And month arithmetic now
+//      CLAMPS to the last day of the target month rather than overflowing into
+//      the next one: a Jan-31 monthly anchor runs Jan 31, Feb 28, Mar 31, Apr
+//      30, May 31, one collection per month. It used to run Jan 31, Mar 3, Mar
+//      31, May 1, May 31 - February got nothing and March got two - and this
+//      section passed anyway because it only ever asserted the ODD periods.
+//      Fixed in the SHARED api/_billing-cadence.js, so the card path gets the
+//      same dates; an off-card member and a card member on one nominal plan
+//      cannot be given different due dates.
 //   3. THE REMINDER LEADS THE MONEY. A collection is generated when its REMINDER
 //      comes due (due_date - lead_days), not when its money does, because an
 //      item created on the due date can never be a warning. One rule, so a
@@ -47,6 +53,22 @@
 //      block was EXTRACTED from POST /api/action-items, not copied, and the JWT
 //      gates it used to sit behind are still in front of it.
 //   8. NO EM DASH REACHES AN OWNER. Every string this module can emit is checked.
+//   9. NOTHING IS QUIETLY DEFAULTED OR QUIETLY HALF-DONE. Four separate places
+//      where the build used to keep going instead of saying something:
+//        - a date the calendar does not have ("2026-02-30", "2026-13-01") is
+//          refused at the door instead of reaching Postgres or a RangeError;
+//        - a create that fails after the insert UNWINDS, so nobody is left with
+//          a live arrangement, no audit row, and a retry that refuses;
+//        - a rhythm override this build cannot bill ("10_weeks", "1_year",
+//          "9 months") is refused instead of collapsing to every 4 weeks;
+//        - a cron failure is logged, alerted to the staff Slack channel and
+//          answered non-2xx, instead of going into an array in a 200 body.
+//  10. A HALF-APPLIED PAIR OF MIGRATIONS IS REFUSED. The two off-card migrations
+//      can land separately, and the half-applied state LOOKS healthy: every
+//      table exists, arrangements create, the drawer shows a live arrangement,
+//      and every single reminder insert fails a CHECK. It is probed for and
+//      answered with a 503 naming the file, rather than left to prose in
+//      supabase/PENDING_SQL.md.
 //
 // WHAT IT DOES NOT PROVE
 //   - That any of this works against real Postgres. There is no database here.
@@ -69,13 +91,26 @@
 //       looks the term up in a hardcoded {3_months, 6_months} map - the closed
 //       world that existed before 2026-08-06, where "1 year" produced no key at
 //       all. Ruling D5 says this must fail loudly. It does.
-//       MEASURED: 12 failures.
+//       MEASURED: 13 failures. (Was 12; re-measured 2026-08-07 - section 4c's
+//       new override assertions catch it too. Nothing was weakened.)
 //   MUTATE=stepfromlast     node api/_off-card.test.mjs
 //       due dates step from the previous due date instead of the anchor. Every
 //       assertion about a fixed rhythm still passes; what breaks is the Jan-31
-//       case, where the day of the month never comes back. This is the control
-//       that proves section 2 is not decorative.
-//       MEASURED: 2 failures.
+//       case, where the day of the month never comes back (Feb 28, Mar 28, Apr
+//       28 ... instead of Feb 28, Mar 31, Apr 30). This is the control that
+//       proves section 2 is not decorative.
+//       MEASURED: 5 failures. (Was 2; re-measured 2026-08-07 - section 2 now
+//       asserts every period of six, not just the odd ones, so the drift is
+//       caught in four places instead of two.)
+//   MUTATE=monthoverflow    node api/_off-card.test.mjs
+//       addInterval goes back to setUTCMonth/setUTCFullYear, which OVERFLOW a
+//       day the target month does not have into the next month. This is the
+//       defect as it shipped: a Jan-31 monthly anchor gives 2026-03-03 for
+//       period 2, so February gets no collection, no reminder and nobody told
+//       to collect, and March gets two. The mutation is applied to
+//       api/_billing-cadence.js and the module under test is re-pointed at the
+//       mutant copy, because that is where the arithmetic actually lives.
+//       MEASURED: 10 failures.
 //   MUTATE=leadignored      node api/_off-card.test.mjs
 //       generation waits for the due date instead of the reminder date, so the
 //       row for a payment due in three days does not exist until the day it is
@@ -104,9 +139,22 @@
 //       'other' stops requiring its follow-up, so an academy ends up with "$85
 //       other." on a row and nobody can collect it.
 //       MEASURED: 2 failures.
+//   MUTATE=looseanchor      node api/_off-card.test.mjs
+//       isDateStr goes back to the regex alone, so "2026-02-30" is a date. It
+//       is not: JS silently reads it as 2026-03-02 and Postgres refuses it with
+//       22008 partway through the create, while "2026-13-01" reaches a
+//       RangeError the caller sees as a 500 with no sentence in it.
+//       MEASURED: 9 failures.
+//   MUTATE=termdefaults     node api/_off-card.test.mjs
+//       validateTerm accepts whatever it is handed. "10_weeks", "1_year" and
+//       "9 months" then fall through intervalFor's last line and all three
+//       become "every 4 weeks", silently, for the length of the commitment.
+//       Same silent-collapse class as the closed term vocabulary that once
+//       turned 12 months into 6.
+//       MEASURED: 12 failures.
 //
-// SOURCE-TEXT CONTROLS. These three mutate the SOURCE STRING the assertion
-// reads, not the file. That is weaker evidence than the eight above and is
+// SOURCE-TEXT CONTROLS. These mutate the SOURCE STRING the assertion
+// reads, not the file. That is weaker evidence than the ten above and is
 // labeled as such: it proves the pin genuinely depends on the text, not that the
 // wiring behaves. It is still the difference between someone noticing these
 // lines being removed and nobody noticing.
@@ -124,8 +172,27 @@
 //       the off-card cron loses its CRON_SECRET check, which would make a URL
 //       that generates rows and fires Slack, push and SMS callable by anyone.
 //       MEASURED: 2 failures.
+//   MUTATE=halfcreated      node api/_off-card.test.mjs
+//       set-off-card stops unwinding. A failure after the arrangement row is
+//       inserted then leaves the arrangement LIVE and the member flagged with
+//       no audit row, the caller gets a 500, and the retry is refused with
+//       "This member already has a live payment arrangement."
+//       MEASURED: 2 failures.
+//   MUTATE=cronsilent       node api/_off-card.test.mjs
+//       the cron records a failure in an array in a 200 body and nowhere else:
+//       no console.error, no Slack alert, no non-2xx for the scheduler. An
+//       arrangement that fails every night then generates nothing forever and
+//       nobody is ever told, which is this build's own failure mode reproduced
+//       inside the thing built to prevent it.
+//       MEASURED: 5 failures.
+//   MUTATE=schemablind      node api/_off-card.test.mjs
+//       both doors stop probing what is actually in the database. The
+//       half-applied state (tables yes, action_items.system_key no) then looks
+//       completely healthy: arrangements create, collections generate, and
+//       every reminder insert fails a CHECK inside a try/catch.
+//       MEASURED: 2 failures.
 //
-// ELEVEN controls. A control run exits ZERO when the mutation IS caught.
+// SEVENTEEN controls. A control run exits ZERO when the mutation IS caught.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -150,19 +217,15 @@ const tmpFiles = [];
 const cleanup = () => { for (const f of tmpFiles) { try { fs.unlinkSync(f); } catch (_) { /* best effort */ } } };
 process.on("exit", cleanup);
 
-function copyWith(edits) {
-  let src = readSrc("_off-card.js");
+function applyEdits(src, edits, file) {
   for (const [find, repl] of edits) {
     if (!src.includes(find)) {
-      controlBroken = `MUTATE=${MUTATE} is pinned to text that is no longer in api/_off-card.js:\n\n${find}\n\nRe-point it or delete it - a pin that fails to apply looks exactly like a check that passed.`;
+      controlBroken = `MUTATE=${MUTATE} is pinned to text that is no longer in api/${file}:\n\n${find}\n\nRe-point it or delete it - a pin that fails to apply looks exactly like a check that passed.`;
       throw new Error(controlBroken);
     }
     src = src.split(find).join(repl);
   }
-  const copy = path.join(HERE, ".mutant-off-card.js");
-  fs.writeFileSync(copy, src);
-  tmpFiles.push(copy);
-  return copy;
+  return src;
 }
 
 const MUTATIONS = {
@@ -209,14 +272,72 @@ const MUTATIONS = {
     `  if (method === "other" && !String(note || "").trim()) {`,
     `  if (false) {   // (control methodotherbare) "other" needs nothing`,
   ]],
+  looseanchor: [[
+    `  const d = new Date(\`\${str}T12:00:00Z\`);
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === str;`,
+    `  return true;   // (control looseanchor) the shape is the whole check again, so 2026-02-30 is a date`,
+  ]],
+  termdefaults: [[
+    `export function validateTerm(term) {
+  const t = String(term == null ? "" : term).trim();`,
+    `export function validateTerm(term) {
+  const t = String(term == null ? "" : term).trim();
+  if (t) return { ok: true, term: t };   // (control termdefaults) take whatever they typed; intervalFor's week x4 default will catch it`,
+  ]],
 };
 
-let M;
+// MUTATIONS THAT LIVE IN THE SHARED CADENCE MODULE, not in _off-card.js.
+// api/_billing-cadence.js is where the interval arithmetic actually is - that is
+// the whole point of section 1 - so the control for it has to reach into that
+// file and then re-point the module under test at the mutant copy.
+const CADENCE_MUTATIONS = {
+  monthoverflow: [[
+    `  const months = iv.interval === "year" ? 12 * n : n;
+  const day = d.getUTCDate();
+  d.setUTCDate(1);                                   // park on a day every month has
+  d.setUTCMonth(d.getUTCMonth() + months);
+  // Day 0 of the following month IS the last day of this one.
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(day < lastDay ? day : lastDay);
+  return d;`,
+    `  // (control monthoverflow) the overflowing arithmetic that shipped: setUTCMonth
+  // rolls a day the target month does not have into the NEXT month.
+  if (iv.interval === "month") d.setUTCMonth(d.getUTCMonth() + n);
+  else d.setUTCFullYear(d.getUTCFullYear() + n);
+  return d;`,
+  ]],
+};
+
+let M, CADENCE;
 {
-  const target = MUTATIONS[MUTATE] ? copyWith(MUTATIONS[MUTATE]) : path.join(HERE, "_off-card.js");
-  M = await import(pathToFileURL(target).href);
-  console.log(MUTATIONS[MUTATE]
-    ? `\n(running a MUTANT copy of api/_off-card.js: MUTATE=${MUTATE})`
+  const offEdits = MUTATIONS[MUTATE];
+  const cadEdits = CADENCE_MUTATIONS[MUTATE];
+  let cadenceTarget = path.join(HERE, "_billing-cadence.js");
+  let offTarget = path.join(HERE, "_off-card.js");
+
+  if (cadEdits) {
+    const copy = path.join(HERE, ".mutant-billing-cadence.js");
+    fs.writeFileSync(copy, applyEdits(readSrc("_billing-cadence.js"), cadEdits, "_billing-cadence.js"));
+    tmpFiles.push(copy);
+    cadenceTarget = copy;
+  }
+  if (offEdits || cadEdits) {
+    let src = applyEdits(readSrc("_off-card.js"), offEdits || [], "_off-card.js");
+    if (cadEdits) {
+      // The module under test must charge on the MUTANT arithmetic, or the
+      // control would prove nothing about the file it actually mutated.
+      src = applyEdits(src, [[`from "./_billing-cadence.js"`, `from "./.mutant-billing-cadence.js"`]], "_off-card.js");
+    }
+    const copy = path.join(HERE, ".mutant-off-card.js");
+    fs.writeFileSync(copy, src);
+    tmpFiles.push(copy);
+    offTarget = copy;
+  }
+
+  M = await import(pathToFileURL(offTarget).href);
+  CADENCE = await import(pathToFileURL(cadenceTarget).href);
+  console.log(offTarget.includes(".mutant")
+    ? `\n(running a MUTANT copy of api/_off-card.js${cadEdits ? " + api/_billing-cadence.js" : ""}: MUTATE=${MUTATE})`
     : "\n(running the real api/_off-card.js)");
 }
 const {
@@ -224,8 +345,12 @@ const {
   settleCollection, validateMethod, cadenceLabel, collectItemTitle,
   collectItemDescription, stopBillingItem, systemKeyForCollection,
   systemKeyForStopBilling, money, addDays, todayIso, MAX_CATCH_UP,
-  COLLECTION_METHODS,
+  COLLECTION_METHODS, isDateStr, validateTerm, validateCadence,
 } = M;
+// The card path's own arithmetic, imported from the SAME place the module under
+// test imports it, so section 2's parity assertions are not comparing the engine
+// against a second copy of itself.
+const { addInterval } = CADENCE;
 
 // ── the sources the wiring pins read ─────────────────────────────────────────
 let OFFCARD_SRC = readSrc("_off-card.js");
@@ -258,6 +383,39 @@ MEMBERS_SRC = mutateSource("cronopen", MEMBERS_SRC,
 ACTIONITEMS_SRC = mutateSource("notifyinline", ACTIONITEMS_SRC,
   `      await announceActionItem(clientId, item, { req, who });`,
   `      await postClientSlackNotification(clientId, \`ping \${title}\`, req);   // (control notifyinline)`);
+// The cron records a failure and nothing else: no log line, no alert, and a 200
+// over a run that generated nothing.
+MEMBERS_SRC = mutateSource("cronsilent", MEMBERS_SRC,
+  `    console.error(\`[cron-collect-off-card] \${where.phase} failed for \${where.arrangement_id || where.collection_id}:\`, message);
+    errors.push({ ...where, message });`,
+  `    errors.push({ ...where, message });   // (control cronsilent) into the array, and nowhere a human looks`);
+MEMBERS_SRC = mutateSource("cronsilent", MEMBERS_SRC,
+  `    const sample = errors.slice(0, 3)
+      .map((e) => \`\${e.phase} \${e.arrangement_id || e.collection_id}: \${e.message}\`)
+      .join("\\n");
+    await alertStaffSlack(
+      \`Off-card collections cron: \${errors.length} failure(s) today (generated \${generated}, notified \${notified}, overdue \${overdue}).\\n\` +
+      \`Anything that failed generated no collection and sent no reminder, and it will keep failing until somebody looks.\\n\${sample}\`
+    );`,
+  `    // (control cronsilent) nobody is told`);
+MEMBERS_SRC = mutateSource("cronsilent", MEMBERS_SRC,
+  `  return res.status(errors.length ? 500 : 200).json({`,
+  `  return res.status(200).json({   // (control cronsilent) a run that failed still answers OK`);
+// The create stops unwinding: a failure after the insert leaves the arrangement
+// live and the member flagged, which is the state the retry cannot get out of.
+MEMBERS_SRC = mutateSource("halfcreated", MEMBERS_SRC,
+  `      body: JSON.stringify({ status: "ended", ended_at: nowIso(), ended_reason: "setup failed, rolled back" }),`,
+  `      body: JSON.stringify({ updated_at: nowIso() }),   // (control halfcreated) the arrangement stays live`);
+MEMBERS_SRC = mutateSource("halfcreated", MEMBERS_SRC,
+  `      body: JSON.stringify({ billing_mode: priorBillingMode, updated_at: nowIso() }),`,
+  `      body: JSON.stringify({ updated_at: nowIso() }),   // (control halfcreated) the flag stays flipped`);
+// The half-applied-migration probe is removed from both doors.
+MEMBERS_SRC = mutateSource("schemablind", MEMBERS_SRC,
+  `      const gaps = await offCardSchemaGaps();`,
+  `      const gaps = [];   // (control schemablind) do not ask what is actually there`);
+MEMBERS_SRC = mutateSource("schemablind", MEMBERS_SRC,
+  `  const gaps = await offCardSchemaGaps();`,
+  `  const gaps = [];   // (control schemablind) the cron does not ask either`);
 
 const arr = (over = {}) => ({
   id: "arr-1", client_id: "c-1", member_id: "m-1",
@@ -331,22 +489,143 @@ console.log("\n── 1. the due-date engine follows whatever was priced ──"
 // ═════════════════════════════════════════════════════════════════════════════
 // 2. due dates are measured from the anchor, so they cannot drift
 // ═════════════════════════════════════════════════════════════════════════════
-console.log("\n── 2. the 31st comes back ──");
+console.log("\n── 2. the 31st comes back, and no month is skipped or doubled ──");
 {
-  // A parent who pays on the 31st. JS month arithmetic CLAMPS, so Feb 31 lands
-  // in March - that is unavoidable and both approaches show it. What separates
-  // them is what happens NEXT: measured from the anchor the day of the month
-  // returns, stepped from the last due date it never does.
+  // THE BLIND SPOT THIS SECTION USED TO HAVE, named because it is the reason a
+  // live defect survived a passing suite. It asserted periods 1, 3 and 5 only -
+  // three 31-day months - and the whole defect lived in the EVEN periods:
+  //
+  //   before: 2026-01-31, 2026-03-03, 2026-03-31, 2026-05-01, 2026-05-31
+  //
+  // February got NO collection and March got TWO, because setUTCMonth OVERFLOWS
+  // a day the target month does not have into the next month instead of
+  // clamping to the last day of the one asked for. Every odd period was right,
+  // so every assertion passed. Fixed in api/_billing-cadence.js on 2026-08-07,
+  // and MUTATE=monthoverflow puts the overflow back.
   const a = arr({ term: "monthly", cadence: "monthly", anchor_date: "2026-01-31" });
-  const dates = [1, 2, 3, 4, 5].map((n) => dueDateForPeriod(a, n));
+  const dates = [1, 2, 3, 4, 5, 6].map((n) => dueDateForPeriod(a, n));
+  console.log(`     (a Jan-31 monthly anchor, six periods: ${dates.join(", ")})`);
   ok(dates[0] === "2026-01-31", `period 1 is the anchor (${dates[0]})`);
-  ok(dates[2] === "2026-03-31", `period 3 is back on the 31st (${dates[2]}) - stepping from the previous date gives 2026-04-03`);
-  ok(dates[4] === "2026-05-31", `period 5 is still on the 31st (${dates[4]}) - stepping gives 2026-06-03, and it never recovers`);
-  console.log(`     (the five dates: ${dates.join(", ")})`);
+  ok(dates[1] === "2026-02-28", `period 2 CLAMPS to the last day of February (${dates[1]}) - it used to overflow to 2026-03-03 and February got nothing`);
+  ok(dates[2] === "2026-03-31", `period 3 is back on the 31st (${dates[2]}) - stepping from the previous date gives 2026-03-28 instead`);
+  ok(dates[3] === "2026-04-30", `period 4 clamps to the last day of April (${dates[3]}) - it used to overflow to 2026-05-01`);
+  ok(dates[4] === "2026-05-31", `period 5 is still on the 31st (${dates[4]})`);
+  ok(dates[5] === "2026-06-30", `and period 6 clamps again (${dates[5]})`);
 
-  // A leap-year February, for the same reason.
+  // THE INVARIANT THE ACADEMY ACTUALLY CARES ABOUT, stated as itself rather than
+  // as six dates: a monthly arrangement produces exactly one collection per
+  // calendar month. A skipped month is a month nobody was asked to pay for.
+  const months = dates.map((d) => d.slice(0, 7));
+  ok(months.join(",") === "2026-01,2026-02,2026-03,2026-04,2026-05,2026-06",
+    `six monthly periods land in six CONSECUTIVE months (${months.join(", ")}) - none skipped, none twice`);
+
+  // The second anchor the tester measured, kept as itself so the report and the
+  // suite talk about the same thing.
+  const aug = arr({ term: "monthly", cadence: "monthly", anchor_date: "2026-08-31" });
+  const augDates = [1, 2, 3, 4].map((n) => dueDateForPeriod(aug, n));
+  console.log(`     (an Aug-31 monthly anchor: ${augDates.join(", ")})`);
+  ok(augDates.join(",") === "2026-08-31,2026-09-30,2026-10-31,2026-11-30",
+    `an Aug-31 anchor runs Aug 31, Sep 30, Oct 31, Nov 30 (${augDates.join(", ")}) - it used to give 2026-10-01 for period 2 and skip September`);
+
+  // EVERY DAY OF THE MONTH, FOR A YEAR. The two anchors above are the two that
+  // were reported; this is the check that would have caught it from any of them.
+  let broke = null;
+  for (let day = 1; day <= 31 && !broke; day++) {
+    const anchor = `2026-01-${String(day).padStart(2, "0")}`;   // January has all 31
+    const twelve = [...Array(12)].map((_, i) =>
+      dueDateForPeriod(arr({ term: "monthly", cadence: "monthly", anchor_date: anchor }), i + 1));
+    if (new Set(twelve.map((d) => d.slice(0, 7))).size !== 12) broke = `${anchor} -> ${twelve.join(", ")}`;
+  }
+  ok(broke === null,
+    `every anchor day from the 1st to the 31st gives twelve periods in twelve different months${broke ? ` (first that did not: ${broke})` : ""}`);
+
+  // A leap-year February, and the non-leap year beside it.
   const feb = arr({ term: "monthly", cadence: "monthly", anchor_date: "2028-01-29" });
   ok(dueDateForPeriod(feb, 2) === "2028-02-29", `a Jan-29 anchor lands on Feb 29 in a leap year (${dueDateForPeriod(feb, 2)})`);
+  const feb26 = arr({ term: "monthly", cadence: "monthly", anchor_date: "2026-01-29" });
+  ok(dueDateForPeriod(feb26, 2) === "2026-02-28", `and on Feb 28 in a year that has no 29th (${dueDateForPeriod(feb26, 2)})`);
+
+  // A quarterly commitment lands on the same rule, so this is not a monthly-only
+  // patch: 2026-11-30 plus 3 months is February, which has no 30th.
+  const q = arr({ term: "3_months", anchor_date: "2026-11-30" });
+  ok(dueDateForPeriod(q, 2) === "2027-02-28", `a Nov-30 quarterly anchor clamps into February too (${dueDateForPeriod(q, 2)})`);
+
+  // ── AND THE CARD PATH GETS THE SAME DATES ──────────────────────────────────
+  // This is WHY the clamp went into the shared addInterval (api/_billing-cadence.js)
+  // rather than into dueDateForPeriod. checkout.js hands addInterval's answer to
+  // Stripe as billing_cycle_anchor; Stripe itself clamps a monthly subscription
+  // anchored on the 31st to the 28th, so the overflowing version handed Stripe a
+  // date a month and three days out and gave the parent a free February. An
+  // off-card member and a card member on ONE nominal plan must not be given
+  // different due dates, and one piece of arithmetic is the only way to promise it.
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const cardFeb = iso(addInterval(new Date("2026-01-31T12:00:00Z"), { interval: "month", interval_count: 1 }));
+  ok(cardFeb === "2026-02-28", `the SHARED addInterval the card path charges on clamps too (${cardFeb})`);
+  ok(cardFeb === dates[1], `so a card member and an off-card member on the same plan get the SAME day (${cardFeb} both ways)`);
+  const cardYear = iso(addInterval(new Date("2028-02-29T12:00:00Z"), { interval: "year", interval_count: 1 }));
+  ok(cardYear === "2029-02-28", `a year clamps as well (${cardYear}) - setUTCFullYear rolled Feb 29 to Mar 1`);
+  // The clamp can only move a date that did not exist. Every mid-month anchor
+  // api/_billing-cadence.test.mjs pins is untouched by it, which is why that
+  // suite's 298 assertions still pass unchanged.
+  ok(iso(addInterval(new Date("2026-03-15T12:00:00Z"), { interval: "month", interval_count: 3 })) === "2026-06-15",
+    "and a mid-month date is untouched: 2026-03-15 + 3 months is still 2026-06-15, the exact date the card-path suite pins");
+  ok(iso(addInterval(new Date("2026-03-15T12:00:00Z"), { interval: "week", interval_count: 4 })) === "2026-04-12",
+    "as is every week-based cadence, which never had the problem");
+}
+
+console.log("\n── 2b. a date the calendar does not have is not a date ──");
+{
+  // ocIsDate was the regex alone, and the regex says yes to days that do not
+  // exist. Each of these had its own wrong ending, and none of them was a 400.
+  const rolled = new Date("2026-02-30T12:00:00Z").toISOString().slice(0, 10);
+  ok(isDateStr("2026-02-30") === false,
+    `"2026-02-30" is refused - it used to pass the shape check, silently mean ${rolled} to JS, and be refused by Postgres with 22008 partway through the create`);
+  let ending = "no error";
+  try { new Date("2026-13-01T12:00:00Z").toISOString(); } catch (e) { ending = e.constructor.name; }
+  ok(isDateStr("2026-13-01") === false,
+    `"2026-13-01" is refused - it used to reach a ${ending} on the way to the database, which the caller read as a 500`);
+  ok(isDateStr("2026-01-32") === false, `and so is "2026-01-32" (same ${ending})`);
+  for (const s of ["2026-04-31", "2026-06-31", "2027-02-29", "2026-00-15", "2026-01-00", "2026-1-5", "20260105", "", null, undefined, "today"]) {
+    ok(isDateStr(s) === false, `not a date: ${JSON.stringify(s)}`);
+  }
+  for (const s of ["2026-02-28", "2028-02-29", "2026-01-31", "2026-04-30", "2026-12-31", "2019-01-15"]) {
+    ok(isDateStr(s) === true, `a real day: ${s}`);
+  }
+  // The generator asks the same question, so a bad anchor cannot mint rows
+  // against a date that does not exist either.
+  ok(periodsDueAsOf(arr({ anchor_date: "2026-02-30" }), { today: "2026-06-01" }).length === 0,
+    "and the generator refuses the same anchor rather than minting collections off it");
+}
+
+console.log("\n── 2c. setting a member up off-card is all or nothing ──");
+{
+  // Source pins over api/members.js - weak evidence, labeled, because this lives
+  // inside an HTTP handler that cannot run without a database. What it is
+  // pinning is an ORDER and an unwind, and both are invisible in behaviour until
+  // the day they are needed.
+  //
+  // What went wrong: the arrangement row was inserted and members.billing_mode
+  // was flipped to 'alternate' BEFORE generation ran. Generation threw on a bad
+  // anchor, the caller got a 500, the arrangement was LIVE, writeAudit never
+  // ran, and the retry hit "This member already has a live payment arrangement."
+  const iAnchor = MEMBERS_SRC.indexOf("if (!ocIsDate(b.anchor_date))");
+  const iTerm = MEMBERS_SRC.indexOf("const tv = validateTerm(b.term);");
+  const iInsert = MEMBERS_SRC.indexOf("const created = await sb(`member_billing_arrangements`, {");
+  const iFlip = MEMBERS_SRC.indexOf(`body: JSON.stringify({ billing_mode: "alternate", updated_at: nowIso() }),`);
+  ok(iAnchor > 0 && iInsert > 0 && iAnchor < iInsert,
+    "the anchor date is checked BEFORE the arrangement row is inserted, not after");
+  ok(iTerm > 0 && iTerm < iInsert, "and so is the rhythm override");
+  ok(iFlip > iInsert, "the members.billing_mode flip comes after the insert, so there is one thing to unwind, not two half-written ones");
+  ok(/const priorBillingMode = member\.billing_mode \?\? null;/.test(MEMBERS_SRC),
+    "the create remembers what billing_mode WAS, because putting it back to null is not the same as putting it back");
+  ok(/ended_reason: "setup failed, rolled back"/.test(MEMBERS_SRC),
+    "a failure after the insert ENDS the arrangement, which releases the one-live-arrangement index so the retry is not refused");
+  ok(/body: JSON\.stringify\(\{ billing_mode: priorBillingMode, updated_at: nowIso\(\) \}\),/.test(MEMBERS_SRC),
+    "and puts members.billing_mode back exactly as it was, rather than guessing null");
+  ok(/throw e;   \/\/ the dispatcher turns this/.test(MEMBERS_SRC),
+    "then rethrows, so the caller is told it failed instead of getting a 200 over a rolled-back setup");
+  ok(/if \(!arrangement \|\| !arrangement\.id\) \{/.test(MEMBERS_SRC),
+    "and an insert that returned nothing is caught before anything is built on top of it");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -460,6 +739,8 @@ console.log("\n── 4b. what the mark-collected endpoint records ──");
   ok(/const collectedOn = ocIsDate\(b\.collected_on\) \? String\(b\.collected_on\)\.slice\(0, 10\) : ocToday\(\)/.test(MEMBERS_SRC),
     "collected_on defaults to today and is EDITABLE, because cash arrives late");
   ok(/collectedOn > ocToday\(\)/.test(MEMBERS_SRC), "but it cannot be in the future");
+  ok(/if \(b\.collected_on != null && String\(b\.collected_on\) !== "" && !ocIsDate\(b\.collected_on\)\) \{/.test(MEMBERS_SRC),
+    "and a collected_on that is not a real day is refused rather than quietly recorded as today - absent means today, wrong does not");
   ok(/action_type: "off-card-collected"/.test(MEMBERS_SRC), "and every marking writes a member_audit_log row");
   ok(/\["paid", "waived", "void"\]\.includes\(collection\.status\)/.test(MEMBERS_SRC),
     "a settled row is not editable - corrections are a new entry, never an edit-away");
@@ -467,6 +748,72 @@ console.log("\n── 4b. what the mark-collected endpoint records ──");
     "and the collection is scoped to the member being acted on, which is the only guard there is when the row has no FK");
   ok(/if \(settled\.closes_item\) \{/.test(MEMBERS_SRC) && /completed_at: nowIso\(\)/.test(MEMBERS_SRC),
     "the action item mirrors the collection: closed only when the collection closed");
+}
+
+console.log("\n── 4c. the rhythm override is refused, never quietly defaulted ──");
+{
+  // THE SILENT COLLAPSE, and it is the same class as the closed term vocabulary
+  // that once read "12 months" as 6_months and billed half the commitment.
+  // set-off-card took b.term RAW and handed it to intervalFor, whose last line
+  // is `return { interval: "week", interval_count: 4 }`. So every one of these
+  // became "every 4 weeks" and the owner was reminded on the wrong day for the
+  // length of the commitment, with nothing anywhere saying so.
+  const collapsed = ["10_weeks", "1_year", "9 months"].map((t) => {
+    const iv = resolveArrangementInterval(arr({ term: t, cadence: null }));
+    return `${t} -> ${iv.interval} x${iv.interval_count}`;
+  });
+  ok(collapsed.every((s) => /week x4$/.test(s)),
+    `these still collapse to the 4-week default if they reach the resolver, which is exactly why they are stopped at the door (${collapsed.join("; ")})`);
+
+  for (const t of ["10_weeks", "1_year", "9 months", "9months", "quarterly", "signup_fee", "months_9", "0_months", "25_months", "100_months", "", "   ", null, undefined]) {
+    const v = validateTerm(t);
+    ok(v.ok === false, `${JSON.stringify(t)} is refused: ${v.error || "*** ACCEPTED ***"}`);
+  }
+  // RULING D5 SURVIVES THE FIX. The check is a SHAPE plus the range intervalFor
+  // can bill, never a list of lengths - so a commitment nobody has priced yet
+  // still passes without anyone editing this file.
+  for (const t of ["4_weeks", "monthly", "1_months", "3_months", "6_months", "9_months", "12_months", "18_months", "23_months", "24_months"]) {
+    ok(validateTerm(t).ok === true, `${t} is accepted`);
+  }
+  ok(validateTerm("23_months").ok === true,
+    "a 23-month commitment nobody has ever priced is accepted, because this is a shape and a range and not a list (ruling D5)");
+  ok(/25 months/.test(validateTerm("25_months").error || "") && /1 to 24/.test(validateTerm("25_months").error || ""),
+    `and the out-of-range message says the number and the range (${validateTerm("25_months").error})`);
+  ok(/10_weeks/.test(validateTerm("10_weeks").error || "") && /9_months/.test(validateTerm("10_weeks").error || ""),
+    `while the wrong-shape message quotes what was sent and shows a right one (${validateTerm("10_weeks").error})`);
+
+  // The cadence half of the same override, same rule. An unknown cadence off a
+  // stored PRICE ROW is absorbed and reported (unknown_cadence) because nobody
+  // typed it today; an unknown cadence somebody just typed is refused.
+  for (const c of ["monthly", "12_weeks", "24_weeks", "4_weeks", "3_calendar_months", "6_calendar_months"]) {
+    ok(validateCadence(c).ok === true, `cadence ${c} is accepted`);
+  }
+  ok(validateCadence("MONTHLY").ok === true && validateCadence("MONTHLY").cadence === "monthly",
+    "case does not matter, and what comes back is normalized");
+  for (const c of ["fortnightly", "12weeks", "every_month", "quarterly"]) {
+    const v = validateCadence(c);
+    ok(v.ok === false, `cadence ${JSON.stringify(c)} is refused: ${v.error || "*** ACCEPTED ***"}`);
+  }
+  ok(validateCadence(null).ok === true && validateCadence(null).cadence === null,
+    "and leaving it off is not an error - it means 'use whatever the plan says'");
+
+  // The endpoint actually calls them, and stores the validated value.
+  ok(/const tv = validateTerm\(b\.term\);\n\s*if \(!tv\.ok\) return res\.status\(400\)\.json\(\{ error: tv\.error \}\);/.test(MEMBERS_SRC),
+    "set-off-card refuses a bad term with that sentence rather than passing it through (weak evidence: source text)");
+  ok(/const cv = validateCadence\(b\.cadence\);\n\s*if \(!cv\.ok\) return res\.status\(400\)\.json\(\{ error: cv\.error \}\);/.test(MEMBERS_SRC),
+    "and a bad cadence override the same way");
+  ok(/if \(b\.term != null\) term = validateTerm\(b\.term\)\.term;/.test(MEMBERS_SRC),
+    "what lands on the row is the validated value, not the raw one");
+  ok(/if \(b\.cadence != null\) cadence = validateCadence\(b\.cadence\)\.cadence;/.test(MEMBERS_SRC),
+    "same for the cadence");
+  // The PLAN's own term and cadence are deliberately NOT put through this: they
+  // came off an offer_prices row nobody typed today, and refusing to record how
+  // a parent pays because a stored price row carries an old cadence would be the
+  // wrong trade. resolveInterval already reports that case as unknown_cadence.
+  const iPlan = MEMBERS_SRC.indexOf("cadence = p.billing_cadence ?? null;");
+  const iOverride = MEMBERS_SRC.indexOf("if (b.cadence != null) cadence = validateCadence(b.cadence).cadence;");
+  ok(iPlan > 0 && iOverride > iPlan,
+    "and only the OVERRIDE is validated - a cadence read off a stored price row is still absorbed and reported, not refused");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -494,7 +841,9 @@ console.log("\n── 5. off-card + a live Stripe sub raises stop-billing ──
   // BOTH DOORS. set-off-card is the front door; billing_mode is still in
   // PROFILE_EDITABLE_FIELDS, so the raw field write is the side door, and the
   // guard has to be on both or it can be walked past.
-  ok(/const stopItem = await raiseStopBillingIfSubscribed\(member\);/.test(MEMBERS_SRC),
+  // Re-pointed 2026-08-07: `const stopItem` became `stopItem` when the create
+  // grew an unwind (the declaration moved above the try). Same call, same door.
+  ok(/\n\s*stopItem = await raiseStopBillingIfSubscribed\(member\);/.test(MEMBERS_SRC),
     "the deliberate endpoint checks it");
   ok(/if \(updates\.billing_mode === "alternate" && member\.billing_mode !== "alternate"\) \{\n\s*guardItem = await raiseStopBillingIfSubscribed\(member\);/.test(MEMBERS_SRC),
     "and so does the raw field write the drawer toggle still uses");
@@ -551,6 +900,58 @@ console.log("\n── 6. a cron with no JWT can notify, and the authed route did
     "the item is created at due_date - lead_days, not when the collection row was generated");
 }
 
+console.log("\n── 6b. a cron that fails says so, out loud, in three places ──");
+{
+  // THE FAILURE SHAPE THIS BUILD EXISTS TO PREVENT, REPRODUCED INSIDE THE THING
+  // BUILT TO PREVENT IT. Each phase isolates one row in a try/catch so a single
+  // bad arrangement cannot take the run down - that was right. What was wrong is
+  // where the error then went: an `errors` array in a 200 body, returned to a
+  // scheduled invocation that nobody reads. An arrangement that failed every
+  // night generated nothing forever, reminded nobody, and looked healthy.
+  const cronSrc = (() => {
+    const at = MEMBERS_SRC.indexOf("async function cronCollectOffCard(res) {");
+    if (at === -1) return "";
+    const end = MEMBERS_SRC.indexOf("\n}\n", at);
+    return end === -1 ? MEMBERS_SRC.slice(at) : MEMBERS_SRC.slice(at, end);
+  })();
+  ok(cronSrc.length > 0, "the cron body is where this suite thinks it is");
+  ok(/const failed = \(where, e\) => \{/.test(cronSrc),
+    "there is ONE recorder for a failure, so no phase can record it a quieter way than another");
+  ok(/console\.error\(`\[cron-collect-off-card\] \$\{where\.phase\} failed/.test(cronSrc),
+    "and it console.errors the phase and the row id where the failure actually happened");
+  const uses = (cronSrc.match(/failed\(\{/g) || []).length;
+  ok(uses === 3, `all three phases go through it (${uses} of 3: generate, notify, overdue)`);
+  ok(!/catch \(e\) \{\s*\n?\s*errors\.push\(/.test(cronSrc),
+    "and no phase pushes straight into the array behind the recorder's back");
+  // Read the failure-alert block SPECIFICALLY, not the whole cron: the
+  // did-not-run refusal above it alerts too, and a whole-body grep would pass on
+  // its strength while a run that failed halfway told nobody.
+  const iAlert = cronSrc.indexOf("if (errors.length) {");
+  const alertBlock = iAlert === -1 ? "" : cronSrc.slice(iAlert);
+  ok(/await alertStaffSlack\(/.test(alertBlock),
+    "a run with failures posts to Slack, so the signal reaches a human and not just a log nobody opens");
+  ok(/keep failing until somebody looks/.test(alertBlock),
+    "and the alert says the failure REPEATS, because a one-off read of it is how it gets ignored");
+  ok(/\$\{e\.phase\} \$\{e\.arrangement_id \|\| e\.collection_id\}/.test(alertBlock),
+    "naming the phase and the row, so the alert is actionable rather than a count");
+  ok(/return res\.status\(errors\.length \? 500 : 200\)/.test(cronSrc),
+    "the run answers non-2xx when anything failed, so the scheduler itself records it as a failed invocation");
+  ok(/console\.log\(`\[cron-collect-off-card\] generated=\$\{generated\} notified=\$\{notified\} overdue=\$\{overdue\} errors=\$\{errors\.length\}`\)/.test(cronSrc),
+    "and every run prints its counts, whether it failed or not");
+  // The loop still survives one bad row - the whole reason the try/catch is
+  // per-row. Loud must not become fatal.
+  ok(/for \(const a of \(arrangements \|\| \[\]\)\) \{\s*\n\s*try \{/.test(cronSrc),
+    "each arrangement is still isolated, so one bad row does not end the run");
+
+  // The alert helper is the one this codebase already has, on the STAFF channel.
+  // A cron that cannot generate is our failure to fix, not news an academy owner
+  // can act on, and postOffCardSlack (the academy channel) is a different thing.
+  ok(/process\.env\.SLACK_ALERTS_CHANNEL \|\| process\.env\.SLACK_STAFF_CHANNEL/.test(MEMBERS_SRC),
+    "it alerts on the same staff channel api/testimonial-drift.js and api/schedule/cron-extend-slots.js use, rather than inventing a new one");
+  ok(/alertStaffSlack\(`Off-card collections cron DIED/.test(MEMBERS_SRC),
+    "and a run that dies outright, before any row, is louder still");
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // 7. the schema says what the code assumes
 // ═════════════════════════════════════════════════════════════════════════════
@@ -588,6 +989,49 @@ console.log("\n── 7. the migrations ──");
   ok(/title=ilike/.test(MIG_KEY), "the migration names the title-matching precedent it exists to replace");
   ok(/title=ilike\.\*Cancel%20old%20Stripe%20sub\*/.test(MEMBERS_SRC),
     "and that old path is deliberately still in place - this pass makes the NEW one correct, it does not rip out the old one");
+}
+
+console.log("\n── 7b. a HALF-applied pair of migrations is refused, not survived ──");
+{
+  // THE STATE THAT LOOKS HEALTHY. Off-card rides on two migration files and they
+  // can land separately. If 20260807T140000 applies and 20260807T140100 does
+  // not, every table the API touches exists, so nothing 503s: arrangements
+  // create, collections generate, the drawer shows a live arrangement, and the
+  // owner sees a configured feature. Then every reminder insert fails the OLD
+  // CHECK (created_by_role IN ('client','staff')) inside a per-row try/catch and
+  // NO REMINDER EVER FIRES. Prose in supabase/PENDING_SQL.md is not a detector.
+  ok(/const OFF_CARD_SCHEMA_PROBES = \[/.test(MEMBERS_SRC),
+    "the code asks what is actually in the database rather than assuming both files landed together");
+  ok(/path: "member_billing_arrangements\?select=id&limit=1"/.test(MEMBERS_SRC),
+    "it probes the tables migration");
+  ok(/path: "action_items\?select=system_key&limit=1"/.test(MEMBERS_SRC),
+    "and it probes action_items.system_key SPECIFICALLY, which is the half that can be missing while every table exists");
+  ok(/every collect reminder is rejected and nobody is ever told to collect/.test(MEMBERS_SRC),
+    "and the message says what actually breaks, which is the part nobody can see on the screen");
+
+  const iGate = MEMBERS_SRC.indexOf("const gaps = await offCardSchemaGaps();");
+  const iDispatch = MEMBERS_SRC.indexOf('if (action === "set-off-card")   return await actionSetOffCard');
+  ok(iGate > 0 && iDispatch > 0 && iGate < iDispatch,
+    "the check runs BEFORE any off-card action, so a gap is a refusal and not a half-finished write");
+  const doors = (MEMBERS_SRC.match(/await offCardSchemaGaps\(\)/g) || []).length;
+  ok(doors === 2, `both doors check it (${doors} of 2: the authed actions and the cron)`);
+  ok(/return res\.status\(503\)\.json\(\{ error: offCardSchemaMessage\(gaps\), missing: gaps \}\)/.test(MEMBERS_SRC),
+    "and a gap is a 503 that NAMES the migration, not a generic failure");
+  ok(/console\.error\("\[cron-collect-off-card\] refusing to run -", msg\);/.test(MEMBERS_SRC)
+    && /await alertStaffSlack\(`Off-card collections cron did not run\./.test(MEMBERS_SRC),
+    "the cron refuses loudly rather than running to completion generating nothing");
+
+  ok(/if \(!gaps\.length\) _offCardSchemaOk = true;/.test(MEMBERS_SRC),
+    "the OK answer is cached (a migration cannot un-apply) and the MISSING answer is not, so applying the SQL takes effect without a redeploy");
+  ok(/Anything else \(network, 500, timeout\) is "could not ask", not "not\n\s*\/\/ there"/.test(MEMBERS_SRC)
+    || /"could not ask", not "not/.test(MEMBERS_SRC),
+    "and a read that FAILED is not treated as evidence a migration is missing - house rule 10");
+  ok(/MISSING_OBJECT_ERR = \/PGRST205\|PGRST204\|42P01\|42703\|does not exist\/i/.test(MEMBERS_SRC),
+    "only Postgres/PostgREST's own 'that object is not there' codes count as a gap, including 42703 for a missing COLUMN");
+
+  // The migration this detector exists for is real, and says what it does.
+  ok(/ALTER TABLE public\.action_items/i.test(MIG_KEY) && /ADD COLUMN IF NOT EXISTS system_key text/.test(MIG_KEY),
+    "and the second migration is the one that adds the column being probed for");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

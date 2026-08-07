@@ -34,6 +34,7 @@ import { announceActionItem } from "./action-items.js";
 import {
   todayIso as ocToday, isDateStr as ocIsDate, addDays as ocAddDays,
   periodsDueAsOf, isOverdue, settleCollection, validateMethod, cadenceLabel,
+  validateTerm, validateCadence,
   collectItemTitle, collectItemDescription, money as ocMoney,
   systemKeyForCollection, stopBillingItem, COLLECTION_METHODS,
 } from "./_off-card.js";
@@ -256,7 +257,10 @@ async function handler(req, res) {
     try {
       return await cronCollectOffCard(res);
     } catch (e) {
+      // The whole run died, not one row. Loudest case there is: nothing was
+      // generated and nothing was reminded today, for every academy at once.
       console.error("cron-collect-off-card error:", e?.message || e);
+      await alertStaffSlack(`Off-card collections cron DIED before finishing: ${e?.message || e}. No collections were generated and no reminders were sent on this run.`);
       return res.status(500).json({ error: e.message });
     }
   }
@@ -875,6 +879,13 @@ async function handler(req, res) {
     // "record how this parent pays cash" depend on a Stripe connection would put
     // the feature out of reach of exactly the academies that need it.
     if (action === "set-off-card" || action === "end-off-card" || action === "mark-collected") {
+      // HALF-APPLIED MIGRATIONS LOOK HEALTHY. Checked BEFORE the write, not
+      // inferred from whatever error came back after it - see offCardSchemaGaps.
+      const gaps = await offCardSchemaGaps();
+      if (gaps.length) {
+        console.error("[off-card] refusing", action, "- schema incomplete:", gaps.map((g) => g.migration).join(", "));
+        return res.status(503).json({ error: offCardSchemaMessage(gaps), missing: gaps });
+      }
       try {
         if (action === "set-off-card")   return await actionSetOffCard(res, member, ctx, body);
         if (action === "end-off-card")   return await actionEndOffCard(res, member, ctx, body);
@@ -882,9 +893,11 @@ async function handler(req, res) {
       } catch (e) {
         // A missing table means the migrations have not been applied yet. Say so
         // in a sentence a human can act on rather than a PostgREST 404 body.
-        if (/PGRST205|does not exist|42P01/i.test(String(e.message || ""))) {
+        // The probe above catches this first now; this stays as the backstop for
+        // a piece of schema the probe does not know to look at.
+        if (/PGRST205|PGRST204|does not exist|42P01|42703/i.test(String(e.message || ""))) {
           return res.status(503).json({
-            error: "Off-card payments are not set up on this database yet - the migration 20260807T140000_off_card_billing.sql has not been applied.",
+            error: "Off-card payments are not fully set up on this database yet - a migration under supabase/migrations has not been applied. The original error was: " + e.message,
           });
         }
         return res.status(500).json({ error: e.message });
@@ -2311,6 +2324,90 @@ async function actionUpdateProfile(res, member, ctx, body) {
 // What lives HERE is everything that touches rows.
 // ═════════════════════════════════════════════════════════════════════════════
 
+// ── THE SCHEMA THIS FEATURE ACTUALLY NEEDS, CHECKED BEFORE IT IS USED ────────
+//
+// Off-card payments ride on TWO migration files, and they can land separately:
+//   20260807T140000_off_card_billing.sql   - the arrangements + collections tables
+//   20260807T140100_action_items_system_key.sql - action_items.system_key, plus
+//       the widened CHECK that admits created_by_role = 'system'
+//
+// THE HALF-APPLIED STATE LOOKS HEALTHY, which is why this exists. If only the
+// first applies, every table the API touches is present, so nothing 503s:
+// arrangements create, collections generate, the drawer shows a live
+// arrangement, and the owner sees a configured feature. Then every reminder
+// insert fails the old CHECK (created_by_role IN ('client','staff')) inside a
+// per-row try/catch, and NO REMINDER EVER FIRES. A payments feature that looks
+// armed and reminds nobody is worse than one that is plainly off, because
+// somebody trusts it.
+//
+// So it is PROBED, not inferred from an error after a partial write. Only
+// errors that actually mean "this object is not there" count as missing; a
+// network failure or a 500 is not evidence of anything and leaves the feature
+// alone rather than declaring it broken. The OK result is cached for the life of
+// the lambda (a migration cannot un-apply); a MISSING result is never cached, so
+// applying the SQL takes effect without a redeploy.
+const OFF_CARD_SCHEMA_PROBES = [
+  {
+    path: "member_billing_arrangements?select=id&limit=1",
+    migration: "20260807T140000_off_card_billing.sql",
+    needs: "the member_billing_arrangements and member_collections tables",
+  },
+  {
+    path: "action_items?select=system_key&limit=1",
+    migration: "20260807T140100_action_items_system_key.sql",
+    needs: "action_items.system_key and the created_by_role check that admits 'system' (without it every collect reminder is rejected and nobody is ever told to collect)",
+  },
+];
+const MISSING_OBJECT_ERR = /PGRST205|PGRST204|42P01|42703|does not exist/i;
+let _offCardSchemaOk = false;
+
+async function offCardSchemaGaps() {
+  if (_offCardSchemaOk) return [];
+  const gaps = [];
+  for (const p of OFF_CARD_SCHEMA_PROBES) {
+    try {
+      await sb(p.path);
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      if (MISSING_OBJECT_ERR.test(msg)) gaps.push({ migration: p.migration, needs: p.needs });
+      // Anything else (network, 500, timeout) is "could not ask", not "not
+      // there". House rule 10: never turn an unanswered question into a verdict.
+    }
+  }
+  if (!gaps.length) _offCardSchemaOk = true;
+  return gaps;
+}
+
+function offCardSchemaMessage(gaps) {
+  return [
+    "Off-card payments are not fully set up on this database yet, so nothing was changed.",
+    ...gaps.map((g) => `Missing: ${g.migration} - it adds ${g.needs}.`),
+    "Apply it (see supabase/PENDING_SQL.md) and try again.",
+  ].join(" ");
+}
+
+// Loud where this codebase is already loud: same helper shape as
+// api/testimonial-drift.js and api/schedule/cron-extend-slots.js, same channel
+// env vars. Staff channel, NOT the academy's: a cron that cannot generate is our
+// failure to fix, not news an academy owner can act on. Never throws - a Slack
+// outage must not make a cron run look worse or better than it was.
+async function alertStaffSlack(text) {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.SLACK_ALERTS_CHANNEL || process.env.SLACK_STAFF_CHANNEL;
+  if (!token || !channel) return { posted: false, reason: "slack not configured" };
+  try {
+    const r = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text, unfurl_links: false }),
+    });
+    const j = await r.json().catch(() => ({}));
+    return { posted: !!j.ok, reason: j.ok ? null : j.error || "unknown" };
+  } catch (e) {
+    return { posted: false, reason: String((e && e.message) || e) };
+  }
+}
+
 // The default assignee of every collect reminder (ruling D2: the OWNER by
 // default, reassignable to a staff member - and reassignment is the action_items
 // PATCH that already exists, so there is nothing new to learn).
@@ -2425,11 +2522,29 @@ async function actionSetOffCard(res, member, ctx, body) {
   const b = body || {};
   const mv = validateMethod(b.method, b.method_note);
   if (!mv.ok) return res.status(400).json({ error: mv.error });
+  // EVERY REFUSAL HAPPENS BEFORE THE FIRST WRITE. ocIsDate now checks the date
+  // is a day the calendar HAS, not just a string shaped like one: "2026-02-30"
+  // used to pass here and be refused by Postgres (22008) three writes later,
+  // and "2026-13-01" used to reach a RangeError. See isDateStr in _off-card.js.
   if (!ocIsDate(b.anchor_date)) {
-    return res.status(400).json({ error: "anchor_date must be YYYY-MM-DD - it is the date their next payment is due." });
+    return res.status(400).json({
+      error: `anchor_date must be a real calendar date written YYYY-MM-DD - it is the date their next payment is due. Got ${JSON.stringify(b.anchor_date ?? null)}.`,
+    });
   }
   if (b.commitment_end_date && !ocIsDate(b.commitment_end_date)) {
-    return res.status(400).json({ error: "commitment_end_date must be YYYY-MM-DD" });
+    return res.status(400).json({
+      error: `commitment_end_date must be a real calendar date written YYYY-MM-DD. Got ${JSON.stringify(b.commitment_end_date)}.`,
+    });
+  }
+  // The rhythm override, refused rather than absorbed. Checked HERE, with the
+  // other refusals, so a bad term cannot get as far as creating a row either.
+  if (b.term != null) {
+    const tv = validateTerm(b.term);
+    if (!tv.ok) return res.status(400).json({ error: tv.error });
+  }
+  if (b.cadence != null) {
+    const cv = validateCadence(b.cadence);
+    if (!cv.ok) return res.status(400).json({ error: cv.error });
   }
   if (await loadLiveArrangement(member.id)) {
     return res.status(400).json({ error: "This member already has a live payment arrangement. End it before starting another." });
@@ -2459,10 +2574,13 @@ async function actionSetOffCard(res, member, ctx, body) {
     return res.status(400).json({ error: "amount_cents required (or name an offer_price_id to take it from the plan)" });
   }
   // A human saying the real rhythm differs from what was sold. Never reconciled
-  // silently: it is recorded as an override so it can surface as drift.
+  // silently: it is recorded as an override so it can surface as drift. Both
+  // halves were validated at the top of this function, so what lands on the row
+  // is a rhythm this build can actually bill, never a typo that collapsed into
+  // the week x4 default on its way through intervalFor.
   if (b.term != null || b.cadence != null) {
-    if (b.term != null) term = String(b.term).trim() || null;
-    if (b.cadence != null) cadence = String(b.cadence).trim() || null;
+    if (b.term != null) term = validateTerm(b.term).term;
+    if (b.cadence != null) cadence = validateCadence(b.cadence).cadence;
     cadence_source = "override";
   }
 
@@ -2496,18 +2614,54 @@ async function actionSetOffCard(res, member, ctx, body) {
     method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(row),
   });
   const arrangement = Array.isArray(created) ? created[0] : created;
+  if (!arrangement || !arrangement.id) {
+    return res.status(500).json({ error: "the payment arrangement did not save, so nothing was changed. Try again." });
+  }
 
-  await sb(`members?id=eq.${member.id}`, {
-    method: "PATCH", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ billing_mode: "alternate", updated_at: nowIso() }),
-  });
+  // ALL OR NOTHING FROM HERE. There is no transaction across PostgREST calls, so
+  // the unwind is written by hand.
+  //
+  // What it is for: this used to insert the arrangement and flip
+  // members.billing_mode BEFORE generation ran. When generation threw, the
+  // caller got a 500, the arrangement was LIVE, writeAudit never ran, and the
+  // retry hit "This member already has a live payment arrangement." - the owner
+  // was left with a member who looks configured, has no audit trail, and cannot
+  // be set up again without someone touching the database.
+  const priorBillingMode = member.billing_mode ?? null;
+  let stopItem = null;
+  let gen = { generated: 0 };
+  try {
+    await sb(`members?id=eq.${member.id}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ billing_mode: "alternate", updated_at: nowIso() }),
+    });
 
-  // THE GUARD, on the write path that sets the flag deliberately.
-  const stopItem = await raiseStopBillingIfSubscribed(member);
+    // THE GUARD, on the write path that sets the flag deliberately. It swallows
+    // its own failures on purpose (see raiseStopBillingIfSubscribed) - failing
+    // to raise a warning must not undo a correct setup.
+    stopItem = await raiseStopBillingIfSubscribed(member);
 
-  // Activation is what generates the first collection (the staff-confirms rule:
-  // nothing generates straight from the workbook).
-  const gen = await generateForArrangement(arrangement);
+    // Activation is what generates the first collection (the staff-confirms
+    // rule: nothing generates straight from the workbook).
+    gen = await generateForArrangement(arrangement);
+  } catch (e) {
+    // Put the member back exactly as they were, and take the arrangement out of
+    // the way so a retry is possible. 'ended' FIRST, because that alone releases
+    // the partial unique index on (member_id) WHERE status IN ('active','paused')
+    // and it cannot be refused by a child row; the DELETE after it is the tidy-up
+    // and is allowed to fail.
+    console.error("[off-card] set-off-card failed after the arrangement row was created, unwinding:", e.message);
+    await sb(`member_billing_arrangements?id=eq.${arrangement.id}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "ended", ended_at: nowIso(), ended_reason: "setup failed, rolled back" }),
+    }).catch((e2) => console.error("[off-card] unwind could not end the arrangement:", e2.message));
+    await sb(`member_billing_arrangements?id=eq.${arrangement.id}`, { method: "DELETE" }).catch(() => { /* the 'ended' flag above is what matters */ });
+    await sb(`members?id=eq.${member.id}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ billing_mode: priorBillingMode, updated_at: nowIso() }),
+    }).catch((e2) => console.error("[off-card] unwind could not restore billing_mode:", e2.message));
+    throw e;   // the dispatcher turns this into the 503/500 with a sentence in it
+  }
 
   await writeAudit({
     client_id: member.client_id, member_id: member.id,
@@ -2606,6 +2760,12 @@ async function actionMarkCollected(res, member, ctx, body) {
   });
   if (!settled.ok) return res.status(400).json({ error: settled.error });
 
+  // Absent means today. PRESENT AND NOT A REAL DAY means say so: quietly
+  // recording "2026-02-30" as today would put a wrong date on the one row that
+  // is supposed to say when the money actually arrived.
+  if (b.collected_on != null && String(b.collected_on) !== "" && !ocIsDate(b.collected_on)) {
+    return res.status(400).json({ error: `collected_on must be a real calendar date written YYYY-MM-DD. Got ${JSON.stringify(b.collected_on)}.` });
+  }
   const collectedOn = ocIsDate(b.collected_on) ? String(b.collected_on).slice(0, 10) : ocToday();
   if (collectedOn > ocToday()) {
     return res.status(400).json({ error: "collected_on cannot be in the future - record it when it actually arrives." });
@@ -2747,10 +2907,39 @@ async function generateForArrangement(arrangement) {
 // RULING D4 IS AN ABSENCE, and absences are invisible unless named: two missed
 // periods does NOTHING here. No auto-cancel, no decision item, no pause of
 // generation. The debt keeps accumulating in the open, which is the point.
+//
+// A FAILURE IS LOUD, and it did not used to be. Every phase isolates one row in
+// a try/catch so a single bad arrangement cannot take the run down - that part
+// was right and is unchanged. What was wrong is what happened next: the error
+// went into an array in a 200 body that a scheduled invocation nobody reads
+// throws away. An arrangement that fails every night generates nothing forever
+// and NOBODY IS TOLD, which is exactly the shape of failure this whole build
+// exists to prevent, reproduced inside the thing built to prevent it. Now every
+// caught error is console.error'd where it happens, the run posts to the staff
+// Slack alert channel, and a run with any failures answers non-2xx so the
+// scheduler itself records it as failed. Fixed 2026-08-07.
 async function cronCollectOffCard(res) {
   const today = ocToday();
   let generated = 0, notified = 0, overdue = 0;
   const errors = [];
+  // One place that records a failure, so no phase can quietly record it a
+  // quieter way. Kept per-row: the loops still continue.
+  const failed = (where, e) => {
+    const message = String((e && e.message) || e);
+    console.error(`[cron-collect-off-card] ${where.phase} failed for ${where.arrangement_id || where.collection_id}:`, message);
+    errors.push({ ...where, message });
+  };
+
+  // The same half-applied-migration check the authed actions run. A cron that
+  // silently generates nothing because system_key is not there is the exact
+  // invisible failure described on offCardSchemaGaps.
+  const gaps = await offCardSchemaGaps();
+  if (gaps.length) {
+    const msg = offCardSchemaMessage(gaps);
+    console.error("[cron-collect-off-card] refusing to run -", msg);
+    await alertStaffSlack(`Off-card collections cron did not run. ${msg}`);
+    return res.status(503).json({ ok: false, error: msg, missing: gaps });
+  }
 
   const arrangements = await sb(
     `member_billing_arrangements?status=eq.active&select=*&order=created_at.asc&limit=500`
@@ -2759,7 +2948,7 @@ async function cronCollectOffCard(res) {
   // ── Phase A ──
   for (const a of (arrangements || [])) {
     try { generated += (await generateForArrangement(a)).generated; }
-    catch (e) { errors.push({ arrangement_id: a.id, phase: "generate", message: e.message }); }
+    catch (e) { failed({ arrangement_id: a.id, client_id: a.client_id, phase: "generate" }, e); }
   }
 
   const byId = new Map((arrangements || []).map((a) => [a.id, a]));
@@ -2806,7 +2995,7 @@ async function cronCollectOffCard(res) {
         notified++;
       }
     } catch (e) {
-      errors.push({ collection_id: c.id, phase: "notify", message: e.message });
+      failed({ collection_id: c.id, client_id: c.client_id, phase: "notify" }, e);
     }
   }
 
@@ -2826,11 +3015,26 @@ async function cronCollectOffCard(res) {
       await postOffCardSlack(c.client_id, `Overdue: ${label} was due ${c.due_date} and has not been marked collected. This member pays outside Stripe, so nothing was charged.`);
       overdue++;
     } catch (e) {
-      errors.push({ collection_id: c.id, phase: "overdue", message: e.message });
+      failed({ collection_id: c.id, client_id: c.client_id, phase: "overdue" }, e);
     }
   }
 
-  return res.status(200).json({ ok: true, generated, notified, overdue, errors: errors.slice(0, 20) });
+  // THE VERDICT, said out loud in three places. Same posture as the pause cron
+  // beside it: the log line always prints, the alert only fires when something
+  // failed, and the status code is what the scheduler reads.
+  console.log(`[cron-collect-off-card] generated=${generated} notified=${notified} overdue=${overdue} errors=${errors.length}`);
+  if (errors.length) {
+    const sample = errors.slice(0, 3)
+      .map((e) => `${e.phase} ${e.arrangement_id || e.collection_id}: ${e.message}`)
+      .join("\n");
+    await alertStaffSlack(
+      `Off-card collections cron: ${errors.length} failure(s) today (generated ${generated}, notified ${notified}, overdue ${overdue}).\n` +
+      `Anything that failed generated no collection and sent no reminder, and it will keep failing until somebody looks.\n${sample}`
+    );
+  }
+  return res.status(errors.length ? 500 : 200).json({
+    ok: errors.length === 0, generated, notified, overdue, errors: errors.slice(0, 20),
+  });
 }
 
 // The overdue re-ping. Slack only: the action item already exists and already

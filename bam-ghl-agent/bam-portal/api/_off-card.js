@@ -29,14 +29,35 @@
 //   D6 - off-card money does NOT feed commissions. Nothing here writes to or is
 //        read by api/commissions.js.
 
-import { resolveInterval, addInterval } from "./_billing-cadence.js";
+import { CADENCES, resolveInterval, addInterval } from "./_billing-cadence.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATES. Collections are DATES, not instants: "due Aug 20" is the same day in
 // every timezone, and a UTC-noon anchor keeps a date-only string from sliding a
 // day when it round-trips through a Date.
 export function todayIso() { return new Date().toISOString().slice(0, 10); }
-export function isDateStr(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || "")); }
+
+// A DATE THE CALENDAR ACTUALLY HAS, not just a string shaped like one.
+//
+// This used to be the regex alone, and the regex says yes to days that do not
+// exist. Three separate wrong endings came out of that:
+//   "2026-02-30" - passes the shape, JS Date silently rolls it to 2026-03-02,
+//                  and Postgres refuses it outright (22008). The create got
+//                  halfway through and 500'd.
+//   "2026-13-01" - passes the shape, and dateToUtc().toISOString() throws
+//                  RangeError: Invalid time value, which reaches the caller as
+//                  a 500 with no sentence in it.
+//   "2026-01-32" - same.
+// Round-tripping is the whole check: parse it, print it back, and if it does not
+// come back as itself it was never a day. Not reachable from the drawer (an
+// <input type=date> cannot produce these) but every one of them is reachable
+// from the API, and the API is the surface. Fixed 2026-08-07.
+export function isDateStr(s) {
+  const str = String(s == null ? "" : s);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+  const d = new Date(`${str}T12:00:00Z`);
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === str;
+}
 export function dateToUtc(iso) { return new Date(`${String(iso).slice(0, 10)}T12:00:00Z`); }
 export function utcToDate(d) { return d.toISOString().slice(0, 10); }
 export function addDays(iso, n) {
@@ -61,6 +82,52 @@ export function addDays(iso, n) {
 // until a 9-month cash payer was reminded on the wrong day for nine months, so
 // api/_off-card.test.mjs asserts both cases and MUTATE=hardcodedterms proves the
 // assertion is alive.
+// THE OVERRIDE VOCABULARY, and why refusing beats defaulting.
+//
+// set-off-card lets a human say the real rhythm differs from what was sold.
+// That override used to be taken RAW and handed to intervalFor, whose last line
+// is `return { interval: "week", interval_count: 4 }` for anything it does not
+// recognise. So "10_weeks", "1_year" and "9 months" (a space, not an
+// underscore) all became "every 4 weeks", silently, and the owner was reminded
+// on the wrong day for the length of the commitment. This is the same
+// silent-collapse class as the closed term vocabulary that once read "12
+// months" as 6_months and billed half the commitment.
+//
+// This function is deliberately NOT a list of commitment lengths (ruling D5) -
+// it is a SHAPE check plus the 1-24 month range intervalFor can actually bill.
+// A 9-month or 18-month commitment passes without anyone editing this file; a
+// typo does not pass at all.
+export const LEGACY_TERMS = ["4_weeks", "monthly"];
+
+export function validateTerm(term) {
+  const t = String(term == null ? "" : term).trim();
+  if (!t) return { ok: false, error: "Say how often they pay, or leave it off entirely to use what the plan says." };
+  if (LEGACY_TERMS.includes(t)) return { ok: true, term: t };
+  const m = /^(\d+)_months$/.exec(t);
+  if (!m) {
+    return {
+      ok: false,
+      error: `"${t}" is not a rhythm this build can bill. Use ${LEGACY_TERMS.join(", ")}, or a number of months written as 9_months. It is refused rather than guessed, because a guess here means every reminder lands on the wrong day.`,
+    };
+  }
+  const n = +m[1];
+  if (n < 1 || n > 24) {
+    return { ok: false, error: `"${t}" is ${n} months, outside the 1 to 24 month range this build can bill. Fix the commitment length on the offer.` };
+  }
+  return { ok: true, term: t };
+}
+
+// The same rule for the cadence half of the override. A cadence the build does
+// not know resolves to the term's legacy shape and reports unknown_cadence,
+// which is the right posture for a value that came off a PRICE ROW nobody typed
+// today - but this one was typed today, so it is refused instead of absorbed.
+export function validateCadence(cadence) {
+  const c = String(cadence == null ? "" : cadence).trim().toLowerCase();
+  if (!c) return { ok: true, cadence: null };
+  if (Object.prototype.hasOwnProperty.call(CADENCES, c)) return { ok: true, cadence: c };
+  return { ok: false, error: `"${cadence}" is not a billing rhythm this build knows. Pick one of: ${Object.keys(CADENCES).join(", ")}.` };
+}
+
 export function resolveArrangementInterval(arrangement) {
   const a = arrangement || {};
   // The row shape resolveInterval reads is { billing_cadence }. The arrangement
@@ -74,10 +141,12 @@ export function resolveArrangementInterval(arrangement) {
 // Period 1 IS the anchor. Period n is anchor + (interval x (n-1)).
 //
 // Measuring from the anchor rather than stepping from the previous due date is
-// not a style preference. JS month arithmetic CLAMPS: a Jan-31 monthly anchor
-// stepped one period at a time gives Feb 31 -> Mar 3, then Apr 3, then May 3,
-// and the parent's pay day walks away from the pay day forever. Multiplying the
-// interval count and measuring from the anchor cannot drift, and it does it
+// not a style preference. Month arithmetic CLAMPS a day the target month does
+// not have (addInterval, since 2026-08-07): a Jan-31 monthly anchor stepped one
+// period at a time gives Feb 28, then Mar 28, then Apr 28, and the parent's pay
+// day walks away from the pay day forever. Multiplying the interval count and
+// measuring from the anchor cannot drift - Jan 31, Feb 28, Mar 31, Apr 30, May
+// 31, one collection per month, the 31st always coming back - and it does it
 // through the SAME addInterval the card path uses rather than new arithmetic.
 export function dueDateForPeriod(arrangement, periodIndex) {
   const n = Math.max(1, Math.floor(Number(periodIndex) || 1));

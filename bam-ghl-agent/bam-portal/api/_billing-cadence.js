@@ -99,14 +99,47 @@ function cadenceWarning(iv) {
 }
 
 // Add one billing interval to a date (UTC). Used to place the recurring anchor one
-// full period AFTER a chosen future start date (they pay the first period today).
+// full period AFTER a chosen future start date (they pay the first period today),
+// and by api/_off-card.js to place the due date of period n.
+//
+// MONTHS AND YEARS CLAMP TO THE LAST DAY OF THE TARGET MONTH. They used to
+// OVERFLOW, because setUTCMonth does: Jan 31 + 1 month came back as Mar 3, and
+// a monthly anchor on the 31st produced
+//     2026-01-31, 2026-03-03, 2026-03-31, 2026-05-01, 2026-05-31
+// February got nothing and March got two. Same shape for a Feb-29 anchor plus a
+// year, which setUTCFullYear rolled to Mar 1.
+//
+// FIXED HERE, IN THE SHARED FUNCTION, ON PURPOSE (2026-08-07). It is a fix on
+// BOTH consumers, not a fix on one and a regression on the other:
+//   - the card path (api/website/checkout.js) feeds this straight to Stripe as
+//     billing_cycle_anchor. Stripe itself clamps a monthly subscription
+//     anchored on the 31st to the 28th/29th/30th, so the overflowing version
+//     handed Stripe an anchor a month plus a few days out and gave the parent a
+//     free February.
+//   - the off-card path generates one collection per expected period, so an
+//     overflowed month is a month with NO collection row, NO reminder and
+//     nobody told to collect.
+// Clamping is also what keeps them equal: an off-card member and a card member
+// on the same nominal plan must not get different due dates, and the only way
+// to guarantee that is one piece of arithmetic that both call.
+//
+// The clamp is written INLINE rather than as a helper because
+// api/_billing-cadence.test.mjs imports this function by cutting its source out
+// of this file by its declaration line; a helper it called would be undefined
+// there. Its 298 assertions are unaffected either way - its fixture date is
+// 2026-03-15, which no month clamps.
 function addInterval(date, iv) {
   const d = new Date(date.getTime());
   const n = iv.interval_count || 1;
-  if (iv.interval === "week") d.setUTCDate(d.getUTCDate() + 7 * n);
-  else if (iv.interval === "month") d.setUTCMonth(d.getUTCMonth() + n);
-  else if (iv.interval === "year") d.setUTCFullYear(d.getUTCFullYear() + n);
-  else d.setUTCDate(d.getUTCDate() + n); // day
+  if (iv.interval === "week") { d.setUTCDate(d.getUTCDate() + 7 * n); return d; }
+  if (iv.interval !== "month" && iv.interval !== "year") { d.setUTCDate(d.getUTCDate() + n); return d; } // day
+  const months = iv.interval === "year" ? 12 * n : n;
+  const day = d.getUTCDate();
+  d.setUTCDate(1);                                   // park on a day every month has
+  d.setUTCMonth(d.getUTCMonth() + months);
+  // Day 0 of the following month IS the last day of this one.
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(day < lastDay ? day : lastDay);
   return d;
 }
 
