@@ -27,6 +27,7 @@ const IcoClock = ({ size }) => _ico('<circle cx="12" cy="12" r="10"/><path d="M1
 const IcoChat = ({ size }) => _ico('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>', size);
 const IcoSlack = ({ size }) => _ico('<rect x="13" y="2" width="3" height="8" rx="1.5"/><path d="M19 8.5V10h1.5A1.5 1.5 0 1 0 19 8.5"/><rect x="8" y="14" width="3" height="8" rx="1.5"/><path d="M5 15.5V14H3.5A1.5 1.5 0 1 0 5 15.5"/><rect x="14" y="13" width="8" height="3" rx="1.5"/><path d="M15.5 19H14v1.5a1.5 1.5 0 1 0 1.5-1.5"/><rect x="2" y="8" width="8" height="3" rx="1.5"/><path d="M8.5 5H10V3.5A1.5 1.5 0 1 0 8.5 5"/>', size);
 const IcoLink = ({ size }) => _ico('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', size);
+const IcoCopy = ({ size }) => _ico('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>', size);
 
 // ─── Combined Clients page ──────────────────────────────────────────────────
 // Replaces the old Clients tab + Client Setup tab. Two states:
@@ -2948,9 +2949,20 @@ function NotesTab({ client, tokens, me, session, staffMap }) {
         <div key={n.id} style={{ padding: "12px 16px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 12, marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 12, color: t.textMute }}>
             <span><b style={{ color: t.text }}>{staffMap[n.staff_id]?.name || "Unknown"}</b></span>
-            <span>{new Date(n.created_at).toLocaleString()}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              {new Date(n.created_at).toLocaleString()}
+              <button
+                onClick={() => {
+                  navigator.clipboard?.writeText(n.body)
+                    .then(() => showToast("Note copied", "success"))
+                    .catch(() => showToast("Couldn't copy the note"));
+                }}
+                title="Copy note"
+                style={{ background: "none", border: "none", padding: 0, margin: 0, color: t.textMute, cursor: "pointer", display: "inline-flex" }}
+              ><IcoCopy size={13} /></button>
+            </span>
           </div>
-          <div style={{ fontSize: 14, color: t.text, whiteSpace: "pre-wrap" }}>{n.body}</div>
+          <div style={{ fontSize: 14, color: t.text, whiteSpace: "pre-wrap", userSelect: "text" }}>{n.body}</div>
         </div>
       ))}
     </div>
