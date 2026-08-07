@@ -7,6 +7,7 @@ import {
   MODES, resolveMode, money, campaignLabel, isVideo, isImage, isAudio,
   fileSize, MARKETING_OWNER_ROLES,
 } from "./intake";
+import { assetPublicUrl } from "../contentv2/utils";
 
 // ── small presentational helpers ─────────────────────────────
 function FieldRows({ rows }) {
@@ -113,12 +114,51 @@ export default function MarketingDrawer({
   const intake = ticket?.intake || {};
   const context = ticket?.context || {};
   const finals = Array.isArray(intake.final_files) ? intake.final_files : [];
-  // Raw library assets the CLIENT picked. Ids only, never files: count as context, never a download.
+  // Raw library assets the CLIENT picked.
   // Empty entries are dropped so corrupt intake cannot claim "2 assets picked" for [null, null].
-  const pickedAssets = Array.isArray(intake.asset_ids) ? intake.asset_ids.filter(Boolean).length : 0;
+  const pickedIds = useMemo(
+    () => (Array.isArray(intake.asset_ids) ? intake.asset_ids.filter(Boolean) : []),
+    [intake.asset_ids],
+  );
+  const pickedAssets = pickedIds.length;
   const blockedBy = context.blocked_by || intake.blocked_by || null;
   const resolved = ticket?.status === "resolved" || ticket?.status === "closed";
   const archived = Array.isArray(intake.archived_asset_ids) && intake.archived_asset_ids.length > 0;
+
+  // Resolve the picked library asset IDs into real, downloadable files.
+  //
+  // These used to be COUNTED and nothing else, so a ticket with no finished
+  // creative but four picked files rendered "the academy picked 4 files" with
+  // Download disabled and Launch enabled. Marketing could close a $900/mo
+  // campaign without ever reaching the files it was supposed to run, which is
+  // the live state of the only marketing ticket in the system (bf1bb1fa).
+  //
+  // Best effort by design: a failed lookup leaves the count line intact rather
+  // than blocking the drawer.
+  const [pickedFiles, setPickedFiles] = useState([]);
+  useEffect(() => {
+    if (!pickedIds.length) { setPickedFiles([]); return undefined; }
+    let cancelled = false;
+    supabase
+      .from("client_assets")
+      .select("id,label,category,storage_path,link_url,mime_type,size_bytes")
+      .in("id", pickedIds)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setPickedFiles((data || []).map((a) => ({
+          url: assetPublicUrl(a),
+          name: a.label || a.storage_path?.split("/").pop() || "asset",
+          mime: a.mime_type || "",
+          size: a.size_bytes || null,
+        })).filter((f) => f.url));
+      });
+    return () => { cancelled = true; };
+  }, [pickedIds]);
+
+  // What the Download button actually hands over. Finished creative when it
+  // exists, otherwise the raw files the academy picked, because "nothing to
+  // download" was never true, only unimplemented.
+  const downloadable = finals.length ? finals : pickedFiles;
 
   // Reads via supabase-js (RLS is_staff()). Refetch on ticket change + on the
   // parent's realtime message bump.
@@ -257,11 +297,17 @@ export default function MarketingDrawer({
                 the reader had just looked at, which is the opposite of what it
                 means. With no preview above it, the subject is unambiguous. */}
             {finals.length === 0 && pickedAssets > 0 && (
-              <div className="v2r-mkt-hint">
-                {pickedAssets === 1
-                  ? "The academy picked 1 file from its library, which is not a finished creative."
-                  : `The academy picked ${pickedAssets} files from its library, which are not finished creatives.`}
-              </div>
+              <>
+                <div className="v2r-mkt-hint">
+                  {pickedAssets === 1
+                    ? "The academy picked 1 file from its library, which is not a finished creative."
+                    : `The academy picked ${pickedAssets} files from its library, which are not finished creatives.`}
+                </div>
+                {/* The files themselves. Naming them without showing them was
+                    the dead end: the reader knew four files existed and had no
+                    route to any of them. */}
+                {pickedFiles.length > 0 && <CreativePreview files={pickedFiles} />}
+              </>
             )}
           </div>
           <div className="v2r-mkt-section">
@@ -289,7 +335,10 @@ export default function MarketingDrawer({
         {rows.length ? <FieldRows rows={rows} /> : <div className="v2r-mkt-nofile">No structured intake on this ticket.</div>}
       </div>
     );
-  }, [ticket, mode, intake, finals, pickedAssets]);
+    // pickedFiles is REQUIRED here: it arrives from an async lookup after the
+    // first render, and without it this memo never recomputes, so the previews
+    // it renders would stay invisible forever.
+  }, [ticket, mode, intake, finals, pickedAssets, pickedFiles]);
 
   if (!ticket) return null;
 
@@ -298,10 +347,12 @@ export default function MarketingDrawer({
     <button
       type="button"
       className="v2r-btn v2r-btn-secondary"
-      disabled={!finals.length || busy === "download"}
-      onClick={() => run("download", () => downloadFiles(finals))}
+      disabled={!downloadable.length || busy === "download"}
+      onClick={() => run("download", () => downloadFiles(downloadable))}
     >
-      {busy === "download" ? "Downloading..." : "Download creative"}
+      {busy === "download"
+        ? "Downloading..."
+        : (finals.length ? "Download creative" : "Download picked files")}
     </button>
   );
 
@@ -352,7 +403,17 @@ export default function MarketingDrawer({
             className="v2r-btn v2r-btn-primary"
             disabled={resolved || !!blockedBy || busy === "done"}
             title={blockedBy ? "Blocked: landing page not live" : undefined}
-            onClick={() => run("done", () => api.setStatus(id, "resolved"), "Campaign launched, marked done.")}
+            /* markLive, not setStatus. Both resolve the ticket, but only
+               markLive archives the finished creative into the academy's Ads
+               library, and a launched campaign's creative belongs there exactly
+               as much as a posted ad's does. This mode called setStatus, so
+               every campaign launch would have resolved cleanly and quietly
+               dropped its creative. No campaign has been launched yet, so
+               nothing has been lost, which is the only reason this is a fix and
+               not a recovery. Campaigns carrying no finished creative archive
+               nothing, correctly: picked library files are already in the
+               library. */
+            onClick={() => run("done", () => api.markLive(id), "Campaign launched. Creative archived to the Ads library.")}
           >
             {resolved ? "Launched" : busy === "done" ? "Launching..." : "Launch, mark done"}
           </button>
@@ -421,7 +482,10 @@ export default function MarketingDrawer({
         <div className={`v2r-mkt-note ${note.kind === "ok" ? "is-ok" : "is-err"}`}>{note.text}</div>
       )}
 
-      {mode === "post" && resolved && archived && (
+      {/* Campaign included now that it archives too, otherwise a launched
+          campaign would archive silently and the reader would have no
+          confirmation it happened. */}
+      {(mode === "post" || mode === "campaign") && resolved && archived && (
         <div className="v2r-mkt-note is-ok">Archived to the client's Ads library.</div>
       )}
 

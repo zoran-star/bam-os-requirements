@@ -114,12 +114,42 @@ function result(rows) {
   return chain;
 }
 
+// The four real files on BAM GTA ticket bf1bb1fa, the ones marketing could not
+// reach. Shapes copied from the live client_assets rows.
+export const CLIENT_ASSETS = [
+  { id: "a1", label: "Mentor handshake", category: "photo", mime_type: "image/jpeg", size_bytes: 1452153, storage_path: "gta/mentor-handshake.jpg", link_url: null },
+  { id: "a2", label: "Youth drive", category: "photo", mime_type: "image/jpeg", size_bytes: 1106191, storage_path: "gta/youth-drive.jpg", link_url: null },
+  { id: "a3", label: "Coach Zoran", category: "photo", mime_type: "image/jpeg", size_bytes: 994385, storage_path: "gta/coach-zoran.jpg", link_url: null },
+  { id: "a4", label: "Logo no Background", category: "photo", mime_type: "image/png", size_bytes: 21538, storage_path: "gta/logo.png", link_url: null },
+];
+
+// A 3:2 placeholder carrying the file's own name, so each preview is visually
+// distinct and it is obvious which asset rendered where.
+function svgDataUri(path) {
+  const name = path.split("/").pop().replace(/\.[a-z0-9]+$/i, "").replace(/[-_]/g, " ");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600">`
+    + `<rect width="900" height="600" fill="#2B2E32"/>`
+    + `<text x="450" y="310" font-family="system-ui,sans-serif" font-size="44" fill="#D4B65C"`
+    + ` text-anchor="middle">${name}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 export const supabase = {
   from(table) {
     if (table === "v2_tickets") return result(store.tickets.filter((t) => t.assignee_role === "backlog"));
     if (table === "clients") return result(CLIENTS);
     if (table === "staff") return result(STAFF);
+    if (table === "client_assets") return result(CLIENT_ASSETS);
+    if (table === "v2_ticket_messages") return result([]);
     return result([]);
+  },
+  // Mirrors assetPublicUrl's storage_path branch. Inline SVG rather than a
+  // remote placeholder service, because the page CSP blocks external images and
+  // a broken <img> hides the exact layout this mock exists to check.
+  storage: {
+    from: () => ({
+      getPublicUrl: (p) => ({ data: { publicUrl: svgDataUri(String(p)) } }),
+    }),
   },
   channel: () => ({ on() { return this; }, subscribe() { return this; } }),
   removeChannel: () => {},
