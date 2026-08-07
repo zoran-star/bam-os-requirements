@@ -455,3 +455,16 @@ After-submit skill's job for takeover: create ONE takeover action item per forei
 
 ### CONFIRMED: after-submit design (Zoran, 2026-08-07)
 Lij submits -> Claude skill: WE review and approve every member and every action item -> apply: seed all 20 members + create the approved action items. Nothing writes until approved in the skill, same staff-confirm gate as the price side. The 3 skill-created items (takeover / missing phone / stop-billing) are created at apply from his answers; the 2 detectors (failed-payment card link, off-card collect) stand behind them.
+
+### After-submit member apply engine: PLAN APPROVED (Zoran, 2026-08-07)
+Full plan: docs/plans/member-apply-engine-plan.md. Decisions locked:
+- A: PRE-SEED member shells from Stripe before the workbook opens (true confirm, every answer targets a real members.id). Seeded mockup already shows the shape.
+- B: athlete age lands in `member_field_values` (existing GTA table 20260709181015), NOT a new members column. ZORAN'S CATCH - he asked "how do we not have age, don't we have it for GTA?" and he was right: member_field_values was purpose-built for per-athlete answers (Age included) when siblings share one parent/Stripe customer, which is exactly the two-athletes-on-one-sub case. Read/written via api/custom-fields.js ?action=values. Avoided building a redundant column. (There is also a date_of_birth in the parent-identity model 20260612124500 if DOB is ever preferred over age.)
+- C: two athletes on one sub = two members rows sharing stripe_subscription_id, each its own member_field_values age.
+- D: ambiguous plan (Christopher $199) = HARD coverage gate, staff name the family in the skill, never auto-file by amount.
+- E: one-person archived-price mint = staff-confirm via BAM v2_tickets queue (live Stripe write inherits the no-unreviewed-mint boundary).
+- F: coverage cannot close until the price side's LIVE mint populates pricing_catalog (SJ has 0 rows); member DB seed may proceed during that wait.
+
+Verified live before planning: members has NO athlete_age / NO next_payment column, HAS contact_id + ghl_contact_id, NO index on stripe_subscription_id. member_field_values exists. KINDS already admits "member"; member_row already legal in the target_kind CHECK.
+
+Apply is REAL for the portal DB (members, arrangements, action items) and DEFERRED at the Stripe seam (archived-price mints, takeover subs) - a deliberate difference from the price workbook whose whole apply is dry. Build behind the same rehearsal loop that caught 14 defects on the price side.
