@@ -179,6 +179,20 @@
  *       a TWIN row for logical code 0. F5's direct-404 pin catches it; the
  *       page-side positive pin proves the real page only ever emits canonical
  *       spellings, so the refusal can never refuse the page.
+ *   MUTATE=planarchiveunmintable    API. mintableOn's plan branch loses
+ *       `archived`, so the page's toggleArch (a null-id save of `archived`)
+ *       404s and the Archive click silently fails. F8 reproduces it end to
+ *       end. This is the "revert the mintableOn change -> reproduce the 404".
+ *   MUTATE=rungarchiveunmintable    API. canMint's plan-card rung branch is
+ *       gone, so the ladder Archive button (a null-id save of
+ *       `commitments.<i>.archived`) 404s on any rung the seed never wrote. F8.
+ *   MUTATE=phantomrungmints    API. canMint's plan-card rung branch drops its
+ *       sibling-existence check and admits ANY canonical
+ *       `commitments.<n>.archived`, so a direct POST of a PHANTOM rung's
+ *       archived leaf MINTS instead of 404ing and apply's pad loop invents the
+ *       empty rungs. F8's phantom-rung refusal catches it. Self-inflicted only
+ *       (the real page archives existing rungs only), but the pad-loop door
+ *       left open at the mint gate.
  *
  * Measured 2026-08-06, after the full rehearsal-round-1 build (Steps 1-12:
  * withheld fee report, Variant A codes guard, confirmed-no tax, registration
@@ -191,7 +205,11 @@
  * drifted and is trued up here. That pass took it 167 -> 174 (F5, D1) ->
  * 176 (D3) -> 179 (F6, D2) -> 181 (D4); the 2026-08-06 whitespace pass took
  * it 181 -> 184 (F7), and its Step 2 (canonical indexes + mint ceiling)
- * 184 -> 186 (F5's direct-404 and page-canonical pins)).
+ * 184 -> 186 (F5's direct-404 and page-canonical pins); the 2026-08-07
+ * Archive pass took it 186 -> 196 (F8: the plan and rung Archive buttons,
+ * cut to the live unseeded shape and driven through the real page), and the
+ * 2026-08-07 phantom-rung pass 196 -> 198 (F8's phantom-rung refusal and its
+ * no-row-minted pin)).
  * typingisapproving -> 18 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 10, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -250,6 +268,20 @@
  * api/_workbook.test.mjs. MUTATE=mintuncapped, the mint ceiling's control,
  * lives ONLY in api/_workbook.test.mjs, where it catches 1 - this flow has
  * no 90-row card).
+ * planarchiveunmintable -> 4 (measured 2026-08-07, Archive pass: F8's
+ * plan-archive save-through, one-row-minted, aimed and card-confirms pins;
+ * the rung sub-case runs on a fresh page so this control's failure cannot
+ * leak into it. The same pin catches 4 in api/_workbook.test.mjs),
+ * rungarchiveunmintable -> 3 (RE-MEASURED 2026-08-07, phantom-rung pass: pin
+ * re-pointed to the rung branch's `if (...) {` head after the sibling-existence
+ * check landed; still catches F8's rung-archive save-through, one-row-minted
+ * and aimed pins; the fail-closed refusals stay green. The same pin catches 3
+ * in api/_workbook.test.mjs),
+ * phantomrungmints -> 2 (measured 2026-08-07, phantom-rung pass: F8's
+ * phantom-rung byte-identical refusal and its no-row-minted pin. With the
+ * sibling check gone commitments.5.archived MINTS instead of 404ing, so both
+ * trip; the existing-rung save-through and the other fail-closed refusals stay
+ * green. The same pin catches 2 in api/_workbook.test.mjs).
  * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
  * flow never submits an inverted band because the page guard refuses it in
  * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
@@ -578,6 +610,30 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
   noncanonicalindex: [[
     `  if (String(index) !== m[1]) {`,
     `  if (false) {   // (control noncanonicalindex) every spelling is an address`]],
+  // The plan branch of mintableOn loses `archived`, the plan-level Archive fix
+  // reverted: the page's toggleArch saves `archived` with a null id, no seeded
+  // row exists, and doSave 404s - the owner clicks Archive and it silently
+  // fails. F8's real-page toggleArch has to catch it. This is the explicit
+  // "revert the mintableOn change -> reproduce the 404" control.
+  planarchiveunmintable: [[
+    `  if (k.startsWith("plan:")) return ["age_min", "age_max", "archived"];`,
+    `  if (k.startsWith("plan:")) return ["age_min", "age_max"]; // (control planarchiveunmintable) the plan Archive button 404s`]],
+  // The plan-card rung branch of canMint is gone, so the ladder's Archive/Restore
+  // button (a null-id save of commitments.<i>.archived) 404s on any rung the seed
+  // never wrote an archived row for. F8's rung-archive path has to catch it. Pin
+  // re-pointed to the branch's `if (...) {` head when the sibling-existence check
+  // landed (the old `return true` line is gone).
+  rungarchiveunmintable: [[
+    `    if (cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) {`,
+    `    if (false && cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) { // (control rungarchiveunmintable) the rung Archive button 404s`]],
+  // The plan-card rung branch drops its sibling-existence check and admits ANY
+  // canonical commitments.<n>.archived, existing rung or not - so a direct POST
+  // of commitments.5.archived on a plan whose rungs stop at 2 MINTS instead of
+  // 404ing, and apply's pad loop invents the empty rungs. F8's phantom-rung
+  // refusal has to catch it.
+  phantomrungmints: [[
+    `      return Array.isArray(mine) && mine.some((a) => String(a.target_field || "").startsWith(sib));`,
+    `      return true; // (control phantomrungmints) the sibling-existence check is gone - a phantom rung mints`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -1210,7 +1266,7 @@ const dbAnswer = (cardId, field) => DB.workbook_answers.find((r) => r.card_id ==
 // ═════════════════════════════════════════════════════════════════════════════
 const RETURNS = [
   "ingest", "render", "boot", "reload", "card", "counted", "countedCards", "remainingCount",
-  "isReady", "flaggedCount", "updProg", "isChanged", "setA", "confirmCard", "doSubmit",
+  "isReady", "flaggedCount", "updProg", "isChanged", "setA", "confirmCard", "toggleArch", "doSubmit",
   "submitAdd", "removeAddition", "flushAll", "idxOf", "monthsOf", "sameShape", "val", "ansOf",
   "planModel", "taxModel", "codeModel", "priceKeys", "addSummary", "readAdd", "addProblem",
   "capReason", "pillOf", "additionsOf", "hasAdditionFields", "sendBlocked", "drawPlan",
@@ -1861,6 +1917,102 @@ console.log("\n── F5. the SJ-shaped codes card grows its missing rows throug
 
   // Put the fixture back and reboot the main page off it, so every later
   // section reads the state it always did.
+  DB.workbook_answers = snapAnswers;
+  DB.workbook_cards = snapCards;
+  await page.boot();
+  await settle();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F8. THE ARCHIVE BUTTONS grow their missing rows through the real page. The
+// live blocker: a plan card (and a rung) seeded before the Archive toggle
+// existed had no `archived` row, so the page's null-id save 404'd and the click
+// silently failed. This suite's fixture pre-seeds an archived row for every plan
+// AND every rung, so the mint gate is never exercised - which is exactly why the
+// contract never caught this. Here those rows are cut to the production shape, a
+// fresh page is booted, and the REAL Archive controls must mint the row and (for
+// the plan) confirm. MUTATE=planarchiveunmintable / MUTATE=rungarchiveunmintable.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n── F8. the Archive buttons grow their missing rows through the page ──");
+{
+  const snapAnswers = structuredClone(DB.workbook_answers);
+  const snapCards = structuredClone(DB.workbook_cards);
+  // Cut to the live shape, the same splice F5 does for the codes rows: the
+  // plan-level archived row for a live plan (c-p2), and one rung's archived row
+  // on another live plan (c-p1, commitment 0).
+  const before = DB.workbook_answers.length;
+  DB.workbook_answers = DB.workbook_answers.filter((r) =>
+    !(r.card_id === "c-p2" && r.target_field === "archived") &&
+    !(r.card_id === "c-p1" && r.target_field === "commitments.0.archived"));
+  check(DB.workbook_answers.length === before - 2,
+    "the fixture is cut to the live shape: the plan-level archived row and one rung's archived row are gone");
+
+  const sjPage = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await sjPage.boot();
+  await settle();
+
+  // ── plan-level Archive: the real toggleArch (setA('archived',true) then
+  //    confirmCard) - the exact click that 404'd on the live workbook ─────────
+  const planLid = (sjPage.CARDS.find((c) => c.card_key === "plan:p2") || {}).lid;
+  const titleSib = dbAnswer("c-p2", "title");
+  ALERTS = [];
+  await sjPage.toggleArch(planLid);
+  await settle();
+  check(sjPage.SAVE.state !== "error" && ALERTS.length === 0,
+    "toggleArch on a plan with no seeded archived row goes through (this exact save 404'd on the live workbook)");
+  const planMint = DB.workbook_answers.filter((r) => r.card_id === "c-p2" && r.target_field === "archived");
+  check(planMint.length === 1 && planMint[0].answered === true,
+    `the archived row was MINTED, exactly once, carrying true (id ${planMint[0] && planMint[0].id})`);
+  check(planMint.length === 1 && planMint[0].target_kind === titleSib.target_kind && planMint[0].target_table === titleSib.target_table && planMint[0].target_id === titleSib.target_id,
+    `aimed by the card's own title sibling (${titleSib.target_kind}/${titleSib.target_table}/${titleSib.target_id}), never by the page's payload`);
+  check(!!dbCard("c-p2").confirmed_at,
+    "and the card CONFIRMS end to end - archiving IS the decision, so the plan is retired without a second click");
+
+  // ── rung-level Archive: the ladder's real onclick path ────────────────────
+  //    (setA(lid,'commitments.0.archived',true); drawPlan(lid)) then flush. A
+  //    FRESH page, so a plan-archive failure under a mutant cannot leave a
+  //    stuck-dirty field that muddies which fix this sub-case is proving.
+  const rungPage = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  await rungPage.boot();
+  await settle();
+  const rungLid = (rungPage.CARDS.find((c) => c.card_key === "plan:p1") || {}).lid;
+  const rungSib = dbAnswer("c-p1", "title");
+  rungPage.setA(rungLid, "commitments.0.archived", true);
+  rungPage.drawPlan(rungLid);
+  TIMERS.clear();
+  const rungSaved = await rungPage.flushAll();
+  await settle();
+  check(rungSaved === true && rungPage.SAVE.state !== "error",
+    "the ladder Archive button's null-id save of commitments.0.archived goes through too");
+  const rungMint = DB.workbook_answers.filter((r) => r.card_id === "c-p1" && r.target_field === "commitments.0.archived");
+  check(rungMint.length === 1 && rungMint[0].answered === true,
+    `the rung's archived row was MINTED, exactly once (id ${rungMint[0] && rungMint[0].id})`);
+  check(rungMint.length === 1 && rungMint[0].target_kind === rungSib.target_kind && rungMint[0].target_table === rungSib.target_table && rungMint[0].target_id === rungSib.target_id,
+    "aimed by the card's own siblings, never by the page's payload");
+
+  // ── FAIL-CLOSED: admission is surgical. A foreign bare plan field still
+  //    refuses byte-for-byte, and a NON-archived rung leaf with no row still
+  //    404s - admitting `archived` admitted nothing else. ─────────────────────
+  const foreign = await callApi({ action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "hacker", answered: "x" }] });
+  check(foreign.ok === false && foreign.error === "that answer does not belong to this card",
+    `a null-id save of a foreign bare plan field still refuses byte-for-byte ("${foreign.error}")`);
+  const rungPrice = await callApi({ action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "commitments.9.price", answered: 1 }] });
+  check(rungPrice.ok === false && rungPrice.error === "that answer does not belong to this card",
+    `a null-id save of a non-archived rung leaf with no row still 404s ("${rungPrice.error}")`);
+  // A PHANTOM RUNG'S archived leaf: p1 has rungs 0..2, so commitments.5.* has no
+  // sibling on the card. Admitting it would mint a row apply's pad loop then
+  // reaches by inventing empty rungs 1..5 in the offer, from a crafted direct
+  // POST the real page never sends (it archives only existing rungs). It is
+  // refused with the byte-identical 404, and nothing is minted.
+  // MUTATE=phantomrungmints.
+  const phantomRung = await callApi({ action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "commitments.5.archived", answered: true }] });
+  check(phantomRung.ok === false && phantomRung.error === "that answer does not belong to this card",
+    `a null-id save of a PHANTOM rung's archived leaf (no commitments.5.* sibling) still 404s byte-for-byte ("${phantomRung.error}")`);
+  check(!DB.workbook_answers.some((r) => r.card_id === "c-p1" && r.target_field === "commitments.5.archived"),
+    "and NO commitments.5.archived row was minted - the pad loop has nothing to reach");
+
+  // Put the fixture back and reboot the main page off it, so every later section
+  // reads the state it always did.
   DB.workbook_answers = snapAnswers;
   DB.workbook_cards = snapCards;
   await page.boot();

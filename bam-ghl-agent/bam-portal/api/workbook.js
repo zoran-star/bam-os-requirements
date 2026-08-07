@@ -245,9 +245,13 @@ function addableOn(cardKey) {
 function mintableOn(cardKey) {
   const k = String(cardKey || "");
   if (k === "tax") return ["tax_registration_number"];
-  // Per-plan age bands (Step 12): plan cards seeded before the question
-  // existed grow exactly these two rows, aimed by their own siblings.
-  if (k.startsWith("plan:")) return ["age_min", "age_max"];
+  // Per-plan age bands (Step 12) and the plan-level Archive button: plan cards
+  // seeded before either question existed grow exactly these rows, aimed by
+  // their own siblings. `archived` is the plan card's own Archive save (page
+  // toggleArch does setA('archived', true) with a null id), a bare PLAN_T leaf
+  // that classifies only as the plan archived flag, so admitting it admits
+  // nothing else. MUTATE=planarchiveunmintable.
+  if (k.startsWith("plan:")) return ["age_min", "age_max", "archived"];
   return [];
 }
 
@@ -264,12 +268,41 @@ function mintableOn(cardKey) {
 // to judge, and a NEW index (`codes.1.*`) is mintable the moment an owner adds
 // a code. Everything else keeps today's refusal, byte for byte.
 // MUTATE=codesunmintable / MUTATE=codesmintany.
-function canMint(cardKey, field) {
+function canMint(cardKey, field, mine) {
   if (mintableOn(cardKey).includes(field)) return true;
   const k = String(cardKey || "");
   if (k === "codes" || k.startsWith("codes:")) {
     const cls = classifyField(field);            // hoisted; defined below
     return cls.kind === "code" && !!cls.t;
+  }
+  // The rung Archive/Restore button (public/workbook.html) saves
+  // `commitments.<i>.archived` with a null id, and a plan card seeded before a
+  // rung existed has no row for it to live in - the same defect class the codes
+  // branch above fixes, on the plan card. classifyField is reused for the
+  // own-property RUNG_T lookup, the canonical index and the MAX_LIST_INDEX
+  // bound, but ONLY the archived leaf is admitted: `commitments.<i>.price` or a
+  // phantom rung field stays today's refusal, so a direct POST cannot mint an
+  // arbitrary rung leaf. MUTATE=rungarchiveunmintable.
+  //
+  // AND ONLY FOR A RUNG THAT ALREADY EXISTS ON THIS CARD. The codes branch can
+  // mint a brand-new index the moment an owner adds a code, because a code is a
+  // top-level row. A rung is not: it lives INSIDE the offer's rung ladder, and
+  // apply pads that ladder out to `cls.index` (`while (rungs.length <= index)
+  // rungs.push({})`). So admitting `commitments.5.archived` on a 1-rung plan
+  // does not archive rung 5, it INVENTS empty rungs 1..5 in the offer jsonb - a
+  // write nobody asked for, from a crafted direct POST the real page can never
+  // send (it emits rung archives only inside `p.rungs.forEach`, i.e. existing
+  // rungs). The gate: some sibling row `commitments.<index>.*` must already be
+  // on the card. For a real rung the seed's price/cycle rows are that sibling;
+  // for a phantom index there is none, so it stays today's 404. This keeps the
+  // Archive button working on every rung the ladder actually has while closing
+  // the pad-loop door at the mint gate. MUTATE=phantomrungmints.
+  if (k.startsWith("plan:")) {
+    const cls = classifyField(field);
+    if (cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) {
+      const sib = `commitments.${cls.index}.`;
+      return Array.isArray(mine) && mine.some((a) => String(a.target_field || "").startsWith(sib));
+    }
   }
   return false;
 }
@@ -747,7 +780,7 @@ async function doSave(wb, body) {
     // name its own target can aim a write at any row in the database.
     if (!row && (item || {}).id == null) {
       const field = String((item || {}).target_field || "");
-      if (canMint(card.card_key, field)) {
+      if (canMint(card.card_key, field, mine)) {
         row = mine.find((a) => a.target_field === field) || null;
         if (!row) {
           // A ROW IS ABOUT TO BE CREATED, so the creation caps stand at this
