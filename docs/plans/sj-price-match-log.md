@@ -377,3 +377,21 @@ This is a scope correction, not a preference. What it means: the member workbook
 **Q3 - fully separate queues.** Owner work lives in `action_items`; BAM internal work (mint requests, unsellable rungs, additions to build) lives in `v2_tickets` and Lij never sees it. Consequence to build: the systems staff lane must actually render `billing_fix`/`data_fix`/`build_ask` - today `WebsiteV2View.jsx` filters `type in ("website_change","fix")`, so those tickets render on NO staff page. Routing work there without fixing the filter recreates the exact lands-nowhere failure.
 
 **Q4 - the 3 joining fees are NOT a lost item, they are a normal onboarding step.** Zoran: "they should be built and put into the portal after lij submits the prices - he is still in the onboarding phase." So the mint requests do not need an emergency ticket; minting his fees is simply the next step of onboarding now that prices are submitted and applied. Correction to the map's framing: P1 is only "lands nowhere" for an academy already LIVE. During onboarding the sequence itself is the owner. The action-item home still matters for post-onboarding applies.
+
+### Sequencing ruling (Zoran, 2026-08-07): plan off-card FIRST, then build both
+"Plan off-card first, then build both." The off-Stripe payments system gets designed before any member workbook code is written, so the cash/e-transfer flag lands somewhere real on day one. No half-wired control. The member workbook build therefore waits on that design (not on its implementation necessarily - both can build together once the design is settled).
+
+### Off-Stripe payments design: findings + rulings (2026-08-07)
+Full design: docs/plans/off-stripe-payments-design.md.
+
+**CORRECTION TO AN EARLIER CLAIM IN THIS LOG.** The action-item map recorded "off-card payer: No column, no concept" - that is WRONG. `members.billing_mode='alternate'` has existed since 2026-06-11 (migration 20260611234439) and already means "pays outside Stripe". It is settable from the member drawer (client-portal.html ~51778) and the Sorter (api/sorter/cleanup.js:436-450). The map missed it by grepping for off_card/pays_cash/manual_payment. Verified live in prod: 2 members carry billing_mode='alternate', 46 are null.
+
+**So the flag is already the decorative-control failure Zoran was trying to prevent.** Today it only: renders "Alternate payment method - not billed via Stripe", makes the next-payment column read "pays another way" with a null date, and silences Sorter complaints. It produces no due date, no reminder, no ledger, no collected record. Nothing else in the codebase reads it.
+
+**LIVE ANOMALY worth checking (1 member):** one of the 2 alternate-flagged members still has a non-null stripe_subscription_id, i.e. flagged as paying by cash AND carrying a live sub. That is the double-billing shape. Not yet investigated - could be a legitimate mid-transition state. Whoever picks this up: check that member before assuming it is a bug.
+
+**Rulings (Zoran, 2026-08-07):**
+- **D6 commission: NO, Stripe only.** Off-card revenue does NOT count toward BAM's growth-share invoice. Consequence accepted knowingly: BAM under-bills itself on every cash dollar an academy collects (api/commissions.js:252-271 reads raw Stripe charges). UPSIDE for the build: the collections ledger stays a SOFT record, not a billing input, so it does not need financial-grade edit controls. Smaller build, lower stakes.
+- **D4 two missed periods: NOTHING, let it age.** No decision item, no auto-cancel. The item sits and accumulates. Accepted risk stated plainly: this is how a member can train free for a long time. Revisit if it bites.
+
+**Still open from the design (not yet ruled):** D1 reuse billing_mode vs new column (recommend reuse), D2 who owns the collect item (recommend named collector + owner fallback), D3 receipts (recommend not in v1), D5 prepay as rung vs paid-through (recommend rung, already priced), D7 workbook parallel build (recommend parallel, capture toggle+method+anchor).
