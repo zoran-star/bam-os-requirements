@@ -48,7 +48,24 @@ Design + rulings: `docs/plans/sj-price-match-log.md`. Core handoff: `docs/core-h
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
 | `20260731T090000_clients_stripe_portal_url.sql` | Adds `clients.stripe_portal_url text` (nullable, no backfill). ONLY the column - the `receipts` build owns the wider receipt system and will declare it again; `IF NOT EXISTS` so whichever runs second is a no-op | The welcome email's manage-membership link (PR #1666). **Must be applied BEFORE that PR merges**: the code reads the column from the MAIN select lists (`CLIENT_COLS` in `api/automations.js` + `api/agent-confirm.js`, `SENDER_COLS` in `api/_send.js`), so merging first would 400 the clients read that feeds EVERY channel, SMS included. Additive and unread until the merge, so applying first is inert | 2026-07-31. **The orchestrator is applying this one directly**, per Zoran's 2026-07-31 ruling that the pending-column retry (one wasted 400 plus a warning line on every send, forever) is not an acceptable substitute for shipping the column. Not for `/pending-sql` |
+| `20260807T140000_off_card_billing.sql` | Two new tables (`member_billing_arrangements`, `member_collections`) plus a CHECK on `members.billing_mode` and the matching one on `members_staging.billing_mode` | Everything off-card: the arrangement, the collections ledger, the drawer panel, the cron. Until it is applied the API answers the drawer with nulls and the write endpoints return a 503 that names this file, so nothing 500s - the feature is simply absent | 2026-08-07 |
+| `20260807T140100_action_items_system_key.sql` | Adds `action_items.system_key` + a unique index on `(client_id, system_key)`, and WIDENS `action_items_created_by_role_check` to admit `'system'` | The idempotency of every system-created action item: the collect reminders and the stop-billing guard. Without it the cron's inserts fail the role CHECK | 2026-08-07 |
 
+
+> **Order matters for the two `20260807T14*` rows.** Apply `...140000_off_card_billing.sql`
+> first: `member_collections.action_item_id` references `action_items(id)`, and the
+> `...140100` file only alters `action_items`, so either order works for Postgres - but
+> the CHECK widening in `140100` is what lets the cron insert at all, so an academy
+> turned on between the two would raise no reminders and look like the tables were
+> broken. Neither file writes a single row of data, so applying both is inert until a
+> human sets up an arrangement from the member drawer.
+>
+> **The `members.billing_mode` CHECK was written against the live values, not guessed:**
+> 46 rows NULL, 2 rows `'alternate'`, nothing else (counted 2026-08-07). `'card'` is
+> admitted because `api/sorter/cleanup.js` writes it at promote and at Stripe-link. The
+> empty string is NOT admitted, and `api/members.js` normalizes `""` to null before the
+> write - that normalization is pinned by `api/_off-card.test.mjs` (MUTATE=emptystringkept)
+> so nobody tidies it away without a red gate.
 
 > **`20260729T230000` step 2 - DONE 2026-07-30.** The follow-up this note demanded is
 > shipped: `business_email`, `tagline` and `instagram_url` are in `CLIENT_COLS` in

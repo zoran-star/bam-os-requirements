@@ -111,9 +111,10 @@
 // wiring behaves. It is still the difference between someone noticing these
 // lines being removed and nobody noticing.
 //   MUTATE=emptystringkept  node api/_off-card.test.mjs
-//       actionUpdateProfile stops normalizing "" to null. The drawer's "Switch
-//       to Stripe billing" button sends the empty string, and the new CHECK on
-//       members.billing_mode rejects it, so the button just fails.
+//       actionUpdateProfile stops normalizing "" to null. billing_mode is still
+//       a directly editable profile field and the drawer's generic field editor
+//       passes an empty select value straight through, so the empty string
+//       reaches the new CHECK on members.billing_mode and the write just fails.
 //       MEASURED: 1 failure.
 //   MUTATE=notifyinline     node api/_off-card.test.mjs
 //       POST /api/action-items stops calling the extracted announcer, so the
@@ -634,13 +635,62 @@ console.log("\n── 8. what a human reads ──");
   ok(COLLECTION_METHODS.every((m) => validateMethod(m, "x").ok), "every method in the vocabulary validates");
   ok(validateMethod("venmo", "x").ok === false, "and one outside it does not");
 
-  // THE NORMALIZATION THE BUTTON DEPENDS ON. Three facts that only matter
-  // together: the button sends "", the database now refuses "", and this line is
-  // what turns one into the other.
-  ok(/_memberUpdateField\('\$\{m\.id\}','billing_mode',''\)/.test(PORTAL_SRC),
-    "the drawer's Switch-to-Stripe button sends the EMPTY STRING (weak evidence: source text)");
+  // THE NORMALIZATION. Three facts that only matter together: billing_mode is
+  // STILL a directly editable profile field, the drawer's generic field editor
+  // passes a <select>'s value straight through and an empty option sends "", and
+  // the new CHECK constraint refuses "". This one line is what stands between
+  // those three and a 400 nobody can explain. The drawer's own toggle no longer
+  // takes that path (it routes through end-off-card), but every other caller of
+  // update-profile still can.
+  ok(/"billing_mode",/.test(MEMBERS_SRC),
+    "billing_mode is still in PROFILE_EDITABLE_FIELDS, so a raw \"\" write is still reachable");
+  ok(/_memberUpdateField\('\$\{m\.id\}','\$\{field\}',this\.value\)/.test(PORTAL_SRC),
+    "and the drawer's generic field editor passes a select value through unchanged (weak evidence: source text)");
   ok(/updates\[k\] = \(v === "" \|\| v === undefined\) \? null : v;/.test(MEMBERS_SRC),
-    "and update-profile normalizes it to null before the write, which the new CHECK constraint makes load-bearing");
+    "so update-profile normalizing \"\" to null before the write is what the new CHECK constraint makes load-bearing");
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 9. the portal hook, and ruling D2
+// ═════════════════════════════════════════════════════════════════════════════
+// Source text only, and that is weak evidence: there is no DOM here. It is still
+// the difference between someone noticing these lines going and nobody noticing.
+console.log("\n── 9. the drawer, and who owns the reminder ──");
+{
+  ok(/id="member-offcard-section"/.test(PORTAL_SRC), "the drawer has a place for the arrangement and the ledger");
+  ok(/_loadMemberOffCard\(m\);/.test(PORTAL_SRC), "and loads it when a member is opened");
+  ok(/action=off-card&member_id=/.test(PORTAL_SRC), "reading it through the scoped GET");
+  ok(/'mark-collected', \{[\s\S]{0,220}amount_collected_cents/.test(PORTAL_SRC),
+    "Mark collected sends the amount that actually came in");
+  ok(/collected_on: on, method: how, reference: ref/.test(PORTAL_SRC), "plus the date, the method and the reference");
+  ok(/max="\$\{_ocTodayIso\(\)\}"/.test(PORTAL_SRC), "the date box cannot be set in the future");
+  ok(/Change it if the money came in earlier than today/.test(PORTAL_SRC),
+    "and says out loud that it is editable, because cash arrives late");
+  ok(/r && r\.remainder_cents > 0[\s\S]{0,140}still owed/.test(PORTAL_SRC),
+    "a partial is REPORTED as a partial - 'Recorded.' on its own is how somebody walks away believing it is settled");
+
+  // The toggle no longer writes the raw field. That write set a claim and created
+  // nothing to collect, which is what made the flag decorative in the first place.
+  ok(/_mEndOffCard\('\$\{m\.id\}'\)/.test(PORTAL_SRC) && /_mSetOffCard\('\$\{m\.id\}'\)/.test(PORTAL_SRC),
+    "the drawer toggle routes through the endpoints, not through a raw billing_mode write");
+  ok(!/_memberUpdateField\('\$\{m\.id\}','billing_mode','alternate'\)/.test(PORTAL_SRC),
+    "and the old raw-write button is gone from the drawer");
+  ok(/there is no payment arrangement set up, so nothing is due and no reminder will ever be sent/.test(PORTAL_SRC),
+    "a flag with no arrangement SAYS it will never remind anyone, rather than looking configured");
+  ok(/Nothing is charged automatically\. Somebody has to collect it\./.test(PORTAL_SRC),
+    "and the panel repeats what the portal cannot do");
+
+  // RULING D2: owner by DEFAULT, reassignable. The default is in the cron
+  // (loadOwnerAssignee); the reassignment is the action-item edit modal that
+  // already exists, which is why no new control was built for it.
+  ok(/role=eq\.owner&status=eq\.active/.test(MEMBERS_SRC),
+    "the reminder defaults to the academy OWNER");
+  ok(/const assignee = named \|\| \(await loadOwnerAssignee\(a\.client_id\)\);/.test(MEMBERS_SRC),
+    "and a named collector is the delegation, not the default");
+  ok(/assignee_id: document\.getElementById\('aiAssignee'\)\.value \|\| null/.test(PORTAL_SRC),
+    "reassigning it is the action-item modal that already exists, so no second control was invented");
+  ok(/notifyOwners\(clientId, "action_item"/.test(ACTIONITEMS_SRC),
+    "and the owner is texted regardless of who it is assigned to, so delegation never cuts them out");
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────
