@@ -37,6 +37,10 @@
       "schedule": "15 * * * *"
     },
     {
+      "path": "/api/members?action=cron-collect-off-card",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/ghl/cron-sync-contacts",
       "schedule": "*/10 * * * *"
     },

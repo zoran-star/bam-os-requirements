@@ -152,9 +152,17 @@ const matchM = await loadModule("match", [
   "export { _termFromLength, intervalFromKey };\n",
 ].join("\n"));
 
+// RE-POINTED 2026-08-07 (off-Stripe payments build): intervalFor MOVED, byte for
+// byte, out of api/website/checkout.js and into api/_billing-cadence.js, which
+// checkout.js now imports - a second shipping consumer arrived (api/_off-card.js,
+// the off-card collections engine) and a third copy of the code that decides when
+// a parent is charged is how the copies stop agreeing. The "checkout" name below
+// is kept because that is what this suite calls this twin, and the claim is
+// unchanged: this is the intervalFor the enrollment path bills on. The other twin
+// (api/parent/_stripe.ts) is untouched and still compared against it.
 let checkoutParserSrc = [
   cut(CHECKOUT, "function norm(s) {", "api/website/checkout.js"),
-  cut(CHECKOUT, "function intervalFor(term) {", "api/website/checkout.js"),
+  cut(readSource("_billing-cadence.js"), "function intervalFor(term) {", "api/_billing-cadence.js"),
   cut(CHECKOUT, "function isCommitmentTerm(term) {", "api/website/checkout.js"),
   cut(CHECKOUT, "function lengthMatchesTerm(length, term) {", "api/website/checkout.js"),
   cut(CHECKOUT, "function _termKeyFromLength(length) {", "api/website/checkout.js"),

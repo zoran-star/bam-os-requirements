@@ -30,6 +30,13 @@ import { smsProvider } from "./messaging/provider.js";
 import { emailProvider } from "./messaging/email-provider.js";
 import { readStripeAccount } from "./stripe/_requirements.js";
 import { stripeFetch as transportStripeFetch } from "./_stripe-transport.js";
+import { announceActionItem } from "./action-items.js";
+import {
+  todayIso as ocToday, isDateStr as ocIsDate, addDays as ocAddDays,
+  periodsDueAsOf, isOverdue, settleCollection, validateMethod, cadenceLabel,
+  collectItemTitle, collectItemDescription, money as ocMoney,
+  systemKeyForCollection, stopBillingItem, COLLECTION_METHODS,
+} from "./_off-card.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -233,6 +240,27 @@ async function handler(req, res) {
     return await cronProcessScheduledPauses(res);
   }
 
+  // ── Cron: off-card collections - generate, then notify (daily via vercel.json) ──
+  // Same shape as the pause cron above, deliberately: bearer CRON_SECRET,
+  // constant-time compare, and it runs BEFORE the user-auth resolver because a
+  // cron has no user. What it does and why each phase is ordered that way is
+  // documented on cronCollectOffCard.
+  if (req.query.action === "cron-collect-off-card") {
+    const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const expected = process.env.CRON_SECRET;
+    if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
+    const gotBuf = Buffer.from(got);
+    const expBuf = Buffer.from(expected);
+    const ok = gotBuf.length === expBuf.length && timingSafeEqual(gotBuf, expBuf);
+    if (!ok) return res.status(401).json({ error: "unauthorized" });
+    try {
+      return await cronCollectOffCard(res);
+    } catch (e) {
+      console.error("cron-collect-off-card error:", e?.message || e);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   let ctx;
   try {
     ctx = await resolveUser(req);
@@ -302,6 +330,44 @@ async function handler(req, res) {
         }
         const receipts = await receiptsCall("listReceipts", { clientId: m.client_id, memberId: m.id });
         return res.status(200).json({ ok: true, receipts: Array.isArray(receipts) ? receipts : [] });
+      }
+
+      // ─── Off-card payments for one member: the arrangement + its collections.
+      // Degrades to nulls before the migration (the catch below), so the drawer
+      // section simply does not render for a database that has not got the tables
+      // yet rather than showing an academy an error it cannot act on.
+      if (req.query.action === "off-card") {
+        const mid = (req.query.member_id || "").toString();
+        if (!mid) return res.status(400).json({ error: "member_id required" });
+        const mrows = await sb(`members?id=eq.${encodeURIComponent(mid)}&select=id,client_id&limit=1`);
+        const m = Array.isArray(mrows) && mrows[0];
+        if (!m) return res.status(404).json({ error: "member not found" });
+        if (!isStaff && !clients.some((c) => c.id === m.client_id)) {
+          return res.status(403).json({ error: "not your member" });
+        }
+        try {
+          const arr = await sb(
+            `member_billing_arrangements?member_id=eq.${encodeURIComponent(mid)}&select=*&order=created_at.desc&limit=1`
+          );
+          const arrangement = (Array.isArray(arr) && arr[0]) || null;
+          // Collections are read by MEMBER, not by arrangement: an off-card ->
+          // card -> off-card member has more than one arrangement and the money
+          // he paid under the first one is still his payment history.
+          const collections = await sb(
+            `member_collections?member_id=eq.${encodeURIComponent(mid)}&select=*&order=due_date.desc&limit=100`
+          );
+          return res.status(200).json({
+            ok: true,
+            arrangement,
+            cadence_label: arrangement ? cadenceLabel(arrangement) : null,
+            collections: Array.isArray(collections) ? collections : [],
+          });
+        } catch (e) {
+          if (/PGRST205|does not exist|42P01/i.test(String(e.message || ""))) {
+            return res.status(200).json({ ok: true, arrangement: null, collections: [], not_migrated: true });
+          }
+          throw e;
+        }
       }
 
       // ─── Cancellations feed: powers the members-focus KPI + Actions pages.
@@ -798,6 +864,29 @@ async function handler(req, res) {
       try {
         return await actionUpdateProfile(res, member, ctx, body);
       } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
+    // ── Off-card payments ────────────────────────────────────────────────────
+    // Placed here, ABOVE the Stripe-connection gate, on purpose. An academy that
+    // takes cash may have no Stripe account at all (San Jose today), and an
+    // academy that has one may still have a member who pays another way. Making
+    // "record how this parent pays cash" depend on a Stripe connection would put
+    // the feature out of reach of exactly the academies that need it.
+    if (action === "set-off-card" || action === "end-off-card" || action === "mark-collected") {
+      try {
+        if (action === "set-off-card")   return await actionSetOffCard(res, member, ctx, body);
+        if (action === "end-off-card")   return await actionEndOffCard(res, member, ctx, body);
+        return await actionMarkCollected(res, member, ctx, body);
+      } catch (e) {
+        // A missing table means the migrations have not been applied yet. Say so
+        // in a sentence a human can act on rather than a PostgREST 404 body.
+        if (/PGRST205|does not exist|42P01/i.test(String(e.message || ""))) {
+          return res.status(503).json({
+            error: "Off-card payments are not set up on this database yet - the migration 20260807T140000_off_card_billing.sql has not been applied.",
+          });
+        }
         return res.status(500).json({ error: e.message });
       }
     }
@@ -2139,10 +2228,35 @@ async function actionUpdateProfile(res, member, ctx, body) {
       continue;
     }
     // Empty string → null (so "pick — " clears the field).
+    //
+    // LOAD-BEARING for billing_mode since 2026-08-07. The drawer's "Switch to
+    // Stripe billing" button sends the empty string, and members.billing_mode now
+    // carries CHECK (billing_mode IS NULL OR billing_mode IN ('alternate','card')).
+    // A literal '' would be rejected by Postgres and the button would just fail.
+    // This line is what keeps it working, and api/_off-card.test.mjs pins it so
+    // it cannot be tidied away by someone who does not know that.
     updates[k] = (v === "" || v === undefined) ? null : v;
   }
   if (!Object.keys(updates).length) {
     return res.status(400).json({ error: "no editable fields provided" });
+  }
+
+  // THE DOUBLE-BILLING GUARD, on the raw-field door.
+  //
+  // set-off-card is the front door and it guards itself. This is the side door:
+  // billing_mode is in PROFILE_EDITABLE_FIELDS, so a client can still flip a
+  // member to 'alternate' with a plain field write and get no arrangement, no
+  // due date and no check on whether Stripe is still charging them. Until every
+  // caller is moved over, the guard has to live on BOTH doors, because the whole
+  // point is that it cannot be walked past. There is one member in production
+  // flagged 'alternate' with a live subscription id right now.
+  //
+  // It RAISES and PROCEEDS rather than refusing. The flag is not the error - the
+  // live subscription is - and an owner who cannot record that a parent pays cash
+  // will simply stop telling the portal anything.
+  let guardItem = null;
+  if (updates.billing_mode === "alternate" && member.billing_mode !== "alternate") {
+    guardItem = await raiseStopBillingIfSubscribed(member);
   }
   updates.updated_at = nowIso();
 
@@ -2180,7 +2294,563 @@ async function actionUpdateProfile(res, member, ctx, body) {
     db_changes: { members: { id: member.id, updated_keys: Object.keys(updates) } },
   });
 
-  return res.status(200).json({ ok: true, member: updated });
+  return res.status(200).json({
+    ok: true,
+    member: updated,
+    stop_billing_item: guardItem ? { id: guardItem.id, title: guardItem.title } : null,
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// OFF-STRIPE PAYMENTS: arrangements, collections, and the reminder that makes
+// members.billing_mode='alternate' mean something.
+//
+// Design + rulings: docs/plans/off-stripe-payments-design.md (Zoran, 2026-08-07).
+// Pure logic (dates, cadence, partial-payment rules, copy) lives in
+// api/_off-card.js and is tested without a database by api/_off-card.test.mjs.
+// What lives HERE is everything that touches rows.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// The default assignee of every collect reminder (ruling D2: the OWNER by
+// default, reassignable to a staff member - and reassignment is the action_items
+// PATCH that already exists, so there is nothing new to learn).
+async function loadOwnerAssignee(clientId) {
+  try {
+    const rows = await sb(
+      `client_users?client_id=eq.${encodeURIComponent(clientId)}&role=eq.owner&status=eq.active&select=id,name&limit=1`
+    );
+    const o = Array.isArray(rows) && rows[0];
+    return o ? { id: o.id, name: o.name || "Owner" } : { id: null, name: null };
+  } catch (_) {
+    // Non-fatal: an unassigned item still reaches the owner, because notifyOwners
+    // always includes them regardless of assignee_id.
+    return { id: null, name: null };
+  }
+}
+
+const isDuplicateErr = (e) => /23505|duplicate key/i.test(String((e && e.message) || e || ""));
+
+// Create an action item that NO HUMAN asked for.
+//
+// Idempotency is the unique index on (client_id, system_key), not a check here.
+// Two overlapping cron runs both insert; Postgres rejects the second with 23505;
+// this returns { created:false } and the caller does not announce it twice. There
+// is no read-then-write window to lose.
+//
+// created_by is left NULL (a cron has no auth.users id) and created_by_role is
+// 'system', which the widened CHECK admits.
+async function createSystemActionItem({ client_id, system_key, title, description, due_date, assignee_id, assignee_name }) {
+  try {
+    const rows = await sb(`action_items`, {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        client_id, system_key, title,
+        description: description || null,
+        due_date: due_date || null,
+        assignee_id: assignee_id || null,
+        assignee_name: assignee_name || null,
+        created_by: null,
+        created_by_name: "FullControl",
+        created_by_role: "system",
+      }),
+    });
+    const item = Array.isArray(rows) ? rows[0] : rows;
+    return { created: true, item };
+  } catch (e) {
+    if (!isDuplicateErr(e)) throw e;
+    const existing = await sb(
+      `action_items?client_id=eq.${encodeURIComponent(client_id)}&system_key=eq.${encodeURIComponent(system_key)}&select=*&limit=1`
+    ).catch(() => null);
+    return { created: false, item: (Array.isArray(existing) && existing[0]) || null };
+  }
+}
+
+// THE DOUBLE-BILLING GUARD.
+//
+// Raising this is not optional politeness. There is one member in production
+// right now flagged 'alternate' with a live subscription id, which is a parent
+// who could be handing over cash while Stripe keeps charging the card. It RAISES
+// rather than REFUSES for the reason stated in api/_off-card.js: the flag is not
+// the error, the live subscription is.
+//
+// Returns the item when one was raised (so the caller can tell the human on the
+// spot rather than leaving it to be discovered), or null when there is no sub.
+async function raiseStopBillingIfSubscribed(member) {
+  const spec = stopBillingItem(member);
+  if (!spec) return null;
+  try {
+    const owner = await loadOwnerAssignee(member.client_id);
+    const { created, item } = await createSystemActionItem({
+      client_id: member.client_id,
+      system_key: spec.system_key,
+      title: spec.title,
+      description: spec.description,
+      due_date: ocToday(),
+      assignee_id: owner.id,
+      assignee_name: owner.name,
+    });
+    if (created && item) await announceActionItem(member.client_id, item, { who: owner.name ? ` for ${owner.name}` : "" });
+    return item || null;
+  } catch (e) {
+    // Non-fatal on purpose: failing to RAISE a warning must not also block the
+    // owner from recording how a member pays. It is logged loudly instead.
+    console.error("[off-card] stop-billing item failed:", e.message);
+    return null;
+  }
+}
+
+async function loadLiveArrangement(memberId) {
+  const rows = await sb(
+    `member_billing_arrangements?member_id=eq.${encodeURIComponent(memberId)}&status=in.(active,paused)&select=*&limit=1`
+  );
+  return (Array.isArray(rows) && rows[0]) || null;
+}
+
+// ── Action: SET-OFF-CARD ─────────────────────────────────────────────────────
+// body: { method, method_note?, anchor_date, amount_cents? | offer_price_id?,
+//         grace_days?, lead_days?, collector_client_user_id?, commitment_end_date?,
+//         cadence?, term?, note? }
+//
+// This is the endpoint the drawer toggle must route through, because the flag on
+// its own is a CLAIM and the arrangement is the OBLIGATION. A raw field write
+// (which is what the toggle did, and what update-profile still allows) sets the
+// claim and creates nothing to collect.
+//
+// The anchor is the one fact the owner supplies that nothing else knows: two
+// members on the same "every 4 weeks" plan pay in different weeks and no plan can
+// say which. Amount comes from the PLAN when a price row is named, which is what
+// keeps the workbook honest about never rendering a dollar box.
+async function actionSetOffCard(res, member, ctx, body) {
+  const b = body || {};
+  const mv = validateMethod(b.method, b.method_note);
+  if (!mv.ok) return res.status(400).json({ error: mv.error });
+  if (!ocIsDate(b.anchor_date)) {
+    return res.status(400).json({ error: "anchor_date must be YYYY-MM-DD - it is the date their next payment is due." });
+  }
+  if (b.commitment_end_date && !ocIsDate(b.commitment_end_date)) {
+    return res.status(400).json({ error: "commitment_end_date must be YYYY-MM-DD" });
+  }
+  if (await loadLiveArrangement(member.id)) {
+    return res.status(400).json({ error: "This member already has a live payment arrangement. End it before starting another." });
+  }
+
+  // The plan's own numbers, when a price row is named. select=* on purpose: it
+  // cannot 400 over a column this deployment does not have yet, which a named
+  // billing_cadence select can (see sbWithCadence in api/website/checkout.js).
+  let amount_cents = null, currency = "cad", cadence = null, term = null, offer_price_key = null, cadence_source = "plan";
+  if (b.offer_price_id) {
+    const prows = await sb(
+      `offer_prices?id=eq.${encodeURIComponent(b.offer_price_id)}&tenant_id=eq.${encodeURIComponent(member.client_id)}&select=*&limit=1`
+    );
+    const p = Array.isArray(prows) && prows[0];
+    if (!p) return res.status(400).json({ error: "that price is not on this academy" });
+    amount_cents = p.amount_cents;
+    currency = p.currency || "cad";
+    cadence = p.billing_cadence ?? null;
+    offer_price_key = p.source_offer_price_key || null;
+    // The term is the half of the price key AFTER the pipe ('Steady|9_months').
+    // No list of accepted lengths here, deliberately - ruling D5. intervalFor
+    // parses whatever the academy priced.
+    term = offer_price_key && offer_price_key.includes("|") ? offer_price_key.split("|").slice(-1)[0] : null;
+  }
+  if (b.amount_cents != null) amount_cents = Math.round(Number(b.amount_cents));
+  if (!Number.isFinite(amount_cents) || amount_cents < 0) {
+    return res.status(400).json({ error: "amount_cents required (or name an offer_price_id to take it from the plan)" });
+  }
+  // A human saying the real rhythm differs from what was sold. Never reconciled
+  // silently: it is recorded as an override so it can surface as drift.
+  if (b.term != null || b.cadence != null) {
+    if (b.term != null) term = String(b.term).trim() || null;
+    if (b.cadence != null) cadence = String(b.cadence).trim() || null;
+    cadence_source = "override";
+  }
+
+  const row = {
+    client_id: member.client_id,
+    member_id: member.id,
+    athlete_name: member.athlete_name || null,
+    parent_name: member.parent_name || null,
+    method: b.method,
+    method_note: b.method_note ? String(b.method_note).trim() : null,
+    amount_cents,
+    currency,
+    offer_id: member.offer_id || null,
+    offer_price_key,
+    term,
+    cadence,
+    cadence_source,
+    anchor_date: String(b.anchor_date).slice(0, 10),
+    grace_days: Number.isFinite(+b.grace_days) ? Math.max(0, Math.min(90, +b.grace_days)) : 3,
+    lead_days: Number.isFinite(+b.lead_days) ? Math.max(0, Math.min(60, +b.lead_days)) : 3,
+    collector_client_user_id: b.collector_client_user_id || null,
+    commitment_end_date: b.commitment_end_date ? String(b.commitment_end_date).slice(0, 10) : null,
+    status: "active",
+    source: b.source === "workbook" ? "workbook" : "staff",
+    note: b.note ? String(b.note).trim() : null,
+    created_by: ctx.user?.id || null,
+    created_by_name: ctx.staff?.name || ctx.displayName || null,
+  };
+
+  const created = await sb(`member_billing_arrangements`, {
+    method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(row),
+  });
+  const arrangement = Array.isArray(created) ? created[0] : created;
+
+  await sb(`members?id=eq.${member.id}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ billing_mode: "alternate", updated_at: nowIso() }),
+  });
+
+  // THE GUARD, on the write path that sets the flag deliberately.
+  const stopItem = await raiseStopBillingIfSubscribed(member);
+
+  // Activation is what generates the first collection (the staff-confirms rule:
+  // nothing generates straight from the workbook).
+  const gen = await generateForArrangement(arrangement);
+
+  await writeAudit({
+    client_id: member.client_id, member_id: member.id,
+    action_type: "off-card-start",
+    args: { arrangement_id: arrangement.id, method: row.method, anchor_date: row.anchor_date, amount_cents, term, cadence, cadence_source },
+    performed_by: ctx.user?.id || null,
+    performed_by_name: ctx.staff?.name || null,
+    db_changes: { members: { billing_mode: "-> alternate" }, member_collections: { generated: gen.generated } },
+  });
+
+  return res.status(200).json({
+    ok: true, arrangement, generated: gen.generated,
+    stop_billing_item: stopItem ? { id: stopItem.id, title: stopItem.title } : null,
+  });
+}
+
+// ── Action: END-OFF-CARD ─────────────────────────────────────────────────────
+// Off-card back to card. Future 'due' collections are VOIDED; past ones are
+// never touched, because they are the record of money that actually moved.
+async function actionEndOffCard(res, member, ctx, body) {
+  const arrangement = await loadLiveArrangement(member.id);
+  if (arrangement) {
+    await sb(`member_billing_arrangements?id=eq.${arrangement.id}&status=in.(active,paused)`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        status: "ended", ended_at: nowIso(),
+        ended_reason: (body && body.reason) ? String(body.reason).trim() : "switched back to card billing",
+      }),
+    });
+    // Only what is still OPEN and still in the FUTURE. A due date that has passed
+    // stays on the books unpaid: switching payment method does not forgive a debt.
+    const openFuture = await sb(
+      `member_collections?arrangement_id=eq.${arrangement.id}&status=in.(due,overdue)&due_date=gt.${ocToday()}&select=id,action_item_id`
+    ).catch(() => []);
+    for (const c of (openFuture || [])) {
+      await sb(`member_collections?id=eq.${c.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "void", note: "voided: member moved back to card billing" }),
+      }).catch(() => {});
+      if (c.action_item_id) {
+        await sb(`action_items?id=eq.${c.action_item_id}&completed_at=is.null`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ completed_at: nowIso(), completed_by_name: "FullControl" }),
+        }).catch(() => {});
+      }
+    }
+  }
+  await sb(`members?id=eq.${member.id}`, {
+    method: "PATCH", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ billing_mode: null, updated_at: nowIso() }),
+  });
+  await writeAudit({
+    client_id: member.client_id, member_id: member.id,
+    action_type: "off-card-end",
+    args: { arrangement_id: arrangement ? arrangement.id : null },
+    performed_by: ctx.user?.id || null,
+    performed_by_name: ctx.staff?.name || null,
+    db_changes: { members: { billing_mode: "alternate -> null" } },
+  });
+  return res.status(200).json({ ok: true, ended: !!arrangement });
+}
+
+// ── Action: MARK-COLLECTED ───────────────────────────────────────────────────
+// body: { collection_id, amount_collected_cents, collected_on?, method?,
+//         reference?, note?, waive? }
+//
+// THIS is the step that makes the flag real. Without it the portal is a nag with
+// no end state.
+//
+// collected_on defaults to today and is EDITABLE, because cash arrives late and a
+// ledger that records when somebody got round to typing it in is a ledger of
+// typing. A PARTIAL never auto-closes: the collection stays open, the action item
+// stays open, and the remainder goes in its title.
+async function actionMarkCollected(res, member, ctx, body) {
+  const b = body || {};
+  const cid = String(b.collection_id || "");
+  if (!cid) return res.status(400).json({ error: "collection_id required" });
+
+  const rows = await sb(`member_collections?id=eq.${encodeURIComponent(cid)}&select=*&limit=1`);
+  const collection = Array.isArray(rows) && rows[0];
+  if (!collection) return res.status(404).json({ error: "collection not found" });
+  // Scope it to the member being acted on. The row carries no FK to members (by
+  // design, so it outlives them), which means this check is the only thing
+  // standing between a collection id and somebody else's ledger.
+  if (collection.client_id !== member.client_id || collection.member_id !== member.id) {
+    return res.status(403).json({ error: "not this member's collection" });
+  }
+  if (["paid", "waived", "void"].includes(collection.status)) {
+    return res.status(400).json({ error: `This one is already ${collection.status}. Correct it with a new entry rather than editing it away.` });
+  }
+
+  const settled = settleCollection({
+    expected_cents: collection.amount_expected_cents,
+    collected_cents: b.amount_collected_cents,
+    waive: b.waive === true,
+  });
+  if (!settled.ok) return res.status(400).json({ error: settled.error });
+
+  const collectedOn = ocIsDate(b.collected_on) ? String(b.collected_on).slice(0, 10) : ocToday();
+  if (collectedOn > ocToday()) {
+    return res.status(400).json({ error: "collected_on cannot be in the future - record it when it actually arrives." });
+  }
+  if (b.method != null && !COLLECTION_METHODS.includes(b.method)) {
+    return res.status(400).json({ error: `method must be one of: ${COLLECTION_METHODS.join(", ")}` });
+  }
+
+  const arrRows = await sb(`member_billing_arrangements?id=eq.${collection.arrangement_id}&select=*&limit=1`);
+  const arrangement = (Array.isArray(arrRows) && arrRows[0]) || null;
+
+  const collectedCents = settled.status === "waived" ? 0 : Math.round(Number(b.amount_collected_cents));
+  const patch = {
+    status: settled.status,
+    amount_collected_cents: collectedCents,
+    collected_on: settled.status === "waived" ? null : collectedOn,
+    method: b.method || (arrangement && arrangement.method) || null,
+    marked_by: ctx.user?.id || null,
+    marked_by_name: ctx.staff?.name || ctx.displayName || null,
+    marked_at: nowIso(),
+    reference: b.reference ? String(b.reference).trim() : collection.reference || null,
+    note: b.note ? String(b.note).trim() : collection.note || null,
+  };
+  const updated = await sb(`member_collections?id=eq.${collection.id}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch),
+  });
+  const after = (Array.isArray(updated) && updated[0]) || null;
+
+  // MIRROR IT ONTO THE ACTION ITEM. The collection row is the truth; the item is
+  // a copy. A partial re-titles the OPEN item with what is still owed rather than
+  // ticking it, which is the difference between a queue and a queue that quietly
+  // empties itself.
+  if (collection.action_item_id) {
+    if (settled.closes_item) {
+      await sb(`action_items?id=eq.${collection.action_item_id}&completed_at=is.null`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          completed_at: nowIso(),
+          completed_by_name: patch.marked_by_name || "FullControl",
+        }),
+      }).catch(() => {});
+    } else {
+      await sb(`action_items?id=eq.${collection.action_item_id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          title: collectItemTitle({
+            amount_cents: collection.amount_expected_cents,
+            currency: collection.currency,
+            athlete_name: collection.athlete_name,
+            parent_name: collection.parent_name,
+            due_date: collection.due_date,
+            remainder_cents: settled.remainder_cents,
+          }),
+        }),
+      }).catch(() => {});
+    }
+  }
+
+  // Roll forward: generate whatever the next period is, if its reminder is now
+  // within reach. There is deliberately NO next_due_date column to move - the
+  // anchor plus the period index answers that question, and one answerer for one
+  // question is the rule this whole design was written under.
+  let generated = 0;
+  if (arrangement && arrangement.status === "active") {
+    generated = (await generateForArrangement(arrangement)).generated;
+  }
+
+  await writeAudit({
+    client_id: member.client_id, member_id: member.id,
+    action_type: "off-card-collected",
+    args: {
+      collection_id: collection.id, period_index: collection.period_index, due_date: collection.due_date,
+      amount_expected_cents: collection.amount_expected_cents, amount_collected_cents: collectedCents,
+      status: settled.status, remainder_cents: settled.remainder_cents,
+      collected_on: patch.collected_on, method: patch.method, reference: patch.reference,
+    },
+    performed_by: ctx.user?.id || null,
+    performed_by_name: patch.marked_by_name,
+    db_changes: { member_collections: { id: collection.id, status: `${collection.status} -> ${settled.status}` } },
+  });
+
+  return res.status(200).json({ ok: true, collection: after, remainder_cents: settled.remainder_cents, generated });
+}
+
+// ── GENERATION ───────────────────────────────────────────────────────────────
+// Rows for every period whose REMINDER is now within reach (due_date - lead_days
+// <= today). Shared by activation, mark-collected roll-forward, and the cron, so
+// there is exactly one implementation of "which periods should exist".
+async function generateForArrangement(arrangement) {
+  if (!arrangement || arrangement.status !== "active") return { generated: 0 };
+  const existing = await sb(
+    `member_collections?arrangement_id=eq.${arrangement.id}&select=period_index&order=period_index.desc&limit=1`
+  ).catch(() => []);
+  const highest = (Array.isArray(existing) && existing[0] && existing[0].period_index) || 0;
+  const wanted = periodsDueAsOf(arrangement, { today: ocToday(), highestExisting: highest });
+  let generated = 0;
+  for (const p of wanted) {
+    try {
+      await sb(`member_collections`, {
+        method: "POST", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          client_id: arrangement.client_id,
+          arrangement_id: arrangement.id,
+          member_id: arrangement.member_id,
+          athlete_name: arrangement.athlete_name,
+          parent_name: arrangement.parent_name,
+          period_index: p.period_index,
+          due_date: p.due_date,
+          amount_expected_cents: arrangement.amount_cents,
+          currency: arrangement.currency || "cad",
+          status: "due",
+        }),
+      });
+      generated++;
+    } catch (e) {
+      // The unique index on (arrangement_id, period_index) is the idempotency,
+      // not a check before the insert. A concurrent run losing the race is the
+      // expected case, not an error.
+      if (!isDuplicateErr(e)) throw e;
+    }
+  }
+  return { generated };
+}
+
+// ── CRON: generate + notify ──────────────────────────────────────────────────
+// vercel.json: /api/members?action=cron-collect-off-card, daily.
+//
+// Three phases, in this order and for this reason:
+//   A. GENERATE the rows whose reminders are within reach.
+//   B. NOTIFY - create the action item at due_date - lead_days, NOT when the row
+//      was generated. An item that lands four weeks early is an item the owner
+//      learns to ignore, and an ignored reminder is the whole failure this build
+//      exists to prevent.
+//   C. OVERDUE - flip 'due' to 'overdue' past due_date + grace_days and re-ping
+//      once. action_items.due_soon_notified_at is a ONE-SHOT stamp, so the
+//      collection carries its own overdue_notified_at or the second ping never
+//      fires.
+//
+// RULING D4 IS AN ABSENCE, and absences are invisible unless named: two missed
+// periods does NOTHING here. No auto-cancel, no decision item, no pause of
+// generation. The debt keeps accumulating in the open, which is the point.
+async function cronCollectOffCard(res) {
+  const today = ocToday();
+  let generated = 0, notified = 0, overdue = 0;
+  const errors = [];
+
+  const arrangements = await sb(
+    `member_billing_arrangements?status=eq.active&select=*&order=created_at.asc&limit=500`
+  );
+
+  // ── Phase A ──
+  for (const a of (arrangements || [])) {
+    try { generated += (await generateForArrangement(a)).generated; }
+    catch (e) { errors.push({ arrangement_id: a.id, phase: "generate", message: e.message }); }
+  }
+
+  const byId = new Map((arrangements || []).map((a) => [a.id, a]));
+
+  // ── Phase B ──
+  const pending = await sb(
+    `member_collections?status=in.(due,overdue,partial)&notified_at=is.null&select=*&order=due_date.asc&limit=500`
+  );
+  for (const c of (pending || [])) {
+    const a = byId.get(c.arrangement_id);
+    if (!a) continue;                              // paused or ended: no new pings
+    const lead = Number.isFinite(+a.lead_days) ? +a.lead_days : 3;
+    if (ocAddDays(c.due_date, -lead) > today) continue;   // not yet its turn
+    try {
+      const collector = a.collector_client_user_id
+        ? (await sb(`client_users?id=eq.${a.collector_client_user_id}&select=id,name&limit=1`).catch(() => []))
+        : [];
+      const named = (Array.isArray(collector) && collector[0]) || null;
+      // Owner by default (ruling D2); a named collector is the delegation. Either
+      // way notifyOwners still texts the owner, so nobody is silently cut out.
+      const assignee = named || (await loadOwnerAssignee(a.client_id));
+      const { created, item } = await createSystemActionItem({
+        client_id: c.client_id,
+        system_key: systemKeyForCollection(c.id),
+        title: collectItemTitle({
+          amount_cents: c.amount_expected_cents, currency: c.currency,
+          athlete_name: c.athlete_name, parent_name: c.parent_name, due_date: c.due_date,
+          remainder_cents: c.status === "partial" ? Math.max(0, c.amount_expected_cents - c.amount_collected_cents) : 0,
+        }),
+        description: collectItemDescription({
+          method: a.method, method_note: a.method_note,
+          collector_name: assignee && assignee.name, cadence_label: cadenceLabel(a),
+        }),
+        due_date: c.due_date,
+        assignee_id: assignee && assignee.id,
+        assignee_name: assignee && assignee.name,
+      });
+      await sb(`member_collections?id=eq.${c.id}&notified_at=is.null`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ notified_at: nowIso(), action_item_id: item ? item.id : null }),
+      });
+      if (created && item) {
+        await announceActionItem(c.client_id, item, { who: assignee && assignee.name ? ` for ${assignee.name}` : "" });
+        notified++;
+      }
+    } catch (e) {
+      errors.push({ collection_id: c.id, phase: "notify", message: e.message });
+    }
+  }
+
+  // ── Phase C ──
+  const stillDue = await sb(
+    `member_collections?status=eq.due&due_date=lt.${today}&overdue_notified_at=is.null&select=*&limit=500`
+  );
+  for (const c of (stillDue || [])) {
+    const a = byId.get(c.arrangement_id);
+    if (!a || !isOverdue(c, a, today)) continue;
+    try {
+      await sb(`member_collections?id=eq.${c.id}&status=eq.due`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "overdue", overdue_notified_at: nowIso() }),
+      });
+      const label = `${ocMoney(c.amount_expected_cents, c.currency)} from ${c.parent_name || c.athlete_name || "a member"}`;
+      await postOffCardSlack(c.client_id, `Overdue: ${label} was due ${c.due_date} and has not been marked collected. This member pays outside Stripe, so nothing was charged.`);
+      overdue++;
+    } catch (e) {
+      errors.push({ collection_id: c.id, phase: "overdue", message: e.message });
+    }
+  }
+
+  return res.status(200).json({ ok: true, generated, notified, overdue, errors: errors.slice(0, 20) });
+}
+
+// The overdue re-ping. Slack only: the action item already exists and already
+// pinged on create, so this is a nudge on the same channel rather than a second
+// item nobody asked for. Best-effort, non-throwing.
+async function postOffCardSlack(clientId, text) {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token || !clientId || !text) return;
+    const rows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=slack_channel_id`);
+    const chan = rows?.[0]?.slack_channel_id;
+    if (!chan) return;
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ channel: chan, text, unfurl_links: false }),
+    });
+  } catch (e) {
+    console.error("[off-card] slack notify failed:", e.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────
