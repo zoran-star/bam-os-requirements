@@ -109,8 +109,11 @@
 //       addition lands (0-of-7 becomes 5-of-8 under the owner's cursor) and the
 //       empty add-a-plan card can ship with nobody able to tell "he was asked
 //       and had nothing to add" from "he never looked". (The old
-//       MUTATE=emptycardblocks was RETIRED by the D6 ruling: the behaviour it
-//       reintroduced - every card counts - is now the correct one.)
+//       "emptycardblocks" control was RETIRED by the D6 ruling: the behaviour
+//       it reintroduced - every card counts - is now the correct one. Its name
+//       is deliberately written WITHOUT the MUTATE= prefix: the CI step
+//       harvests controls by grepping this file for that literal, so a retired
+//       control named in prose gets run as if it were live and fails the job.)
 //   MUTATE=countsflag          node api/_workbook.test.mjs
 //       "does this card count" becomes writable by a card_key or a meta flag, so
 //       seeding can make a REAL question invisible to the submit gate. The
