@@ -43,7 +43,30 @@ async function overlayPortalSmsRecency(queue, ids, ctx) {
   try {
     rows = await ctx.sb(`sms_threads?client_id=eq.${ctx.clientId}&select=ghl_contact_id,contact_name,last_message_at,last_direction,last_preview&order=last_message_at.desc&limit=500`);
   } catch (_) { return queue; }
-  const byContact = new Map((Array.isArray(rows) ? rows : []).filter(t => t.ghl_contact_id).map(t => [t.ghl_contact_id, t]));
+  // NEWEST THREAD WINS, explicitly.
+  //
+  // A contact can have more than one sms_threads row (11 contacts did on
+  // 2026-08-07). `new Map(rows.map(...))` keeps the LAST entry for a duplicate
+  // key, and rows arrive ordered last_message_at DESC, so the OLDEST thread
+  // silently overwrote the newest. Every duplicate-thread lead therefore
+  // reported the older thread's last_direction, and a lead whose newest thread
+  // was their REPLY looked outbound-last: the confirm detector saw no reply,
+  // took the proactive path, and skipped them because a card already existed.
+  //
+  // Five real parent messages were invisible because of this, including a
+  // reschedule request the day before the trial (Andrea Canady, BAM GTA) and a
+  // court-rental complaint that sat 13 days (DETAIL Miami).
+  //
+  // Compared on the timestamp rather than trusting the query's order, so this
+  // cannot silently regress if the ordering is ever changed or dropped.
+  const byContact = new Map();
+  for (const t of (Array.isArray(rows) ? rows : [])) {
+    if (!t.ghl_contact_id) continue;
+    const prev = byContact.get(t.ghl_contact_id);
+    if (!prev || new Date(t.last_message_at || 0) > new Date(prev.last_message_at || 0)) {
+      byContact.set(t.ghl_contact_id, t);
+    }
+  }
   const tapSafeDir = (t) => {
     const dir = String(t.last_direction || "").toLowerCase();
     return (dir === "inbound" && !isRealInbound(t.last_preview)) ? "tapback" : dir;
