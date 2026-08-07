@@ -433,3 +433,25 @@ CUT (with the reason where he gave one):
 - ALL of "roster honesty" (dupes, paying-not-on-roster, roster-not-paying): not needed.
 
 Consequence for the after-submit skill: its FC outputs are exactly items 1, 2 and 5 (created at apply from workbook answers), while 3 and 4 are standing detectors (Stripe webhook + off-card cron) rather than skill outputs. Keep the list this small on purpose: an action list the owner ignores is worse than none.
+
+### RULING: the after-submit skill's job spec (Zoran, 2026-08-07)
+"The after-submit should seed all the members, create the action items (all approved by us in the claude skill)."
+So the skill = review everything -> BAM approves in Claude -> seed ALL members
+### RULING: subscription takeover is PER-MEMBER, when the owner works the action item (Zoran, 2026-08-07)
+The replacement sub is NOT created for all 20 at apply. Each "take over" action item does it one member at a time. Flow (the engine already exists in api/sorter/take-over.js):
+1. Item: "Take over <parent>'s subscription".
+2. Preview (mode=preview, no writes): current amount + interval, next-charge date, card-on-file or needs_card.
+3. Create (mode=create): portal creates the new sub, GRANDFATHERED to the current amount/interval, ANCHORED to the next payment date (trial_end), silent (import_silent=1 suppresses welcome side).
+4. Cancel link appears -> owner cancels the OLD foreign sub by hand in his Stripe (Stripe blocks the portal from cancelling another app's sub - the hard rule that dictates this whole order).
+5. Portal reads Stripe, confirms the old sub is gone, item closes.
+
+KEY SAFETY, why per-member beats all-at-once: the new sub does not charge until the next payment date, so during the brief two-sub window only one will actually bill. Cancel the old before that date and the parent is NEVER double-charged. All-at-once would leave every member double-subbed for however long the owner stalls.
+
+EDGE: a member with NO card on file cannot have the sub created (step 3 refuses); preview returns needs_card + a payment link. That takeover waits on the parent adding a card, which ties into the failed-payment card-link item.
+
+CORRECTION to the owner's earlier framing: he assumed "cancel old -> auto-create new". The actual order is the reverse (create new -> cancel old by hand), forced by Stripe's rule that an app cannot cancel another app's subscription. He accepted this once shown.
+
+After-submit skill's job for takeover: create ONE takeover action item per foreign-sub member (all 20 for SJ), each pointed at the existing engine. The engine is built; only the item-wiring is new.
+
+### CONFIRMED: after-submit design (Zoran, 2026-08-07)
+Lij submits -> Claude skill: WE review and approve every member and every action item -> apply: seed all 20 members + create the approved action items. Nothing writes until approved in the skill, same staff-confirm gate as the price side. The 3 skill-created items (takeover / missing phone / stop-billing) are created at apply from his answers; the 2 detectors (failed-payment card link, off-card collect) stand behind them.
