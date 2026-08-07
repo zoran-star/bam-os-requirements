@@ -38,6 +38,10 @@ import {
   collectItemTitle, collectItemDescription, money as ocMoney,
   systemKeyForCollection, stopBillingItem, COLLECTION_METHODS,
 } from "./_off-card.js";
+import {
+  createSystemActionItem as createSystemActionItemShared,
+  isDuplicateErr,
+} from "./_action-items.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -2425,43 +2429,13 @@ async function loadOwnerAssignee(clientId) {
   }
 }
 
-const isDuplicateErr = (e) => /23505|duplicate key/i.test(String((e && e.message) || e || ""));
-
-// Create an action item that NO HUMAN asked for.
-//
-// Idempotency is the unique index on (client_id, system_key), not a check here.
-// Two overlapping cron runs both insert; Postgres rejects the second with 23505;
-// this returns { created:false } and the caller does not announce it twice. There
-// is no read-then-write window to lose.
-//
-// created_by is left NULL (a cron has no auth.users id) and created_by_role is
-// 'system', which the widened CHECK admits.
-async function createSystemActionItem({ client_id, system_key, title, description, due_date, assignee_id, assignee_name }) {
-  try {
-    const rows = await sb(`action_items`, {
-      method: "POST",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify({
-        client_id, system_key, title,
-        description: description || null,
-        due_date: due_date || null,
-        assignee_id: assignee_id || null,
-        assignee_name: assignee_name || null,
-        created_by: null,
-        created_by_name: "FullControl",
-        created_by_role: "system",
-      }),
-    });
-    const item = Array.isArray(rows) ? rows[0] : rows;
-    return { created: true, item };
-  } catch (e) {
-    if (!isDuplicateErr(e)) throw e;
-    const existing = await sb(
-      `action_items?client_id=eq.${encodeURIComponent(client_id)}&system_key=eq.${encodeURIComponent(system_key)}&select=*&limit=1`
-    ).catch(() => null);
-    return { created: false, item: (Array.isArray(existing) && existing[0]) || null };
-  }
-}
+// The one copy of this now lives in api/_action-items.js so the member apply
+// engine (api/workbook.js) and this file's off-card cron share the SAME
+// idempotency rule (dedupe on the (client_id, system_key) unique index). The
+// local name and call shape are unchanged - this wrapper just hands the shared
+// creator this route's own service-key sb(). isDuplicateErr is imported from the
+// same module (still used by the receipt-idempotency insert below).
+const createSystemActionItem = (spec) => createSystemActionItemShared(sb, spec);
 
 // THE DOUBLE-BILLING GUARD.
 //

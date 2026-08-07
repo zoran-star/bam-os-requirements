@@ -356,6 +356,10 @@ const { addInterval } = CADENCE;
 let OFFCARD_SRC = readSrc("_off-card.js");
 let MEMBERS_SRC = readSrc("members.js");
 let ACTIONITEMS_SRC = readSrc("action-items.js");
+// createSystemActionItem was extracted here so members.js (off-card cron) and
+// api/workbook.js (member apply) share ONE idempotency rule. The pins that used
+// to read the inline body in members.js now read its shared home.
+let SYSITEM_SRC = readSrc("_action-items.js");
 const PORTAL_SRC = readRepo("public", "client-portal.html");
 const VERCEL = readRepo("vercel.json");
 const MIG_TABLES = readRepo("supabase", "migrations", "20260807T140000_off_card_billing.sql");
@@ -888,10 +892,12 @@ console.log("\n── 6. a cron with no JWT can notify, and the authed route did
   ok(MEMBERS_SRC.indexOf('req.query.action === "cron-collect-off-card"') < MEMBERS_SRC.indexOf("ctx = await resolveUser(req)"),
     "and it runs BEFORE the user resolver, because a cron has no user");
   ok(/"\/api\/members\?action=cron-collect-off-card"/.test(VERCEL), "vercel.json schedules it");
-  ok(/created_by_role: "system"/.test(MEMBERS_SRC), "cron-created items declare themselves 'system', not a fake human");
-  ok(/created_by: null,/.test(MEMBERS_SRC), "with no invented user id");
-  ok(/isDuplicateErr\(e\)/.test(MEMBERS_SRC) && /23505\|duplicate key/.test(MEMBERS_SRC),
-    "and both generators treat a unique-index collision as the expected case, not an error - the index IS the idempotency");
+  ok(/created_by_role: "system"/.test(SYSITEM_SRC), "cron-created items declare themselves 'system', not a fake human (shared creator, api/_action-items.js)");
+  ok(/created_by: null,/.test(SYSITEM_SRC), "with no invented user id");
+  ok(/isDuplicateErr\(e\)/.test(SYSITEM_SRC) && /23505\|duplicate key/.test(SYSITEM_SRC),
+    "and the one shared creator treats a unique-index collision as the expected case, not an error - the index IS the idempotency (both generators call it)");
+  ok(/createSystemActionItemShared\(sb, spec\)/.test(MEMBERS_SRC),
+    "and members.js reaches it through a thin wrapper that hands over its own sb, so there is no second copy to drift");
   ok(/if \(created && item\)/.test(MEMBERS_SRC),
     "so a losing race announces nothing, and the owner is not pinged twice for one collection");
 
