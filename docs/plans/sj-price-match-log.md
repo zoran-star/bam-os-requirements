@@ -395,3 +395,20 @@ Full design: docs/plans/off-stripe-payments-design.md.
 - **D4 two missed periods: NOTHING, let it age.** No decision item, no auto-cancel. The item sits and accumulates. Accepted risk stated plainly: this is how a member can train free for a long time. Revisit if it bites.
 
 **Still open from the design (not yet ruled):** D1 reuse billing_mode vs new column (recommend reuse), D2 who owns the collect item (recommend named collector + owner fallback), D3 receipts (recommend not in v1), D5 prepay as rung vs paid-through (recommend rung, already priced), D7 workbook parallel build (recommend parallel, capture toggle+method+anchor).
+
+### RULING: every member must land on a live or archived price (Zoran, 2026-08-07)
+Zoran: "i want every member on a live price or archived price, what are the rules to make sure that happens?" This SHARPENS the earlier live-or-legacy coverage gate from a classification exercise into a completeness guarantee about MEMBERS, not prices. The rules, as agreed:
+
+1. **Build the price list from members, not from plans.** Every distinct in-use price must EXIST in the portal. If it does not exist, create it as archived. Coverage is driven by who pays, not by what was typed during pricing.
+2. **Archived is a landing place, not just leftovers.** Creating archived prices is a normal migration step, not an exception.
+3. **Never move a member to make them fit.** A $199 payer gets a $199 archived price. Rounding them onto a $250 plan is forbidden: their amount is a fact, the catalogue bends to it.
+4. **Match on price identity (stripe price id), never on amount.** Amount collisions are how someone lands on the wrong plan (SJ live example: Salvador pays $200 on an old Pre Season 1x price while Elementary is also $200; amount matching would file him under Elementary).
+5. **The owner picks the plan FAMILY.** We can see amount and rhythm; only he knows whether an odd price is an old plan, a family deal, or a mistake.
+6. **Coverage is a hard gate, not a warning.** Migration is not done while any member has no portal price. The number that must reach zero is "members with no price".
+7. **Archived prices are invisible to new families and untouchable for existing ones.** Never in checkout, never quoted by the agent, never re-priced.
+
+**RULING on one-person deals: THEIR OWN ARCHIVED PRICE.** Zoran chose option (a). A $199 deal becomes a $199 archived price under the right plan family, rather than a discount attached to a person on the live $250 plan. Rationale accepted: it guarantees coverage with no per-member discount machinery, and archived prices are invisible anyway. Accepted cost: the catalogue will hold a few single-person archived prices.
+
+**This REFINES (does not contradict) the 2026-08-04 special-deals ruling.** That ruling moved special deals OFF the price workbook and onto the member workbook, and forbade the member workbook from rendering a dollar box. Both still hold: the member workbook still shows the amount read-only and asks only which plan family it belongs to. What changes is what staff do with that answer at apply time - they mint an archived price at that amount under the chosen family, rather than modelling a person-level discount.
+
+**Consequence for SJ (5 members):** Jenny Chung + Ted Miranda ($200 Elementary, already archived - covered), Salvador Esparza ($200 Pre Season 1x - needs a $200 archived price under 1x, NOT Elementary), Christy Hang ($199 - needs an archived price under whichever family Lij names), Meredith Torio ($100 - same). Note SJ currently has ZERO offer_prices and ZERO pricing_catalog rows, so no member is classified yet; classification happens when the fees mint and prices go live.

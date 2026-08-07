@@ -43,22 +43,28 @@ Design + rulings: `docs/plans/sj-price-match-log.md`. Core handoff: `docs/core-h
 
 `20260801T120000_client_stripe_direct.sql` - applied via Supabase MCP, read back: both tables exist (13 + 10 cols), RLS enabled on both, zero rows. Env `STRIPE_DIRECT_ENC_KEY` + `PORTAL_BASE_URL` set in Vercel PRODUCTION (preview adds blocked by a CLI wrapper loop - add per-branch if ever needed; preview deploys refuse webhook registration anyway via the PORTAL_BASE_URL guard).
 
+`20260807T140000_off_card_billing.sql` + `20260807T140100_action_items_system_key.sql` - applied via Supabase MCP 2026-08-07, in that order. Live values were verified BEFORE applying (members 46 NULL / 2 alternate, members_staging 661 NULL / 1 alternate, action_items 1187 staff / 1 client, nothing else), so neither CHECK could reject an existing row.
+
+Read back: both tables exist and are EMPTY, all three indexes present (`member_billing_arrangements_live_uk`, `member_collections_period_uk`, `action_items_client_system_key_uk`), `action_items.system_key` present, and both CHECKs read as widened rather than dropped.
+
+SMOKE TESTED AGAINST PRODUCTION, then fully cleaned up (0 rows left in both tables, action_items back to its original 1188, the 2 real `alternate` members untouched). Every guard bit for real, which is what the 246 stub assertions could not prove:
+- a second live arrangement for one member -> unique_violation
+- method `other` with no note -> check_violation
+- `billing_mode='Alternate'` (wrong case) -> check_violation
+- a duplicate `(arrangement, period)` -> unique_violation (this IS the cron's idempotency)
+- a partial payment -> recorded 10000/19900 and stayed OPEN, did not auto-close
+- deleting an arrangement that has collections -> foreign_key_violation (payment history is protected by Postgres, not by a code path)
+- `created_by_role='system'` -> accepted; a second row with the same `system_key` -> unique_violation; `created_by_role='robot'` -> check_violation; two items with NULL `system_key` -> both allowed
+- a 9-month term anchored 2026-01-31 held its clamped dates (p1 2026-01-31, p2 2026-10-31), the case the month-overflow bug used to get wrong
+
 ## ⏳ PENDING
 
 | Migration file | What it does | Blocked features until applied | Added |
 |---|---|---|---|
 | `20260731T090000_clients_stripe_portal_url.sql` | Adds `clients.stripe_portal_url text` (nullable, no backfill). ONLY the column - the `receipts` build owns the wider receipt system and will declare it again; `IF NOT EXISTS` so whichever runs second is a no-op | The welcome email's manage-membership link (PR #1666). **Must be applied BEFORE that PR merges**: the code reads the column from the MAIN select lists (`CLIENT_COLS` in `api/automations.js` + `api/agent-confirm.js`, `SENDER_COLS` in `api/_send.js`), so merging first would 400 the clients read that feeds EVERY channel, SMS included. Additive and unread until the merge, so applying first is inert | 2026-07-31. **The orchestrator is applying this one directly**, per Zoran's 2026-07-31 ruling that the pending-column retry (one wasted 400 plus a warning line on every send, forever) is not an acceptable substitute for shipping the column. Not for `/pending-sql` |
-| `20260807T140000_off_card_billing.sql` | Two new tables (`member_billing_arrangements`, `member_collections`) plus a CHECK on `members.billing_mode` and the matching one on `members_staging.billing_mode` | Everything off-card: the arrangement, the collections ledger, the drawer panel, the cron. Until it is applied the API answers the drawer with nulls and the write endpoints return a 503 that names this file, so nothing 500s - the feature is simply absent | 2026-08-07 |
-| `20260807T140100_action_items_system_key.sql` | Adds `action_items.system_key` + a unique index on `(client_id, system_key)`, and WIDENS `action_items_created_by_role_check` to admit `'system'` | The idempotency of every system-created action item: the collect reminders and the stop-billing guard. Without it the cron's inserts fail the role CHECK | 2026-08-07 |
 
-
-> **Order matters for the two `20260807T14*` rows.** Apply `...140000_off_card_billing.sql`
-> first: `member_collections.action_item_id` references `action_items(id)`, and the
-> `...140100` file only alters `action_items`, so either order works for Postgres - but
-> the CHECK widening in `140100` is what lets the cron insert at all, so an academy
-> turned on between the two would raise no reminders and look like the tables were
-> broken. Neither file writes a single row of data, so applying both is inert until a
-> human sets up an arrangement from the member drawer.
+> The two `20260807T14*` off-card migrations were APPLIED on 2026-08-07. See the
+> APPLIED section above for the read-back and the live smoke test.
 >
 > **The `members.billing_mode` CHECK was written against the live values, not guessed:**
 > 46 rows NULL, 2 rows `'alternate'`, nothing else (counted 2026-08-07). `'card'` is
