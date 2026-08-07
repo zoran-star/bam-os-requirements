@@ -186,6 +186,13 @@
  *   MUTATE=rungarchiveunmintable    API. canMint's plan-card rung branch is
  *       gone, so the ladder Archive button (a null-id save of
  *       `commitments.<i>.archived`) 404s on any rung the seed never wrote. F8.
+ *   MUTATE=phantomrungmints    API. canMint's plan-card rung branch drops its
+ *       sibling-existence check and admits ANY canonical
+ *       `commitments.<n>.archived`, so a direct POST of a PHANTOM rung's
+ *       archived leaf MINTS instead of 404ing and apply's pad loop invents the
+ *       empty rungs. F8's phantom-rung refusal catches it. Self-inflicted only
+ *       (the real page archives existing rungs only), but the pad-loop door
+ *       left open at the mint gate.
  *
  * Measured 2026-08-06, after the full rehearsal-round-1 build (Steps 1-12:
  * withheld fee report, Variant A codes guard, confirmed-no tax, registration
@@ -200,7 +207,9 @@
  * it 181 -> 184 (F7), and its Step 2 (canonical indexes + mint ceiling)
  * 184 -> 186 (F5's direct-404 and page-canonical pins); the 2026-08-07
  * Archive pass took it 186 -> 196 (F8: the plan and rung Archive buttons,
- * cut to the live unseeded shape and driven through the real page)).
+ * cut to the live unseeded shape and driven through the real page), and the
+ * 2026-08-07 phantom-rung pass 196 -> 198 (F8's phantom-rung refusal and its
+ * no-row-minted pin)).
  * typingisapproving -> 18 failures, pagedenominatorgrows -> 7,
  * emptycardsdontcount -> 7, feecasing -> 10, addkeepsconfirm -> 5,
  * numericprice -> 5, monthsmisparse -> 5, staffcountsanswered -> 5,
@@ -263,9 +272,16 @@
  * plan-archive save-through, one-row-minted, aimed and card-confirms pins;
  * the rung sub-case runs on a fresh page so this control's failure cannot
  * leak into it. The same pin catches 4 in api/_workbook.test.mjs),
- * rungarchiveunmintable -> 3 (measured 2026-08-07, Archive pass: F8's
- * rung-archive save-through, one-row-minted and aimed pins; the fail-closed
- * refusals stay green. The same pin catches 3 in api/_workbook.test.mjs).
+ * rungarchiveunmintable -> 3 (RE-MEASURED 2026-08-07, phantom-rung pass: pin
+ * re-pointed to the rung branch's `if (...) {` head after the sibling-existence
+ * check landed; still catches F8's rung-archive save-through, one-row-minted
+ * and aimed pins; the fail-closed refusals stay green. The same pin catches 3
+ * in api/_workbook.test.mjs),
+ * phantomrungmints -> 2 (measured 2026-08-07, phantom-rung pass: F8's
+ * phantom-rung byte-identical refusal and its no-row-minted pin. With the
+ * sibling check gone commitments.5.archived MINTS instead of 404ing, so both
+ * trip; the existing-rung save-through and the other fail-closed refusals stay
+ * green. The same pin catches 2 in api/_workbook.test.mjs).
  * (MUTATE=agebandunchecked lives ONLY in api/_workbook-apply.test.mjs - this
  * flow never submits an inverted band because the page guard refuses it in
  * D3 - where it catches 2; agesunknownfield and agenotegone are pinned in
@@ -604,10 +620,20 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
     `  if (k.startsWith("plan:")) return ["age_min", "age_max"]; // (control planarchiveunmintable) the plan Archive button 404s`]],
   // The plan-card rung branch of canMint is gone, so the ladder's Archive/Restore
   // button (a null-id save of commitments.<i>.archived) 404s on any rung the seed
-  // never wrote an archived row for. F8's rung-archive path has to catch it.
+  // never wrote an archived row for. F8's rung-archive path has to catch it. Pin
+  // re-pointed to the branch's `if (...) {` head when the sibling-existence check
+  // landed (the old `return true` line is gone).
   rungarchiveunmintable: [[
-    `    if (cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) return true;`,
-    `    if (false && cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) return true; // (control rungarchiveunmintable) the rung Archive button 404s`]],
+    `    if (cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) {`,
+    `    if (false && cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) { // (control rungarchiveunmintable) the rung Archive button 404s`]],
+  // The plan-card rung branch drops its sibling-existence check and admits ANY
+  // canonical commitments.<n>.archived, existing rung or not - so a direct POST
+  // of commitments.5.archived on a plan whose rungs stop at 2 MINTS instead of
+  // 404ing, and apply's pad loop invents the empty rungs. F8's phantom-rung
+  // refusal has to catch it.
+  phantomrungmints: [[
+    `      return Array.isArray(mine) && mine.some((a) => String(a.target_field || "").startsWith(sib));`,
+    `      return true; // (control phantomrungmints) the sibling-existence check is gone - a phantom rung mints`]],
 };
 
 const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
@@ -1973,6 +1999,17 @@ console.log("\n── F8. the Archive buttons grow their missing rows through th
   const rungPrice = await callApi({ action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "commitments.9.price", answered: 1 }] });
   check(rungPrice.ok === false && rungPrice.error === "that answer does not belong to this card",
     `a null-id save of a non-archived rung leaf with no row still 404s ("${rungPrice.error}")`);
+  // A PHANTOM RUNG'S archived leaf: p1 has rungs 0..2, so commitments.5.* has no
+  // sibling on the card. Admitting it would mint a row apply's pad loop then
+  // reaches by inventing empty rungs 1..5 in the offer, from a crafted direct
+  // POST the real page never sends (it archives only existing rungs). It is
+  // refused with the byte-identical 404, and nothing is minted.
+  // MUTATE=phantomrungmints.
+  const phantomRung = await callApi({ action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "commitments.5.archived", answered: true }] });
+  check(phantomRung.ok === false && phantomRung.error === "that answer does not belong to this card",
+    `a null-id save of a PHANTOM rung's archived leaf (no commitments.5.* sibling) still 404s byte-for-byte ("${phantomRung.error}")`);
+  check(!DB.workbook_answers.some((r) => r.card_id === "c-p1" && r.target_field === "commitments.5.archived"),
+    "and NO commitments.5.archived row was minted - the pad loop has nothing to reach");
 
   // Put the fixture back and reboot the main page off it, so every later section
   // reads the state it always did.
