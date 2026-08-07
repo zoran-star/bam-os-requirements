@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Lij sent, and what apply would do</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;color:#1E1E24;background:#F7F6F2;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    line-height:1.45;-webkit-font-smoothing:antialiased;padding:24px 16px 70px}
+  .wrap{max-width:840px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 3px;letter-spacing:-.5px;font-weight:800}
+  .sub{font-size:12.5px;color:#6E6E78;margin:0 0 8px}
+  .banner{background:#E4F5EA;border:1px solid #7DC79A;border-radius:10px;padding:9px 13px;font-size:12.5px;color:#2E7D46;margin:0 0 22px;font-weight:600}
+  h2{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#8A8A94;margin:26px 0 11px;font-weight:800;border-top:1px solid #E3E1DA;padding-top:15px}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  @media(max-width:620px){.cards{grid-template-columns:1fr}}
+  .c{background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:12px 14px;box-shadow:0 1px 2px rgba(20,20,20,.04)}
+  .c.arch{background:#FBF4F1;border-color:#E0B9AC}
+  .c h3{margin:0 0 3px;font-size:14.5px}
+  .c .old{font-size:11px;color:#9A9AA4;text-decoration:line-through}
+  .c .line{font-size:12.5px;color:#4A4A54;margin-top:5px}
+  .c .line b{color:#1E1E24}
+  .edit{background:#FFF6E0;border-radius:5px;padding:0 4px;font-weight:600}
+  .kept{font-size:11.5px;color:#8A8A94;margin-top:6px}
+  .tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:11px;margin-left:5px;vertical-align:1px}
+  .t-arch{background:#FADbcf;color:#B0472A}
+  .t-none{background:#EEEDE8;color:#7C7C86}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px;background:#fff;border:1px solid #E3E1DA;border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid #EFEDE6}
+  th{background:#FAF9F5;color:#7C7C86;font-size:10px;text-transform:uppercase;letter-spacing:1px}
+  tr:last-child td{border-bottom:none}
+  .ex{color:#2E7D46;font-weight:700}
+  .mn{color:#8A6D1F;font-weight:700}
+  .plan-h{background:#F4F3EE;font-weight:700;color:#3A3A44}
+  .pid{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#9A9AA4}
+
+  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 4px}
+  .kpi{background:#fff;border:1px solid #E3E1DA;border-radius:11px;padding:10px 12px;text-align:center}
+  .kpi .v{font-size:22px;font-weight:800;letter-spacing:-.5px}
+  .kpi .l{font-size:10px;color:#8A8A94;text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
+  .kpi.g .v{color:#2E7D46}.kpi.y .v{color:#8A6D1F}.kpi.n .v{color:#6E6E78}
+  @media(max-width:620px){.strip{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>What Lij sent, and what apply would do</h1>
+  <p class="sub">Built from the REAL dry-run against his live Stripe, then rolled back. His account was only read. Nothing is approved yet.</p>
+  <div class="banner">Clean: 9 of his prices already exist (we match, never duplicate), only 3 new joining fees would be created, zero fees withheld, no surprises.</div>
+
+  <h2>The 8 cards he confirmed</h2>
+  <div class="cards">
+    <div class="c">
+      <h3>Sales tax <span class="tag t-none">none</span></h3>
+      <div class="line">He confirmed <b>he does not charge sales tax</b>. Prices apply as-is.</div>
+    </div>
+    <div class="c">
+      <h3>Academy 2x/week</h3>
+      <div class="old">was "2 Trainings/Week"</div>
+      <div class="line">Renamed. Description &rarr; <span class="edit">"2 one-hour trainings per week"</span></div>
+      <div class="kept">Kept: $250 / 4 weeks, $40 fee, 3mo $599, 6mo $1,150, ages</div>
+    </div>
+    <div class="c">
+      <h3>Academy Unlimited</h3>
+      <div class="old">was "Unlimited"</div>
+      <div class="line">Renamed to his Stripe name.</div>
+      <div class="kept">Kept: $300 / 4 weeks, $40 fee, 3mo $749, 6mo $1,399</div>
+    </div>
+    <div class="c">
+      <h3>Academy 1x/week</h3>
+      <div class="old">was "1 Training/Week"</div>
+      <div class="line">Renamed. Description &rarr; <span class="edit">"1 1 hr training per week"</span></div>
+      <div class="kept">Kept: $175 / 4 weeks, $40 fee, 3mo $425, 6mo $875</div>
+    </div>
+    <div class="c arch">
+      <h3>Elementary Academy <span class="tag t-arch">removed</span></h3>
+      <div class="line"><b>Archived.</b> Pulled from what he sells to new families. He filled ages 9-12 and prepay $499/$999 first, but archiving overrides all of it.</div>
+      <div class="kept">Ted & Jenny keep paying $200. Archive is not cancel.</div>
+    </div>
+    <div class="c">
+      <h3>Discount codes <span class="tag t-none">no coupon</span></h3>
+      <div class="line">He <b>left the code blank</b>, so no discount code is created. The prefilled "club" was cleared.</div>
+    </div>
+    <div class="c">
+      <h3>Something missing?</h3>
+      <div class="line">Confirmed empty. Nothing to add.</div>
+    </div>
+    <div class="c">
+      <h3>Anything else</h3>
+      <div class="line">Confirmed empty. No extra notes.</div>
+    </div>
+  </div>
+
+  <h2>What apply would create in his Stripe</h2>
+  <div class="strip">
+    <div class="kpi n"><div class="v">3</div><div class="l">plans go live</div></div>
+    <div class="kpi g"><div class="v">9</div><div class="l">prices matched</div></div>
+    <div class="kpi y"><div class="v">3</div><div class="l">fees minted</div></div>
+    <div class="kpi n"><div class="v">0</div><div class="l">duplicates</div></div>
+  </div>
+  <table>
+    <tr><th>Price</th><th>In his Stripe?</th><th>Stripe id</th></tr>
+    <tr class="plan-h"><td colspan="3">Academy 1x/week</td></tr>
+    <tr><td>Monthly (every 4 weeks) $175</td><td class="ex">Exists, matched</td><td class="pid">price_1ShEoq...</td></tr>
+    <tr><td>3 months $425</td><td class="ex">Exists, matched</td><td class="pid">price_1ShEtz...</td></tr>
+    <tr><td>6 months $875</td><td class="ex">Exists, matched</td><td class="pid">price_1ShEu0...</td></tr>
+    <tr><td>$40 joining fee</td><td class="mn">Mint new (one-time)</td><td class="pid">-</td></tr>
+    <tr class="plan-h"><td colspan="3">Academy 2x/week</td></tr>
+    <tr><td>Monthly (every 4 weeks) $250</td><td class="ex">Exists, matched</td><td class="pid">price_1SNRKX...</td></tr>
+    <tr><td>3 months $599</td><td class="ex">Exists, matched</td><td class="pid">price_1SNR8y...</td></tr>
+    <tr><td>6 months $1,150</td><td class="ex">Exists, matched</td><td class="pid">price_1SNR95...</td></tr>
+    <tr><td>$40 joining fee</td><td class="mn">Mint new (one-time)</td><td class="pid">-</td></tr>
+    <tr class="plan-h"><td colspan="3">Academy Unlimited</td></tr>
+    <tr><td>Monthly (every 4 weeks) $300</td><td class="ex">Exists, matched</td><td class="pid">price_1SUf7p...</td></tr>
+    <tr><td>3 months $749</td><td class="ex">Exists, matched</td><td class="pid">price_1SUf7p...</td></tr>
+    <tr><td>6 months $1,399</td><td class="ex">Exists, matched</td><td class="pid">price_1SUf7p...</td></tr>
+    <tr><td>$40 joining fee</td><td class="mn">Mint new (one-time)</td><td class="pid">-</td></tr>
+  </table>
+  <p class="sub" style="margin-top:10px">Elementary is archived, so it does not appear here at all: no price touched, no fee minted. Its members keep paying untouched.</p>
+</div>
+</body>
+</html>

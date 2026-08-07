@@ -348,3 +348,32 @@ PROPER FIX (in the loop): add `archived` (plan) and the rung archive field to th
 
 ### Archive-button fix: loop complete, deploying (2026-08-07)
 plan+rung Archive mint-gate fix (cf13822) -> tester found phantom-rung leak (commitments.N.archived minted for non-existent rungs) -> tightened to require a sibling row (84069d0) -> fresh tester PASS (phantom dead across all indexes, batch/cross-card/addition spoof all closed, all gates green: workbook 233, apply 213, contract 198, term-vocab 243, billing-cadence 296). The contract test now cuts its fixture to production shape so it would actually reproduce the live 404 - the rehearsal blind spot (never removed a plan; fixture pre-seeded archived) is closed. Merging to main + deploying so the Archive button works for every future academy. Lij's Elementary was already hotfixed directly; this does not touch his workbook.
+
+### Ruling: alternate payment = FLAG HOW THEY PAY (Zoran, 2026-08-07)
+Resolves the open question from the alt-payment story. Lij marks a member as paying by cash / e-transfer / other instead of card. **No card details ever touch the workbook page** (PCI + the no-credential rule stays absolute), and no Stripe-hosted card link in v1. Consequence for the build: an off-card member is EXCLUDED from auto-charging, so the flag is not cosmetic - it changes whether billing runs for that person, which makes it a money-adjacent action item that must surface in staff review (see the action-item map below). Applies to existing members AND newly-added ones.
+
+### RULING: the V2 portal action-item map must be fully planned before the member workbook is built (Zoran, 2026-08-07)
+"One thing that we have to make sure we have fully planned out is all of the action items that would show up in the v2 of the portal."
+
+The point, and it is the assurance-without-connection rule again: **the workbooks' real output is not data, it is a queue of things a human must then do.** Every one of those needs a named home in the V2 portal or it lands nowhere. A stop-billing row nobody is obliged to clear is how a parent gets charged for four months after their kid quit (already recorded 2026-08-02, still unowned). This is now a BUILD PREREQUISITE for the member workbook, not a follow-up.
+
+Known action-item producers so far (to be mapped, not yet complete):
+- **Stop billing this parent** (member marked not-a-member) - carries dollar amount, subscription id, parent name, date marked; surfaces FIRST in staff review on blast-radius precedence; clearing it is a REQUIRED step in skill 3.
+- **Off-card payer flag** (this ruling) - member excluded from auto-charge; someone must actually collect cash/e-transfer, so it is a recurring operational item, not a one-time import decision.
+- **Additions**: plans/members the owner requested that staff must create by hand (the workbook never writes them).
+- **Mint requests**: prices that do not exist in the academy's Stripe and would be created at live apply (San Jose: 3 joining fees, still uncreated because live apply is deliberately unbuilt).
+- **Unmatched / ambiguous rows**: a member whose plan attachment could not be resolved (e.g. Christopher's $199 special deal).
+- **Owner notes / free text** the workbook parks in skipped.notes for a human to adjudicate.
+- **Conflicts between what the owner typed and what the portal already asserts** (e.g. Lij's cancellation terms vs stored policy - round 1 finding, unresolved).
+
+### Rulings on the V2 action-item map (Zoran, 2026-08-07)
+Given after reading the map (docs/plans/v2-action-item-map.md, visual: docs/plans/action-items-visual.html). Headline finding that prompted them: 16 of 19 kinds of work the two workbooks produce currently land nowhere.
+
+**Q1 - who cancels a subscription the owner marks as gone: THE ACADEMY OWNER (Lij).** Lands in `action_items`, which already Slacks his channel, pushes his app and SMSes him. Reason it is the only workable answer today: all 20 SJ subs are foreign (`members.billing_portal_owned=false`), so the portal cannot cancel them; only someone with his Stripe access can. Build note: the row needs a TYPED KEY, not the existing title-string match (`title=ilike.*Cancel old Stripe sub*`), or a re-run duplicates rows and a rename orphans the banner.
+
+**Q2 - off-card payers are NOT a flag, they are an unbuilt SUBSYSTEM.** Zoran: "flag and a collect reminder that is adaptable to when the payment is actually supposed to be collected - this might have to be a whole build that we plan out (how we handle payments outside of our stripe portal - how we know when its due, notification to collect, and all the edge cases around it)."
+This is a scope correction, not a preference. What it means: the member workbook may capture the flag, but the OFF-STRIPE PAYMENTS system (due-date model per member, collect reminders on their real cadence, notification to whoever collects, and the edge cases: partial payment, late payment, member stops paying, switching back to card, proof of payment, reconciliation against what the portal thinks they owe) needs its own planned build. DO NOT ship a control whose only outcome is a flag nobody acts on - that is the dead-tax-chip failure in a new costume. Sequencing decision still open: whether the member workbook waits on that build or captures the flag and the subsystem follows.
+
+**Q3 - fully separate queues.** Owner work lives in `action_items`; BAM internal work (mint requests, unsellable rungs, additions to build) lives in `v2_tickets` and Lij never sees it. Consequence to build: the systems staff lane must actually render `billing_fix`/`data_fix`/`build_ask` - today `WebsiteV2View.jsx` filters `type in ("website_change","fix")`, so those tickets render on NO staff page. Routing work there without fixing the filter recreates the exact lands-nowhere failure.
+
+**Q4 - the 3 joining fees are NOT a lost item, they are a normal onboarding step.** Zoran: "they should be built and put into the portal after lij submits the prices - he is still in the onboarding phase." So the mint requests do not need an emergency ticket; minting his fees is simply the next step of onboarding now that prices are submitted and applied. Correction to the map's framing: P1 is only "lands nowhere" for an academy already LIVE. During onboarding the sequence itself is the owner. The action-item home still matters for post-onboarding applies.
