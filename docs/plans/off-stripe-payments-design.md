@@ -242,3 +242,34 @@ Offline receipts (new `kind`, new unique index). Proof-of-payment upload via `me
 - `/Users/zoransavic/bam-os-requirements/.claude/worktrees/mike-sandu-scheduled-messages-3862a6/bam-ghl-agent/bam-portal/api/sorter/cleanup.js` (the existing alt-payment action `:436-450`, `computeNextPayment` `:121-123`, promote carry-through `:857-869`)
 - `/Users/zoransavic/bam-os-requirements/.claude/worktrees/mike-sandu-scheduled-messages-3862a6/bam-ghl-agent/bam-portal/api/_member-receipts.js` (the invoice-shaped assumptions at `:176-206` and `:521-527` that rule receipts out of v1)
 - `/Users/zoransavic/bam-os-requirements/.claude/worktrees/mike-sandu-scheduled-messages-3862a6/bam-ghl-agent/bam-portal/public/client-portal.html` (the toggle at `:51778-51780` and the drawer billing block at `:51565-51568`, both of which need to route through the new endpoint)
+---
+
+## RULINGS (Zoran, 2026-08-07) - these settle D1 to D6
+
+| # | Decision | Ruling |
+|---|---|---|
+| D1 | The flag | **Reuse `members.billing_mode='alternate'`.** One field, one answer. Add a CHECK constraint; do not mint a second column |
+| D2 | Who owns the collect reminder | **Owner by DEFAULT, reassignable to a staff member.** So `action_items.assignee_id` defaults to the owner and the UI must expose a change-owner control. Not "named collector first" - the owner is the default and delegation is the exception |
+| D3 | Receipts | **Not in v1.** Add later as `kind='offline_payment'` with its own send-once index. Never fake a Stripe invoice |
+| D4 | Two missed periods | **Nothing. Let it age.** No decision item, no auto-cancel |
+| D5 | Prepay | **It is the prepay plan** (already priced). See the constraint below |
+| D6 | Commission | **Stripe only.** Off-card revenue stays out of BAM's growth-share. Ledger stays a soft record |
+
+### D5 CONSTRAINT, stated by Zoran and load-bearing
+*"i just want to make sure its adaptable to any commitment that is created in the pricing stage"*
+
+The due-date engine must resolve its interval from **whatever commitments the academy actually created**, never from a hardcoded 3/6-month list. If an academy prices a 9-month or 8-week or 18-month commitment, off-card arrangements must follow it with no code change.
+
+This is not hypothetical: the term vocabulary was previously CLOSED to monthly/3_months/6_months, `_bbTermFromLength` collapsed 12 months to `6_months`, and "1 year" produced no key at all. That was fixed on 2026-08-06 (adjustable prepay lengths, any 1-24 months, mints honour the declared week rhythm). Off-card must consume that same open vocabulary, i.e. resolve through the shared `resolveInterval`/`addInterval`/`CADENCES` path (api/website/checkout.js:146-211, mirrored in api/offers/create-price.js:195-202, drift-guarded by api/_billing-cadence.test.mjs) and read the commitment's declared length/week count off the offer.
+
+**Test that must exist:** create a commitment with a non-standard length (e.g. 9 months, and one declared in weeks), attach an off-card arrangement, and assert the generated due dates follow it. A hardcoded 3/6 assumption must fail that test loudly.
+
+### D7 sequencing ruling (Zoran, 2026-08-07): OFF-CARD FOUNDATION FIRST, THEN THE WORKBOOK
+Build the arrangement + collections tables and the mark-collected step BEFORE the member workbook captures anything. The moment the workbook's "pays cash" toggle exists, it must land somewhere real. Nothing inert, not even temporarily and not even deliberately. Slower to a second link for Lij, and that cost is accepted.
+
+Build order therefore:
+1. `member_billing_arrangements` + `member_collections` (+ CHECK on billing_mode, + the double-billing guard).
+2. `action_items.system_key` + unique index (shared with the stop-billing ruling, so not extra cost).
+3. The generate-and-notify cron, reusing the existing Slack/push/SMS block (must extract the notify function so a cron with no JWT can call it).
+4. Mark-collected: amount, date, method, who, reference. Portal-side, logged in. THIS is the step that makes it real.
+5. Then the member workbook, whose off-card capture is toggle + method chips (with a required follow-up for "other") + the anchor date, and never a dollar box.
