@@ -412,3 +412,24 @@ Zoran: "i want every member on a live price or archived price, what are the rule
 **This REFINES (does not contradict) the 2026-08-04 special-deals ruling.** That ruling moved special deals OFF the price workbook and onto the member workbook, and forbade the member workbook from rendering a dollar box. Both still hold: the member workbook still shows the amount read-only and asks only which plan family it belongs to. What changes is what staff do with that answer at apply time - they mint an archived price at that amount under the chosen family, rather than modelling a person-level discount.
 
 **Consequence for SJ (5 members):** Jenny Chung + Ted Miranda ($200 Elementary, already archived - covered), Salvador Esparza ($200 Pre Season 1x - needs a $200 archived price under 1x, NOT Elementary), Christy Hang ($199 - needs an archived price under whichever family Lij names), Meredith Torio ($100 - same). Note SJ currently has ZERO offer_prices and ZERO pricing_catalog rows, so no member is classified yet; classification happens when the fees mint and prices go live.
+
+### RULING: the FC action items after the member workbook comes back (Zoran, 2026-08-07)
+Context correction from Zoran: these are the action items the post-submit skill CREATES IN FC once the owner sends back the members list. Not a general 17-type monitoring system.
+
+THE FINAL LIST, exactly 5:
+1. **Take over each imported subscription** - owner cancels the old sub in his Stripe; the portal auto-creates the replacement at the identical price (his idea, confirmed). Per member; 20 for SJ.
+2. **Missing parent phone number** - the ONLY missing-data action item. "in terms of data that we should collect its rly only phone number." Names/ages resolve inside the member workbook itself, not as after-items.
+3. **Send a card link for a failed payment** - recurring, Stripe-triggered.
+4. **Collect from a cash/e-transfer member** - recurring, the off-card system built this week.
+5. **Stop charging someone who left** - from the workbook's "not a member" answer.
+
+CUT (with the reason where he gave one):
+- Confirm unmatched prices: "in the member workbook it should match every person there with a live price, or make a custom archived one for them" - i.e. the coverage rule solves this INSIDE the workbook/apply, never as a leftover task.
+- Create missing prices: "this shouldn't be in their action items" - it is BAM work, goes to the BAM queue (v2_tickets), consistent with the fully-separate-queues ruling.
+- Card expiring soon: not needed.
+- Member with no card on file: not needed.
+- ALL of "missing information" except phone (unsigned agreement, emergency contact, email): not needed.
+- ALL of "about to happen" (prepay ending, pause resuming, drifting, trial not converted): not needed.
+- ALL of "roster honesty" (dupes, paying-not-on-roster, roster-not-paying): not needed.
+
+Consequence for the after-submit skill: its FC outputs are exactly items 1, 2 and 5 (created at apply from workbook answers), while 3 and 4 are standing detectors (Stripe webhook + off-card cron) rather than skill outputs. Keep the list this small on purpose: an action list the owner ignores is worse than none.

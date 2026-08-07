@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The owner's action items, final</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;color:#1E1E24;background:#F7F6F2;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    line-height:1.45;-webkit-font-smoothing:antialiased;padding:24px 16px 80px}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:23px;margin:0 0 3px;letter-spacing:-.5px;font-weight:800}
+  .sub{font-size:12.5px;color:#6E6E78;margin:0 0 18px}
+  h2{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#8A8A94;margin:26px 0 10px;font-weight:800;border-top:1px solid #E3E1DA;padding-top:15px}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;border:1px solid #E3E1DA;border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid #EFEDE6;vertical-align:top}
+  th{background:#FAF9F5;color:#7C7C86;font-size:9.5px;text-transform:uppercase;letter-spacing:1px}
+  tr:last-child td{border-bottom:none}
+  td b{color:#1E1E24}
+  .why{font-size:11.5px;color:#6E6E78;display:block;margin-top:2px}
+  .num{font-variant-numeric:tabular-nums;color:#B0472A;font-weight:700;white-space:nowrap}
+  .tag{display:inline-block;font-size:8.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;padding:2px 7px;border-radius:11px;white-space:nowrap}
+  .t-skill{background:#F8EFD4;color:#8A6D1F}
+  .t-auto{background:#E4F5EA;color:#2E7D46}
+
+  .note{background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:12px 15px;font-size:12.5px;color:#4A4A54;margin-top:14px}
+  .note b{color:#1E1E24}
+  .cut{background:#FAF9F5;border:1px dashed #D9D6CD;border-radius:12px;padding:12px 15px;font-size:12px;color:#8A8A94;margin-top:20px}
+  .cut b{color:#6E6E78}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>The owner's action items, final</h1>
+  <p class="sub">What lands in FullControl after the member workbook comes back and the skill runs. Ruled 2026-08-07. Five items, kept small on purpose: a list he ignores is worse than none.</p>
+
+  <h2>Created by the skill, from his workbook answers</h2>
+  <table>
+    <tr><th style="width:38%">Action item</th><th>What it does</th><th style="width:100px">San Jose</th></tr>
+    <tr><td><b>Take over this subscription</b> <span class="tag t-skill">per member</span><span class="why">He cancels the old sub in his Stripe; the portal instantly creates the replacement at the identical price. Parent's card is already on file, so the parent notices nothing.</span></td><td>Moves the member onto a subscription the portal can actually manage. Until then the portal can only watch</td><td class="num">20</td></tr>
+    <tr><td><b>Add this parent's phone number</b> <span class="tag t-skill">per member</span></td><td>The one missing-data item. Everything else (names, ages, plans) is resolved inside the workbook itself</td><td class="num">as found</td></tr>
+    <tr><td><b>Stop charging this parent</b> <span class="tag t-skill">from "not a member"</span><span class="why">Carries the amount, the subscription id and the date he marked them.</span></td><td>The one that prevents a parent being charged for months after their kid quit</td><td class="num">as marked</td></tr>
+  </table>
+
+  <h2>Standing detectors, forever</h2>
+  <table>
+    <tr><th style="width:38%">Action item</th><th>Trigger</th><th style="width:100px">How</th></tr>
+    <tr><td><b>Send a card link for a failed payment</b></td><td>A charge bounced</td><td><span class="tag t-auto">Stripe tells us</span></td></tr>
+    <tr><td><b>Collect from a cash / e-transfer member</b></td><td>An off-card payment is coming due</td><td><span class="tag t-auto">built this week</span></td></tr>
+  </table>
+
+  <div class="note">
+    <b>Two things that came off his list but still happen:</b><br>
+    Unmatched prices never become action items because the workbook itself guarantees every member lands on a live or custom archived price before this stage. And creating missing prices (his three joining fees) is <b>BAM's job</b>, tracked in BAM's queue, invisible to him.
+  </div>
+
+  <div class="cut">
+    <b>Cut by ruling (2026-08-07):</b> card expiring soon &middot; member with no card on file &middot; unsigned agreement &middot; emergency contact &middot; missing email &middot; prepay ending &middot; pause resuming &middot; member drifting &middot; trial did not convert &middot; duplicate family &middot; paying but not on roster &middot; on roster but not paying
+  </div>
+</div>
+</body>
+</html>
