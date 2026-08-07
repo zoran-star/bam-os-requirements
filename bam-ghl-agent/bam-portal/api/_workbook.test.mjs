@@ -155,6 +155,14 @@
 //       imports a mutant guardrails copy); the SAME pin is carried by
 //       api/_coupon-guardrails.test.mjs, api/_workbook-apply.test.mjs and
 //       scripts/verify-workbook-contract.mjs.
+//   MUTATE=planarchiveunmintable node api/_workbook.test.mjs
+//       the plan branch of mintableOn loses `archived`, so the page's Archive
+//       button (a null-id save of `archived`) 404s and the click silently
+//       fails - the live blocker exactly as it shipped.
+//   MUTATE=rungarchiveunmintable node api/_workbook.test.mjs
+//       the plan-card rung branch of canMint is gone, so the ladder's
+//       Archive/Restore button (a null-id save of `commitments.<i>.archived`)
+//       404s on any rung the seed never wrote an archived row for.
 //   MUTATE=noncanonicalindex   node api/_workbook.test.mjs
 //       classifyIndexed's one-spelling check becomes `if (false)`, so
 //       `codes.00.applies_to` is a VALID address distinct from
@@ -215,6 +223,14 @@
 //                    91st-row cap-sentence pin, DB pinned at 90. This control
 //                    lives ONLY here - the contract flow has no 90-row card,
 //                    and building one would prove nothing this pin does not)
+//   planarchiveunmintable -> 4 failures (measured 2026-08-07, Archive pass: the
+//                    plan-archive section's accept, one-row-minted, aimed and
+//                    Restore-same-row pins; also pinned in
+//                    scripts/verify-workbook-contract.mjs, section F8)
+//   rungarchiveunmintable -> 3 failures (measured 2026-08-07, Archive pass: the
+//                    rung-archive section's accept, one-row-minted and aimed
+//                    pins; the fail-closed refusals still pass. Also pinned in
+//                    scripts/verify-workbook-contract.mjs, section F8)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -482,6 +498,21 @@ const CODESMINTANY = [[
   `    return cls.kind === "code" && !!cls.t;`,
   `    return true; // (control codesmintany) the allowlist is gutted`]];
 
+// MUTATE=planarchiveunmintable  the plan branch of mintableOn loses `archived`,
+// which is the plan-level Archive fix reverted: the live blocker exactly as it
+// shipped. The page's toggleArch saves `archived` with a null id, no seeded row
+// exists, and doSave 404s - so the owner clicks Archive and it silently fails.
+const PLANARCHIVEUNMINTABLE = [[
+  `  if (k.startsWith("plan:")) return ["age_min", "age_max", "archived"];`,
+  `  if (k.startsWith("plan:")) return ["age_min", "age_max"]; // (control planarchiveunmintable) the plan Archive button 404s`]];
+
+// MUTATE=rungarchiveunmintable  the plan-card rung branch of canMint is gone, so
+// a rung's `commitments.<i>.archived` save with a null id 404s again - the ladder
+// Archive/Restore button, dead, on any plan whose rung the seed never wrote.
+const RUNGARCHIVEUNMINTABLE = [[
+  `    if (cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) return true;`,
+  `    if (false && cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) return true; // (control rungarchiveunmintable) the rung Archive button 404s`]];
+
 // MUTATE=serverconfirmsuntargeted  the server-side codes confirm guard is gone,
 // so a direct POST confirms a named code with no applies-to list - exactly what
 // the dress rehearsal found succeeding while the page promised a refusal.
@@ -585,6 +616,7 @@ const EDITS = {
   emptycardsdontcount: EMPTYCARDSDONTCOUNT, countsflag: COUNTSFLAG, addkeepsconfirm: ADDKEEPSCONFIRM,
   othernofollowup: OTHERNOFOLLOWUP,
   codesunmintable: CODESUNMINTABLE, codesmintany: CODESMINTANY,
+  planarchiveunmintable: PLANARCHIVEUNMINTABLE, rungarchiveunmintable: RUNGARCHIVEUNMINTABLE,
   serverconfirmsuntargeted: SERVERCONFIRMSUNTARGETED,
   blankadd: BLANKADD, typingisapproving: TYPINGISAPPROVING,
   confirmsurvivesedit: CONFIRMSURVIVESEDIT,
@@ -1708,6 +1740,66 @@ console.log("\n── the mint whitelist, plan cards: the age question can grow 
   const r3 = await post({ token: TOKEN, action: "save", card_key: "codes", answers: [{ id: null, target_field: "age_min", answered: "9" }] });
   ok(r3.status === 404 && /does not belong to this card/.test(String(r3.body.error)),
     `a null-id save of age_min on the CODES card still refuses with the existing sentence ("${r3.body.error}")`);
+  reset();
+}
+
+console.log("\n── the mint whitelist, plan cards: the Archive button can grow its row ──");
+{
+  reset();
+  // THE LIVE BLOCKER: a plan card seeded before the Archive toggle existed has
+  // no `archived` row, so the page's toggleArch (setA('archived', true) with a
+  // null id) 404'd - the owner clicked Archive and it silently failed.
+  // mintableOn("plan:*") now allows exactly that one field, aimed by the card's
+  // own siblings. MUTATE=planarchiveunmintable.
+  const before = DB.workbook_answers.length;
+  const r1 = await post({ token: TOKEN, action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "archived", answered: true }] });
+  ok(r1.status === 200 && r1.body.ok === true, "a null-id save of archived on a plan card is accepted - the exact save that 404'd on the live workbook");
+  const minted = DB.workbook_answers.filter((a) => a.card_id === "c-p1" && a.target_field === "archived");
+  ok(minted.length === 1 && DB.workbook_answers.length === before + 1 && minted[0].answered === true,
+    `exactly ONE row is minted, carrying the boolean answer (id ${minted[0] && minted[0].id}, answered ${JSON.stringify(minted[0] && minted[0].answered)})`);
+  ok(minted.length === 1 && minted[0].target_kind === "price_row" && minted[0].target_table === "offer_prices" && minted[0].target_id === "p1",
+    "aimed at the plan's own offer row by the card's title sibling - never by the payload");
+
+  // The save reply carries no answer ids, so the page's next Restore sends null
+  // again: it must land on the SAME row, never mint a twin.
+  const r2 = await post({ token: TOKEN, action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "archived", answered: false }] });
+  const again = DB.workbook_answers.filter((a) => a.card_id === "c-p1" && a.target_field === "archived");
+  ok(r2.body.ok === true && again.length === 1 && again[0].id === minted[0].id && again[0].answered === false,
+    `a second null-id save (Restore) updates the SAME row (${again[0] && again[0].id}), not a twin`);
+
+  // FAIL-CLOSED DID NOT WEAKEN. Admitting `archived` admits nothing else: a
+  // foreign bare plan field with no row still 404s, byte for byte.
+  const foreign = await post({ token: TOKEN, action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "hacker", answered: "x" }] });
+  ok(foreign.status === 404 && foreign.body.error === "that answer does not belong to this card",
+    `a null-id save of a foreign bare plan field still refuses byte-for-byte ("${foreign.body.error}")`);
+  reset();
+}
+
+console.log("\n── the mint whitelist, plan cards: the ladder Archive button grows its rung row ──");
+{
+  reset();
+  // The ladder Archive/Restore control saves `commitments.<i>.archived` with a
+  // null id, and a plan card seeded before that rung's archived row 404'd
+  // identically. canMint on a plan card now admits ONLY that one leaf.
+  // MUTATE=rungarchiveunmintable.
+  DB.workbook_answers.push({ id: "a-p1-c0-price", workbook_id: "wb1", card_id: "c-p1", client_id: "sj", target_kind: "price_row", target_table: "offer_prices", target_id: "p1", target_field: "commitments.0.price", current_value: 749, proposed: 749, answered: null, applied_at: null, created_at: "2026-08-04T00:00:07Z" });
+  const before = DB.workbook_answers.length;
+  const r1 = await post({ token: TOKEN, action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: "commitments.0.archived", answered: true }] });
+  ok(r1.status === 200 && r1.body.ok === true, "a null-id save of commitments.0.archived on a plan card is accepted");
+  const minted = DB.workbook_answers.filter((a) => a.card_id === "c-p1" && a.target_field === "commitments.0.archived");
+  ok(minted.length === 1 && DB.workbook_answers.length === before + 1 && minted[0].answered === true,
+    `exactly ONE row is minted, carrying the boolean answer (id ${minted[0] && minted[0].id})`);
+  ok(minted.length === 1 && minted[0].target_kind === "price_row" && minted[0].target_table === "offer_prices" && minted[0].target_id === "p1",
+    "aimed at the plan's own offer row by the card's siblings - never by the payload");
+
+  // FAIL-CLOSED: only the archived leaf. A NON-archived rung leaf with no row
+  // (commitments.1.price) still refuses, and a non-canonical index still 404s
+  // via the existing one-spelling check - the admission is surgical.
+  for (const field of ["commitments.1.price", "commitments.00.archived"]) {
+    const r = await post({ token: TOKEN, action: "save", card_key: "plan:p1", answers: [{ id: null, target_field: field, answered: field.endsWith("archived") ? true : 1 }] });
+    ok(r.status === 404 && r.body.error === "that answer does not belong to this card",
+      `a null-id save of ${field} on the plan card still refuses byte-for-byte ("${r.body.error}")`);
+  }
   reset();
 }
 

@@ -245,9 +245,13 @@ function addableOn(cardKey) {
 function mintableOn(cardKey) {
   const k = String(cardKey || "");
   if (k === "tax") return ["tax_registration_number"];
-  // Per-plan age bands (Step 12): plan cards seeded before the question
-  // existed grow exactly these two rows, aimed by their own siblings.
-  if (k.startsWith("plan:")) return ["age_min", "age_max"];
+  // Per-plan age bands (Step 12) and the plan-level Archive button: plan cards
+  // seeded before either question existed grow exactly these rows, aimed by
+  // their own siblings. `archived` is the plan card's own Archive save (page
+  // toggleArch does setA('archived', true) with a null id), a bare PLAN_T leaf
+  // that classifies only as the plan archived flag, so admitting it admits
+  // nothing else. MUTATE=planarchiveunmintable.
+  if (k.startsWith("plan:")) return ["age_min", "age_max", "archived"];
   return [];
 }
 
@@ -270,6 +274,18 @@ function canMint(cardKey, field) {
   if (k === "codes" || k.startsWith("codes:")) {
     const cls = classifyField(field);            // hoisted; defined below
     return cls.kind === "code" && !!cls.t;
+  }
+  // The rung Archive/Restore button (public/workbook.html) saves
+  // `commitments.<i>.archived` with a null id, and a plan card seeded before a
+  // rung existed has no row for it to live in - the same defect class the codes
+  // branch above fixes, on the plan card. classifyField is reused for the
+  // own-property RUNG_T lookup, the canonical index and the MAX_LIST_INDEX
+  // bound, but ONLY the archived leaf is admitted: `commitments.<i>.price` or a
+  // phantom rung field stays today's refusal, so a direct POST cannot mint an
+  // arbitrary rung leaf. MUTATE=rungarchiveunmintable.
+  if (k.startsWith("plan:")) {
+    const cls = classifyField(field);
+    if (cls.kind === "rung" && cls.leaf === "archived" && !!cls.t) return true;
   }
   return false;
 }

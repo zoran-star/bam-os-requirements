@@ -107,6 +107,11 @@
 //       new price land on the ARCHIVED tier while the live plan is untouched -
 //       with ok:true, a write report that reads correctly, and every answer
 //       stamped so the rerun does nothing.
+//   MUTATE=archivedwritedropped node api/_workbook-apply.test.mjs
+//       the plan-archive write is dropped: apply stamps the answer applied but
+//       never sets offering.archived, so the plan the owner retired stays live
+//       in the offer jsonb AND in the sellable set the rehearsal builds.
+//       Section 24 catches it.
 //   MUTATE=ambiguoustitle     node api/_workbook-apply.test.mjs
 //       two LIVE offerings sharing a title resolve by position again, so both
 //       cards write onto the first one and one plan's money lands on another.
@@ -210,6 +215,10 @@
 //                       elsewhere: 4 in api/_coupon-guardrails.test.mjs, 2 in
 //                       api/_workbook.test.mjs, 2 in
 //                       scripts/verify-workbook-contract.mjs)
+//   archivedwritedropped -> 2 failures (measured 2026-08-07, Archive pass:
+//                       section 24's offering.archived write-landed pin and the
+//                       dropped-from-phase3-targets pin. This control lives ONLY
+//                       here - it is about the apply WRITE, not resolution)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -360,6 +369,23 @@ const AMBIGUOUSTITLE = [[
     if (hits.length > 1) {`,
   `    if (hits.length >= 1) return { index: hits[0] };   // (control ambiguoustitle) position decides
     if (false) {`]];
+
+// The plan-archive write is dropped: apply resolves the offering and stamps the
+// answer applied, but never sets offering.archived = true. The plan the owner
+// retired stays live - in the offer jsonb AND in the sellable set the phase-3
+// rehearsal builds. Section 24's write-landed and dropped-from-targets pins are
+// what have to catch it.
+const ARCHIVEDWRITEDROPPED = [[
+  `      } else {
+        holder[cls.leaf] = value;
+        wrote.push({ answer_id: a.id, target_field: a.target_field, to: value });
+      }`,
+  `      } else if (cls.kind === "plan" && cls.leaf === "archived") {   // (control archivedwritedropped) the archive write is dropped
+        agreed.push(a.id);
+      } else {
+        holder[cls.leaf] = value;
+        wrote.push({ answer_id: a.id, target_field: a.target_field, to: value });
+      }`]];
 
 const PROTOFIELD = [
   [`  if (!own(table, leaf)) {`,
@@ -562,6 +588,7 @@ const EDITS = {
   ownertoken: OWNERTOKEN,
   liveapply: LIVEAPPLY,
   archivedsteal: ARCHIVEDSTEAL,
+  archivedwritedropped: ARCHIVEDWRITEDROPPED,
   ambiguoustitle: AMBIGUOUSTITLE,
   protofield: PROTOFIELD,
   unboundedrung: UNBOUNDEDRUNG,
@@ -1964,6 +1991,45 @@ console.log("\n── 23. a code's set-number-of-months is bounded 1-24, like th
   const apBk = await staffPost({ action: "apply", workbook_id: "wb1" });
   ok((apBk.body || {}).ok === true && codeMonths() == null,
     `blank stays null (stored ${JSON.stringify(codeMonths())})`);
+  reset();
+}
+
+console.log("\n── 24. archiving a plan lands on the offer and drops it from the sellable set ──");
+{
+  // The owner clicks Archive on a plan he no longer sells. The page confirms the
+  // card with `archived: true`; the offering is LIVE at apply start, so it
+  // resolves, the flag lands, and the plan leaves everything the phase-3
+  // rehearsal would mint or sell. MUTATE=archivedwritedropped.
+  reset();
+  approveAll();
+  // currentArchived false, answered true: a real change staff must see.
+  addAnswer("c-ele", "archived", true, { current_value: false });
+
+  // ── review shows it as a change, not a silent flag flip ───────────────────
+  const rev = await staffPost({ action: "review", workbook_id: "wb1" });
+  const eleCard = (((rev.body || {}).review || {}).cards || []).find((c) => c.card_key === "plan:ele") || {};
+  const archItem = (eleCard.items || []).find((i) => i.target_field === "archived") || {};
+  ok(archItem.is_change === true && archItem.will_write === true && archItem.current_value === false,
+    `review lists the archive as a real change - the "removed from what you sell" edit surfaces (is_change ${archItem.is_change}, will_write ${JSON.stringify(archItem.will_write)})`);
+
+  // ── apply: the flag lands on the offering the title resolves to ───────────
+  const r = await staffPost({ action: "apply", workbook_id: "wb1" });
+  ok(r.status === 200 && r.body.ok === true && offering(1).archived === true,
+    `apply writes offering.archived = true on the Elementary tier (saw ${JSON.stringify(offering(1).archived)})`);
+
+  // ── and it drops out of the sellable set the rehearsal builds ─────────────
+  const p3 = r.body.phase3 || {};
+  const keys = (p3.targets || []).map((t) => t.key);
+  const eleKeys = keys.filter((k) => k.startsWith("Elementary Academy|"));
+  ok(keys.length > 0 && eleKeys.length === 0,
+    `the archived plan's keys are ABSENT from phase3.targets - nothing prices or sells it (${eleKeys.length} Elementary keys of ${keys.length} targets)`);
+  ok(keys.includes("Academy 2x/week|monthly"),
+    "while a still-live sibling plan keeps its targets - archiving one plan does not blank the rest");
+
+  // ── the dry-run invariants hold: nothing published, owner still locked ─────
+  ok(wbRow().status !== "applied", `apply(dry) never moves the workbook to 'applied' (saw ${JSON.stringify(wbRow().status)})`);
+  const ownerSave = await post({ token: TOKEN, action: "save", card_key: "plan:ele", answers: [{ id: "a-ele-title", answered: "sneak" }] });
+  ok(ownerSave.status === 409, "and the owner is still locked out after apply");
   reset();
 }
 
