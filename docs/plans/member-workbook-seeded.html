@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>By Any Means San Jose &middot; Your members</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;color:#1E1E24;background:#F7F6F2;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    line-height:1.4;-webkit-font-smoothing:antialiased;padding:22px 14px 90px}
+  .wrap{max-width:1220px;margin:0 auto}
+  h1{font-size:21px;margin:0 0 2px;letter-spacing:-.5px;font-weight:800}
+  .sub{font-size:12.5px;color:#6E6E78;margin:0 0 4px}
+  .mock{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;
+    background:#FBF3E1;color:#8A6D1F;border:1px solid #EAD9A8;border-radius:20px;padding:3px 10px;margin-bottom:14px}
+
+  .plans{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 14px}
+  .p{background:#fff;border:1px solid #E3E1DA;border-radius:11px;padding:9px 12px;font-size:11.5px;min-width:150px}
+  .p b{display:block;font-size:12.5px;margin-bottom:2px}
+  .p .r{color:#6E6E78}
+  .p.arch{background:#FBF4F1;border-color:#E0B9AC}
+  .p .tag{font-size:8.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;background:#FADbcf;color:#B0472A;border-radius:10px;padding:1px 6px;margin-left:4px}
+
+  /* ONE sticky bar. The header row is NOT sticky, so nothing can sit on top of a row. */
+  .bar{position:sticky;top:0;z-index:30;background:#F7F6F2;padding:9px 0 11px;border-bottom:1px solid #E3E1DA;margin-bottom:12px}
+  .prog{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px}
+  .pill{background:#fff;border:1px solid #E3E1DA;border-radius:20px;padding:4px 12px;font-weight:650}
+  .pill.need{background:#FDEAE4;border-color:#E09A85;color:#B0472A}
+  .send{background:#C9C5B9;color:#fff;border:none;border-radius:9px;padding:7px 16px;font-weight:700;font-size:12.5px;cursor:not-allowed}
+  .why{font-size:11.5px;color:#B0472A}
+  .addbtn{margin-left:auto;background:#1E1E24;color:#fff;border:none;border-radius:9px;padding:7px 14px;font-weight:700;font-size:12.5px;cursor:pointer}
+
+  table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid #E3E1DA;border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid #EFEDE6;vertical-align:middle}
+  th{background:#FAF9F5;color:#7C7C86;font-size:9.5px;text-transform:uppercase;letter-spacing:.9px}
+  tr:last-child td{border-bottom:none}
+  tr.flag{background:#FEFAF4}
+  tr:hover{background:#FAFAF7}
+  tr.flag:hover{background:#FDF6EC}
+  .ck{width:19px;height:19px;border:2px solid #D2CFC4;border-radius:6px;display:inline-block;cursor:pointer}
+  .nm{font-weight:650}
+  .em{font-size:10.5px;color:#9A9AA4}
+  .money{font-variant-numeric:tabular-nums;font-weight:650;color:#3A3A44}
+  .money .ro{font-size:9px;color:#B4B0A5;font-weight:600;display:block;letter-spacing:.5px}
+  .dt{font-variant-numeric:tabular-nums;font-size:11.5px}
+  .dt .src{font-size:9px;color:#9BBFA6;font-weight:700;display:block;letter-spacing:.4px}
+  .dt.past{color:#8A8A94}
+  select,input[type=text]{font:inherit;font-size:11.5px;border:1px solid #DCD9CE;border-radius:7px;padding:4px 6px;background:#fff;max-width:100%}
+  input[type=text].sm{width:118px}
+  input[type=text].age{width:44px}
+  .ath{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+  .pre{background:#F1F8F3;border-color:#BFDDC9}
+  .addath{font-size:10.5px;color:#8A6D1F;border:1px dashed #D4B65C;border-radius:6px;padding:2px 7px;cursor:pointer;background:#FDFBF4}
+  .note{font-size:10.5px;color:#B0472A;margin-top:3px}
+
+  /* three dot menu */
+  .dots{width:26px;height:26px;border:1px solid #E3E1DA;border-radius:7px;background:#fff;cursor:pointer;
+    font-size:15px;line-height:1;color:#6E6E78;font-weight:800}
+  .dots:hover{background:#F2F1EC}
+  .menu{position:absolute;z-index:60;background:#fff;border:1px solid #DCD9CE;border-radius:11px;
+    box-shadow:0 8px 24px rgba(20,20,20,.14);padding:6px;min-width:212px;font-size:12.5px;display:none}
+  .menu.on{display:block}
+  .menu .sec{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#9A9AA4;padding:6px 9px 3px;font-weight:800}
+  .menu button{display:block;width:100%;text-align:left;border:none;background:none;font:inherit;
+    padding:6px 9px;border-radius:7px;cursor:pointer;color:#2E2E36}
+  .menu button:hover{background:#F4F3EE}
+  .menu button.on{background:#1E1E24;color:#fff;font-weight:650}
+  .menu button.danger{color:#B0472A}
+  .menu button.danger:hover{background:#FDEAE4}
+  .menu hr{border:none;border-top:1px solid #EFEDE6;margin:5px 2px}
+  .paytag{font-size:9.5px;color:#6E6E78;display:block;margin-top:2px}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:#6E6E78;margin:12px 0 0}
+  .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+  .foot{margin-top:22px;background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:14px 16px;font-size:12.5px;color:#4A4A54}
+  .foot b{color:#1E1E24}
+  .foot ul{margin:7px 0 0;padding-left:19px}
+  .foot li{margin-bottom:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="mock">Mockup &middot; real members, real Stripe dates, athlete names pulled from GHL</span>
+  <h1>Your members</h1>
+  <p class="sub">These are the 20 people paying you today. We filled in everything we could find. Check each row, fix what is wrong, then send it back.</p>
+
+  <div class="plans">
+    <div class="p"><b>Academy 1x/week</b><span class="r">$175 / 4 weeks &middot; 3mo $425 &middot; 6mo $875</span></div>
+    <div class="p"><b>Academy 2x/week</b><span class="r">$250 / 4 weeks &middot; 3mo $599 &middot; 6mo $1,150</span></div>
+    <div class="p"><b>Academy Unlimited</b><span class="r">$300 / 4 weeks &middot; 3mo $749 &middot; 6mo $1,399</span></div>
+    <div class="p arch"><b>Elementary <span class="tag">removed</span></b><span class="r">$200 &middot; current members only</span></div>
+  </div>
+
+  <div class="bar">
+    <div class="prog">
+      <span class="pill need">0 of 20 checked</span>
+      <span class="pill">7 need your eye</span>
+      <button class="send">Send back to BAM</button>
+      <span class="why">Check all 20 rows to send</span>
+      <button class="addbtn" onclick="alert('Adds a blank row: parent, athlete, age, plan, what they pay, how they pay.\n\nUse this for anyone who trains with you but is not in Stripe, for example a cash family.')">+ Add a member</button>
+    </div>
+  </div>
+
+  <table id="t">
+    <tr>
+      <th style="width:26px"></th><th>Parent</th><th style="width:196px">Athlete + age</th>
+      <th style="width:184px">Plan</th><th style="width:92px">They pay</th>
+      <th style="width:96px">Last payment</th><th style="width:96px">Next payment</th><th style="width:34px"></th>
+    </tr>
+
+    <tr class="flag"><td><span class="ck"></span></td>
+      <td><span class="nm">Jenny Chung</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Tayden Liam Luu"><input type="text" class="age pre" value="9"><span class="addath">+</span></div></td>
+      <td><select><option selected>Elementary (removed)</option><option>Academy 1x/week</option><option>Academy 2x/week</option><option>Academy Unlimited</option></select>
+        <div class="note">Elementary is no longer sold. Keep her rate or move her?</div></td>
+      <td class="money">$200<span class="ro">every 4 wks</span></td>
+      <td class="dt past">Jul 10</td><td class="dt">Aug 7<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Janeth Beltran</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Andrea Beltran V."><input type="text" class="age pre" value="12"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 1x/week</option></select></td>
+      <td class="money">$175<span class="ro">every 4 wks</span></td>
+      <td class="dt past">Jul 20</td><td class="dt">Aug 17<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Bernard Lintag</span><div class="em">duplicate product in Stripe</div></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Joshua Lam"><input type="text" class="age" placeholder="age"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 2x/week</option></select></td>
+      <td class="money">$250<span class="ro">every 4 wks</span></td>
+      <td class="dt past">Jul 21</td><td class="dt">Aug 18<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr class="flag"><td><span class="ck"></span></td>
+      <td><span class="nm">Christy Hang</span><div class="em">$199, a deal you set up</div></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Matt Hang"><input type="text" class="age pre" value="13"><span class="addath">+</span></div>
+        <div class="note">Stripe calls this plan "Christopher". Is Matt right?</div></td>
+      <td><select><option>Which plan is this?</option><option>Academy 1x/week</option><option>Academy 2x/week</option><option>Academy Unlimited</option></select>
+        <div class="note">We do not know which plan this discount is on</div></td>
+      <td class="money">$199<span class="ro">every 4 wks</span></td>
+      <td class="dt past">Jul 22</td><td class="dt">Aug 19<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr class="flag"><td><span class="ck"></span></td>
+      <td><span class="nm">Salvador Esparza</span><div class="em">"Pre Season 1x/week"</div></td>
+      <td><div class="ath"><input type="text" class="sm" placeholder="athlete"><input type="text" class="age" placeholder="age"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 1x/week</option><option>Academy 2x/week</option><option>Academy Unlimited</option></select>
+        <div class="note">He pays $200, the 1x plan is $175</div></td>
+      <td class="money">$200<span class="ro">every 4 wks</span></td>
+      <td class="dt past">Jul 22</td><td class="dt">Aug 19<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Brian De Guzman</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Zachari De Guzman"><input type="text" class="age pre" value="11"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 2x/week</option></select></td>
+      <td class="money">$250<span class="ro">every 4 wks</span></td>
+      <td class="dt past">Jul 25</td><td class="dt">Aug 22<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr class="flag"><td><span class="ck"></span></td>
+      <td><span class="nm">Adam Ly</span><div class="em">was on "Pre Season"</div></td>
+      <td><div class="ath"><input type="text" class="sm" placeholder="athlete"><input type="text" class="age" placeholder="age"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy Unlimited</option><option>Academy 2x/week</option><option>Academy 1x/week</option></select>
+        <div class="note">Pre Season now counts as Unlimited</div></td>
+      <td class="money">$300<span class="ro">every 4 wks</span></td>
+      <td class="dt past">Jul 29</td><td class="dt">Aug 26<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr class="flag"><td><span class="ck"></span></td>
+      <td><span class="nm">MEREDITH TORIO</span><div class="em">$100, Keanu's family deal</div></td>
+      <td><div class="ath"><input type="text" class="sm" value="Keanu"><input type="text" class="age" placeholder="age"><span class="addath">+</span></div></td>
+      <td><select><option selected>Elementary (removed)</option><option>Academy 1x/week</option><option>Academy 2x/week</option><option>Academy Unlimited</option></select>
+        <div class="note">Elementary is no longer sold. Keep his rate or move him?</div></td>
+      <td class="money">$100<span class="ro">monthly</span></td>
+      <td class="dt past">Jul 27</td><td class="dt">Aug 27<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr class="flag"><td><span class="ck"></span></td>
+      <td><span class="nm">Ted Miranda</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Trajan Miranda"><input type="text" class="age pre" value="9"><span class="addath">+</span></div></td>
+      <td><select><option selected>Elementary (removed)</option><option>Academy 1x/week</option><option>Academy 2x/week</option><option>Academy Unlimited</option></select>
+        <div class="note">Elementary is no longer sold. Keep his rate or move him?</div></td>
+      <td class="money">$200<span class="ro">every 4 wks</span></td>
+      <td class="dt past">Aug 5</td><td class="dt">Sep 2<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Jimmy Nguyen</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Kaisei Nguyen"><input type="text" class="age pre" value="11"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 2x/week</option></select></td>
+      <td class="money">$250<span class="ro">every 4 wks</span></td>
+      <td class="dt past">Aug 6</td><td class="dt">Sep 3<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Manish Patel</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Vihaan Patel"><input type="text" class="age pre" value="13"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 2x/week &middot; 3 months</option></select></td>
+      <td class="money">$599<span class="ro">12 weeks</span></td>
+      <td class="dt past">Jun 15</td><td class="dt">Sep 7<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr class="flag"><td><span class="ck"></span></td>
+      <td><span class="nm">Aaron Rufin</span><div class="em">price has no name in Stripe</div></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Logan Rufin"><input type="text" class="age pre" value="12"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy Unlimited &middot; 3 months</option><option>Academy 2x/week &middot; 3 months</option></select>
+        <div class="note">We matched this by price. Is it right?</div></td>
+      <td class="money">$749<span class="ro">12 weeks</span></td>
+      <td class="dt past">Jun 22</td><td class="dt">Sep 14<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Mohan Sriperambaduru</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Nikith Sriperambaduru"><input type="text" class="age" placeholder="age"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 2x/week &middot; 3 months</option></select></td>
+      <td class="money">$599<span class="ro">12 weeks</span></td>
+      <td class="dt past">Jun 24</td><td class="dt">Sep 16<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Neha Vashistha</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Gaurang Thakur"><input type="text" class="age pre" value="13"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 2x/week &middot; 3 months</option></select></td>
+      <td class="money">$599<span class="ro">12 weeks</span></td>
+      <td class="dt past">Jul 1</td><td class="dt">Sep 23<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Prakash K. Sambandam</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Akilesh S P. Kumaar"><input type="text" class="age pre" value="13"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy Unlimited &middot; 3 months</option></select></td>
+      <td class="money">$749<span class="ro">12 weeks</span></td>
+      <td class="dt past">Jul 5</td><td class="dt">Sep 27<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Crystal Gomez</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Myles Ruiz"><input type="text" class="age" placeholder="age"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 2x/week &middot; 3 months</option></select></td>
+      <td class="money">$599<span class="ro">12 weeks</span></td>
+      <td class="dt past">Jul 28</td><td class="dt">Oct 20<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">James Hwang</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Hunter Hwang"><input type="text" class="age pre" value="13"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 2x/week &middot; 3 months</option></select></td>
+      <td class="money">$599<span class="ro">12 weeks</span></td>
+      <td class="dt past">Jul 31</td><td class="dt">Oct 23<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Dana Lee</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Troy Keanu Concepcion"><input type="text" class="age pre" value="12"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy Unlimited &middot; 6 months</option></select></td>
+      <td class="money">$1,399<span class="ro">24 weeks</span></td>
+      <td class="dt past">Jun 18</td><td class="dt">Dec 3<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Thuy Chau</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Kalvin Chau"><input type="text" class="age pre" value="12"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy Unlimited &middot; 6 months</option></select></td>
+      <td class="money">$1,399<span class="ro">24 weeks</span></td>
+      <td class="dt past">Jun 27</td><td class="dt">Dec 12<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+
+    <tr><td><span class="ck"></span></td>
+      <td><span class="nm">Tamba GbondoTugbawa</span></td>
+      <td><div class="ath"><input type="text" class="sm pre" value="Sahr Gbondo-Tugbawa"><input type="text" class="age pre" value="12"><span class="addath">+</span></div></td>
+      <td><select><option selected>Academy 2x/week &middot; 6 months</option></select></td>
+      <td class="money">$1,150<span class="ro">24 weeks</span></td>
+      <td class="dt past">Jul 22</td><td class="dt">Jan 6 2027<span class="src">from Stripe</span></td>
+      <td><button class="dots" onclick="menu(this)">&#8942;</button></td></tr>
+  </table>
+
+  <div class="legend">
+    <span><span class="sw" style="background:#FEFAF4;border:1px solid #E8CFA8"></span>Needs your eye (7)</span>
+    <span><span class="sw" style="background:#F1F8F3;border:1px solid #BFDDC9"></span>Green boxes = we already found this, just check it</span>
+  </div>
+
+  <div class="foot">
+    <b>What changed in this version, and what the data said</b>
+    <ul>
+      <li><b>Stripe has every date.</b> All 20 next payments and all 20 last payments came straight from his account. Lij types zero dates. My earlier note that we lacked them was wrong: they live on the subscription ITEM, not the subscription.</li>
+      <li><b>GHL already knows 17 of 20 athletes and 14 of 20 ages</b>, plus grade and skill level we are not showing. Only Adam Ly, Salvador Esparza and Meredith Torio are blank. This also corrects my earlier claim that we knew no athlete names.</li>
+      <li><b>Fixed:</b> the sticky header no longer covers a row. Only the progress bar sticks now.</li>
+      <li><b>Added:</b> a Last payment column, and a real "+ Add a member" button for anyone not in Stripe.</li>
+      <li><b>Three dots</b> now hold how they pay, mark them gone, and the rest, instead of two crowded columns.</li>
+      <li><b>Worth a look:</b> Stripe names Christy Hang's plan "Christopher" but GHL says her athlete is <b>Matt Hang</b>. One of them is stale, or there are two kids. The row asks rather than guesses.</li>
+      <li><b>Rows are sorted by next payment</b>, so the soonest charge is at the top. Jenny Chung bills today.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="menu" id="m">
+  <div class="sec">How they pay</div>
+  <button class="on" onclick="pick(this)">Card on file</button>
+  <button onclick="pick(this)">Cash</button>
+  <button onclick="pick(this)">e-Transfer</button>
+  <button onclick="pick(this)">Something else</button>
+  <hr>
+  <div class="sec">This member</div>
+  <button onclick="alert('Opens a note field for this member.')">Add a note</button>
+  <button class="danger" onclick="alert('Marks this member as gone.\n\nThis means STOP CHARGING them. It creates a task with the amount and the subscription id so it actually gets done.')">Not a member anymore</button>
+</div>
+
+<script>
+  var open=null;
+  function menu(btn){
+    var m=document.getElementById('m');
+    if(open===btn){ m.classList.remove('on'); open=null; return; }
+    var r=btn.getBoundingClientRect();
+    m.style.left=Math.max(8,r.right-212+window.scrollX)+'px';
+    m.style.top=(r.bottom+6+window.scrollY)+'px';
+    m.classList.add('on'); open=btn;
+  }
+  function pick(b){
+    var sib=b.parentNode.querySelectorAll('.sec+button,button');
+    ['Card on file','Cash','e-Transfer','Something else'].forEach(function(t){
+      Array.prototype.forEach.call(document.querySelectorAll('#m button'),function(x){
+        if(x.textContent===t) x.classList.remove('on');
+      });
+    });
+    b.classList.add('on');
+    if(open){
+      var td=open.closest('td'), row=open.closest('tr');
+      var tag=row.querySelector('.paytag');
+      if(!tag){ tag=document.createElement('span'); tag.className='paytag'; td.appendChild(tag); }
+      tag.textContent=b.textContent==='Card on file'?'':b.textContent;
+    }
+    document.getElementById('m').classList.remove('on'); open=null;
+  }
+  document.addEventListener('click',function(e){
+    if(!e.target.closest('.dots') && !e.target.closest('.menu')){
+      document.getElementById('m').classList.remove('on'); open=null;
+    }
+  });
+  document.querySelectorAll('.ck').forEach(function(c){
+    c.addEventListener('click',function(){ c.style.background=c.style.background?'':'#4CAF78'; c.style.borderColor=c.style.borderColor==='rgb(76, 175, 120)'?'':'#4CAF78'; });
+  });
+</script>
+</body>
+</html>

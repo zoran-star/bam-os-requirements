@@ -217,6 +217,37 @@ function dueLabel(d) {
   return ` · due ${d}`;
 }
 
+// ── The "a new action item exists" announcement, as one function ─────────────
+//
+// EXTRACTED 2026-08-07, not rewritten. These four calls used to sit inline in
+// the POST branch, INSIDE the JWT-authenticated handler, which meant the only
+// way for anything else to announce an item was to copy them - and a copy is how
+// two notification paths start disagreeing about which channels fire.
+//
+// The off-Stripe collections cron (api/_off-card.js, called from api/members.js
+// ?action=cron-collect-off-card) has no user and no JWT: it authenticates with
+// CRON_SECRET and inserts with the service role. It calls THIS after its insert.
+//
+// WHAT WAS DELIBERATELY NOT DONE: the authed POST route was not loosened. It
+// still requires ctx.user.id and still checks canAccess before it reaches this
+// function. Extracting the announcement moved no gate.
+//
+// Best-effort by construction, exactly as the inline version was: Slack is
+// awaited (it is the one the academy actually reads), push and SMS are fired and
+// forgotten. A notification that throws must never undo a row that was already
+// written - the item existing matters more than the ping.
+export async function announceActionItem(clientId, item, { req = null, who = "" } = {}) {
+  const title = (item && item.title) || "";
+  if (!clientId || !title) return;
+  await postClientSlackNotification(
+    clientId, `📋 New action item${who} — *${title}*${dueLabel(item && item.due_date)}`, req
+  );
+  notifyClientPush(clientId, "action-item-assigned", {
+    label: title, itemId: item && item.id, view: "action-items",
+  }).catch(() => {});
+  notifyOwners(clientId, "action_item", `📋 New action item: ${title}`).catch(() => {});
+}
+
 // ── SM Onboarding Call Sequence (Mike / BAM spec, 2026-07-25) ──────────────
 // 7 structured Scaling Manager calls that run for every newly activated client.
 // Each call is its own onboarding action item (the generic "Book a call with
@@ -735,16 +766,11 @@ async function handler(req, res) {
       });
       const item = Array.isArray(rows) ? rows[0] : rows;
 
+      // Slack channel + #3 assigned native push + owner/staff SMS (V1.5/V2, per
+      // notification_prefs). Shared with the off-card collections cron, which
+      // reaches it after a service-role insert; see announceActionItem above.
       const who = assignee_name ? ` for ${assignee_name}` : "";
-      await postClientSlackNotification(
-        clientId, `📋 New action item${who} — *${title}*${dueLabel(item.due_date)}`, req
-      );
-      // #3 assigned native push
-      notifyClientPush(clientId, "action-item-assigned", {
-        label: title, itemId: item.id, view: "action-items",
-      }).catch(() => {});
-      // Owner/staff SMS (V1.5/V2, per notification_prefs)
-      notifyOwners(clientId, "action_item", `📋 New action item: ${title}`).catch(() => {});
+      await announceActionItem(clientId, item, { req, who });
       return res.status(200).json({ item });
     }
 

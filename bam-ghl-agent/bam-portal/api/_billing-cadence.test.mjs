@@ -38,12 +38,15 @@
 //   4. The anchor math, which is where a cadence stops being a label: a 12-week
 //      commitment anchors +84 days, a 3-calendar-month one lands on the calendar
 //      date, and 3_calendar_months is provably the same date as legacy 3_months.
-//   5. The vocabulary does not FORK. The same map is written out in
-//      api/website/checkout.js (which charges) and api/offers/create-price.js
-//      (which mints the Stripe price); api/website/offer.js labels the same keys;
-//      the migration's CHECK constraint allows the same keys and no others. All
-//      four are compared. A price minted on one clock and billed on another is
-//      the worst outcome available here, and this is what stops it.
+//   5. The vocabulary does not FORK. The map lives in api/_billing-cadence.js,
+//      which api/website/checkout.js (which charges) and api/_off-card.js (which
+//      reminds an owner to collect cash) both IMPORT, so those two cannot differ
+//      at all; api/offers/create-price.js (which mints the Stripe price) still
+//      writes its own copy and is compared entry by entry; api/website/offer.js
+//      labels the same keys; the migration's CHECK constraint allows the same
+//      keys and no others. All are compared. A price minted on one clock and
+//      billed on another is the worst outcome available here, and this is what
+//      stops it.
 //   6. Both idempotency keys carry the cadence when there is one. Without that,
 //      re-minting after a cadence change hands back Stripe's CACHED price on the
 //      OLD clock with no error anywhere.
@@ -153,17 +156,28 @@ function cut(src, pin, where) {
 const CHECKOUT = readSource("website/checkout.js");
 const CREATE_PRICE = readSource("offers/create-price.js");
 const OFFER = readSource("website/offer.js");
+// RE-POINTED 2026-08-07 (off-Stripe payments build). These five definitions used
+// to live INSIDE api/website/checkout.js and were cut out of it here. They moved,
+// byte for byte, to api/_billing-cadence.js when a second shipping consumer
+// arrived (api/_off-card.js, the off-card collections engine) - copying them
+// would have made a third copy of the arithmetic that decides when a parent is
+// charged. checkout.js now IMPORTS them, so the pins below aim at the module.
+//
+// This is a strictly stronger claim than before: checkout.js can no longer drift
+// from what this suite tests, because it does not carry the code at all. The
+// create-price.js mirror in section 5 is untouched and still compared.
+const SHARED = readSource("_billing-cadence.js");
 const MIGRATION = fs.readFileSync(
   path.join(HERE, "..", "supabase", "migrations", "20260730T230000_offer_prices_billing_cadence.sql"), "utf8"
 );
 
-// The four pieces of checkout.js that decide an interval, as themselves.
+// The five pieces of api/_billing-cadence.js that decide an interval, as themselves.
 let module_ = [
-  cut(CHECKOUT, "const CADENCES = {", "website/checkout.js"),
-  cut(CHECKOUT, "function intervalFor(term) {", "website/checkout.js"),
-  cut(CHECKOUT, "function resolveInterval(row, term) {", "website/checkout.js"),
-  cut(CHECKOUT, "function addInterval(date, iv) {", "website/checkout.js"),
-  cut(CHECKOUT, "function cadenceWarning(iv) {", "website/checkout.js"),
+  cut(SHARED, "const CADENCES = {", "_billing-cadence.js"),
+  cut(SHARED, "function intervalFor(term) {", "_billing-cadence.js"),
+  cut(SHARED, "function resolveInterval(row, term) {", "_billing-cadence.js"),
+  cut(SHARED, "function addInterval(date, iv) {", "_billing-cadence.js"),
+  cut(SHARED, "function cadenceWarning(iv) {", "_billing-cadence.js"),
   "export { CADENCES, intervalFor, resolveInterval, addInterval, cadenceWarning };\n",
 ].join("\n");
 
@@ -444,14 +458,27 @@ const countCalls = (src, needle) => codeLines(src).filter((l) => l.includes(need
   // named above. intervalFor may be called from exactly three places: its own
   // definition, resolveInterval's fallback, and signupFeeAppliesTo (which uses it
   // as a term-key truthiness check and is deliberately left alone).
+  // RE-POINTED 2026-08-07: this used to be one count of 3 over checkout.js, when
+  // the definition and resolveInterval's fallback still lived there. The three
+  // permitted places are unchanged, they are now split across two files - the
+  // module holds its own definition plus the fallback, checkout.js holds the one
+  // remaining reference, signupFeeAppliesTo's term-key truthiness check, which is
+  // deliberately left alone. Counting BOTH is what still catches a mutation that
+  // reintroduces a direct legacy call anywhere, in any wording.
+  const ivSharedCalls = countCalls(SHARED, "intervalFor(");
+  ok(ivSharedCalls === 2,
+    `_billing-cadence.js: intervalFor appears in exactly 2 places, its definition and the fallback (saw ${ivSharedCalls})`);
   const ivCalls = countCalls(CHECKOUT, "intervalFor(");
-  ok(ivCalls === 3, `checkout.js: intervalFor is referenced in exactly 3 places, none of them a call site (saw ${ivCalls})`);
-  const ivTermCalls = codeLines(CHECKOUT)
+  ok(ivCalls === 1,
+    `checkout.js: intervalFor is referenced exactly once, in signupFeeAppliesTo, and nowhere near a billed row (saw ${ivCalls})`);
+  ok(/import \{[^}]*\bintervalFor\b[^}]*\} from "\.\.\/_billing-cadence\.js";/.test(CHECKOUT),
+    "checkout.js: and it gets that intervalFor by IMPORT, so it cannot be a second copy");
+  const ivTermCalls = codeLines(SHARED)
     .filter((l) => l.includes("intervalFor(term)") && !l.includes("function intervalFor")).length;
   ok(ivTermCalls === 1,
-    `checkout.js: and intervalFor(term) is CALLED exactly once, inside resolveInterval's fallback (saw ${ivTermCalls})`);
-  ok(/return \{ \.\.\.intervalFor\(term\), cadence: null, unknown_cadence: raw \|\| null \};/.test(CHECKOUT),
-    "checkout.js: that one call IS the legacy fallback, so the old mapping is still reachable");
+    `_billing-cadence.js: and intervalFor(term) is CALLED exactly once, inside resolveInterval's fallback (saw ${ivTermCalls})`);
+  ok(/return \{ \.\.\.intervalFor\(term\), cadence: null, unknown_cadence: raw \|\| null \};/.test(SHARED),
+    "_billing-cadence.js: that one call IS the legacy fallback, so the old mapping is still reachable");
 
   // The selects. Every read of a row that gets BILLED goes through the retry;
   // bypassing it is the pre-migration 400 that takes the enroll page down.

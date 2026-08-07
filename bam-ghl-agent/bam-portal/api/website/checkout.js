@@ -34,6 +34,7 @@ import { resolveOrMintPortalContact, writePortalFieldValues, ensureStorageOnlyDe
 import { stripeFetch as transportStripeFetch, publishableFor } from "../_stripe-transport.js";
 import { isOnboardingTestMode, onboardingKeyOverride } from "../_stripe-onboarding-key.js";
 import { assertHeaderSafeCredential, safeFetch } from "../_header-safe-credential.js";
+import { CADENCES, intervalFor, resolveInterval, addInterval, cadenceWarning } from "../_billing-cadence.js";
 
 const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
 const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
@@ -106,77 +107,6 @@ function stripeKey() {
 // authenticated with the trimmed one meant a leading space made this return
 // false on an sk_test key: live branches, test money.
 function isTestMode() { return isOnboardingTestMode(); }
-function intervalFor(term) {
-  if (term === "3_months") return { interval: "month", interval_count: 3 };
-  if (term === "6_months") return { interval: "month", interval_count: 6 };
-  // Adjustable prepay lengths (Zoran, 2026-08-06): any bounded <n>_months term
-  // bills calendar months. The two branches above stay byte-identical - they are
-  // the shapes every live academy bills on today. An out-of-range <n>_months
-  // REFUSES LOUDLY: billing a "27_months" key as week x4 (the old default)
-  // would be a silent wrong charge, and no such key can be minted, so reaching
-  // this throw means the data is broken and a human must look.
-  const nm = /^(\d+)_months$/.exec(String(term || ""));
-  if (nm) {
-    const n = +nm[1];
-    if (n >= 1 && n <= 24) return { interval: "month", interval_count: n };
-    throw new Error(`term "${term}" is ${n} months, outside the 1-24 month range this build can bill - fix the commitment length on the offer`);
-  }
-  return { interval: "week", interval_count: 4 };
-}
-
-// ── Billing CADENCE: how a price actually re-bills ──────────────────────────
-//
-// The term key (4_weeks / 3_months / 6_months) is the COMMITMENT'S IDENTITY and
-// nothing here changes what it means: it is what offer_price_key joins on, what
-// the agreement PDF's term noun reads, and what the revert logic gates on.
-// Cadence is a second, explicit, NULLABLE field on the offer_prices row that
-// says how the money actually recurs, because one 3-month commitment can
-// legitimately bill per calendar quarter (BAM GTA, live today) and another can
-// bill per 12 weeks (San Jose, ruled 2026-07-30) while both are "3 months" to
-// the parent.
-//
-// WHY IT CANNOT COME FROM THE COMMITMENT TEXT. Prod carries both notations for
-// the same thing: GTA's archived tiers say "12 Weeks (3 Months)" and San Jose
-// says "3 Months (12 Weeks)". Both match /(\d+)\s*month/ AND /12\s*week/, so
-// free text cannot express the distinction at all. termFromLength and
-// lengthMatchesTerm are deliberately left alone; the cadence is DATA, not prose.
-//
-// NULL, absent, or unrecognized cadence resolves to intervalFor(term) - byte for
-// byte the behavior every live academy has today.
-const CADENCES = {
-  "4_weeks": { interval: "week", interval_count: 4 },
-  monthly: { interval: "month", interval_count: 1 },
-  "12_weeks": { interval: "week", interval_count: 12 },
-  "24_weeks": { interval: "week", interval_count: 24 },
-  "3_calendar_months": { interval: "month", interval_count: 3 },
-  "6_calendar_months": { interval: "month", interval_count: 6 },
-};
-
-// The ONE place a billing interval is decided. Every caller goes through here so
-// a cadence cannot be honored on one code path and ignored on another.
-// Returns the Stripe recurring shape plus:
-//   cadence          - the recognized cadence that shaped it, else null (legacy)
-//   unknown_cadence  - a value the row carried that this build does not know.
-//                      We bill the LEGACY shape and report it, the same non-fatal
-//                      posture as the sign-up fee lookup: an enrollment is never
-//                      blocked over it, and it never silently invents a cadence.
-function resolveInterval(row, term) {
-  const raw = row && typeof row === "object" && row.billing_cadence != null
-    ? String(row.billing_cadence).trim().toLowerCase()
-    : "";
-  if (raw && Object.prototype.hasOwnProperty.call(CADENCES, raw)) {
-    return { ...CADENCES[raw], cadence: raw, unknown_cadence: null };
-  }
-  return { ...intervalFor(term), cadence: null, unknown_cadence: raw || null };
-}
-
-// The admin-facing note for a cadence this build does not know. Non-fatal by
-// construction: it rides the 200 alongside coupon_error rather than turning a
-// paid enrollment into an error the parent has to read.
-function cadenceWarning(iv) {
-  if (!iv || !iv.unknown_cadence) return null;
-  return `This price is set to bill "${iv.unknown_cadence}", which this build does not recognize. It was billed on the standard schedule for its term instead. Check the price row in the portal.`;
-}
 
 // offer_prices.billing_cadence ships AHEAD of its migration (see
 // supabase/migrations/20260730T230000_offer_prices_billing_cadence.sql and the
@@ -198,17 +128,13 @@ async function sbWithCadence(pathFor) {
     return await sb(pathFor(false));
   }
 }
-// Add one billing interval to a date (UTC). Used to place the recurring anchor one
-// full period AFTER a chosen future start date (they pay the first period today).
-function addInterval(date, iv) {
-  const d = new Date(date.getTime());
-  const n = iv.interval_count || 1;
-  if (iv.interval === "week") d.setUTCDate(d.getUTCDate() + 7 * n);
-  else if (iv.interval === "month") d.setUTCMonth(d.getUTCMonth() + n);
-  else if (iv.interval === "year") d.setUTCFullYear(d.getUTCFullYear() + n);
-  else d.setUTCDate(d.getUTCDate() + n); // day
-  return d;
-}
+// The billing interval arithmetic (intervalFor / CADENCES / resolveInterval /
+// addInterval / cadenceWarning) used to be defined right here. It MOVED to
+// api/_billing-cadence.js, unchanged, when the off-Stripe collections engine
+// (api/_off-card.js) needed the same answers: a cash payer on a 9-month
+// commitment must be reminded on the same rhythm a card payer is charged on,
+// and two copies of that decision is how they stop agreeing. Behaviour here is
+// byte-identical - the functions are imported above, not reimplemented.
 // Stripe rejects trial_end more than 730 days out — clamp so a far-future anchor can't 400.
 const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
