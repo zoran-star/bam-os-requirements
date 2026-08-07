@@ -36,6 +36,9 @@ import { enrollContact, isAutomationLive, resolveContactInfo } from "./automatio
 import { sendOn } from "./_send.js";
 import { moveStage, setStatus, findOpenOpp } from "./agent/_store.js";
 import { routeTransition } from "./agent/_router.js";
+// "Move the lead" -> another sales agent. Shared by all three agent APIs so the
+// six directed pairs behave identically; see api/agent/_agent-move.js.
+import { handleAgentMove } from "./agent/_agent-move.js";
 import { DEFAULT_BOOKING_AUTOMATIONS, getBookingAutomations, automationsLive as bookingAutosLive, nextDueStep as bookingNextStep } from "./agent/booking-automations.js";
 import { agentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { buildGoogleCalUrl, buildIcalUrl } from "./agent/confirm-automations.js";
@@ -1917,6 +1920,16 @@ async function handler(req, res) {
     // multi-touch follow-up: reply → back to Responded, no reply → marked Lost.
     // This REPLACES drafting one-off follow-up nudges. Works from a ghost ready-row
     // (ready_id) OR straight from a contact_id (the board "Needs action" badge).
+    // "Move the lead" -> the Confirm or Closing agent. The booking agent is simply
+    // the wrong one for this lead: they already have a trial booked, or they
+    // already attended one. Moves the opportunity, leaves the receiving agent a
+    // note saying who moved them and why, and drafts that agent's card inline.
+    // Nothing is sent - the drafted card waits for a human ✓.
+    if (b.action === "move-agent") {
+      const out = await handleAgentMove({ sb, clientId, client, token, locationId, staffEmail, fromAgent: "booking", body: b });
+      return res.status(out.status).json(out.body);
+    }
+
     if (b.action === "confirm-ghost") {
       let row = null, contactId = b.contact_id || null;
       if (b.ready_id) {

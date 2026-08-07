@@ -45,6 +45,12 @@ import {
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
 import { moveStage, setStatus, findOpenOpp as findOpenOppStore } from "./agent/_store.js";
 import { routeTransition } from "./agent/_router.js";
+// "Move the lead" -> another sales agent. Shared by all three agent APIs so the
+// six directed pairs behave identically; see api/agent/_agent-move.js. The
+// confirm -> booking pair is NOT routed through it: confirm-handoff below is
+// older, does more (voids the dropped trial slot, files a "rebook" outcome), and
+// stays the one path for a lead who cannot make their booked time.
+import { handleAgentMove } from "./agent/_agent-move.js";
 import {
   DEFAULT_CONFIRM_AUTOMATIONS, getConfirmAutomations, automationsLive,
   nextDueStep, resolveApptTokens, addressFromOverrides, resolveClientTz,
@@ -345,6 +351,74 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     thread_tail: messages.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 2000), at: toIso(m.date) })),
     reply_count: agentMsgs.length,
   };
+}
+
+/**
+ * Draft the confirm agent's first message for a lead who was JUST moved into its
+ * stage by staff, and queue it as a PENDING card. The confirm-side twin of
+ * draftAndQueueRebook (api/agent-approvals.js), called inline by the shared
+ * agent-move path so the card is in the Confirm tab the moment the modal closes.
+ *
+ * Returns { queued, row?, skipped? }. Never throws: the move has already landed
+ * and must not be undone because a draft failed.
+ *
+ * NOTHING here consults shouldAutoSend. Every card this makes is `pending` and
+ * waits for a human, which is the whole point of moving a lead by hand.
+ */
+export async function draftAndQueueConfirm({ token, locationId, client, contactId, contactName = null, createdBy = "agent-move" }) {
+  try {
+    if (!client || !contactId) return { queued: false, skipped: "missing client or contact" };
+    // The CONFIRM agent owns this card, so the CONFIRM agent's switch decides
+    // whether it exists (same rule draftAndQueueRebook applies for booking).
+    if (!modeIsOn(confirmAgentMode(client))) return { queued: false, skipped: "confirm agent is off" };
+    const clientId = client.id;
+    // Dedupe on ACTIVE cards only. The cron's 14-day "recently actioned" rule is
+    // there to stop the detector re-opening a conversation on its own; a human who
+    // just pressed a button asked for this one, so only a card already waiting for
+    // review blocks it (the table's unique index allows one anyway).
+    try {
+      const live = await sb(`agent_confirm_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved)&select=id&limit=1`);
+      if (Array.isArray(live) && live.length) return { queued: false, skipped: "a card is already waiting" };
+    } catch (e) { return { queued: false, skipped: `dedup error - ${e.message}` }; }
+
+    const cfg = await loadConfig(clientId);
+    // skipStageGuard: the move just put them in Scheduled-Trial, and the read-back
+    // can lag it. lastDirection is deliberately NOT passed - draftForContact reads
+    // the real thread and decides reactive vs proactive from it.
+    const d = await draftForContact(token, locationId, clientId, contactId, cfg, { skipStageGuard: true, tz: client.time_zone });
+    // The honest skip: a lead with no upcoming booked trial and no inbound to
+    // answer gives the confirm agent nothing to say yet. The card appears the
+    // moment either exists; the caller reports the reason rather than implying
+    // a card was made.
+    if (d.skip || d.error) return { queued: false, skipped: d.skip || d.error };
+
+    const baseRow = {
+      client_id: clientId, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
+      contact_name: contactName || null, reasoning: d.reasoning || null, confidence: d.confidence,
+      trial_at: d.trial_at || null, last_message: d.last_message || null, last_outbound: d.last_outbound || null,
+      summary: d.summary || null, thread_tail: d.thread_tail || null, reply_count: d.reply_count,
+      status: "pending", created_by: createdBy,
+    };
+    // The same dispositions the detector recognises, minus its self-drive branches.
+    // Order matches detectForClient: opt-out beats handoff beats lost beats park.
+    let row;
+    if (d.recommend_unqualified) row = { ...baseRow, kind: "confirm_unqualified", lost_reason: d.unqualified_reason || "Opted out", draft_message: "" };
+    else if (d.recommend_handoff) row = { ...baseRow, kind: "confirm_handoff", handoff_note: d.handoff_note || null, draft_message: (d.reply || "").trim() };
+    else if (d.recommend_lost) row = { ...baseRow, kind: "confirm_lost", lost_reason: d.lost_reason || "Other", draft_message: (d.reply || "").trim() };
+    else if (d.reignite_at && d.reignite_message) row = { ...baseRow, kind: "reignite", reignite_at: d.reignite_at, reignite_message: d.reignite_message, draft_message: (d.reply || "").trim() };
+    else if (!String(d.reply || "").trim()) {
+      // An escalation is still a card (it explains itself and a human sees it);
+      // an empty draft with nothing to explain is not.
+      if (!d.escalate) return { queued: false, skipped: "empty draft" };
+      row = { ...baseRow, kind: "confirm", draft_message: "", escalate: true, escalate_reason: d.escalate_reason || null };
+    } else row = { ...baseRow, kind: "confirm", draft_message: d.reply };
+
+    const inserted = await sb(`agent_confirm_replies`, { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify([row]) });
+    const saved = Array.isArray(inserted) ? inserted[0] : inserted;
+    return { queued: true, row: saved || null };
+  } catch (e) {
+    return { queued: false, skipped: `draft threw - ${(e && e.message) || e}` };
+  }
 }
 
 async function sendReplyViaGhl(token, contactId, reply, clientId) {
@@ -1523,6 +1597,16 @@ async function handler(req, res) {
         } : null,
         rebook_skipped: rebook.queued ? null : (rebook.skipped || "not drafted"),
       });
+    }
+
+    // "Move the lead" -> the Closing agent (the Booking direction keeps its own
+    // richer confirm-handoff path above, which the deck still calls). The trial
+    // already happened and this lead is deciding, so the confirm agent chasing
+    // attendance is the wrong conversation. Nothing is sent: the receiving
+    // agent's card is drafted inline and waits for a human ✓.
+    if (b.action === "move-agent") {
+      const out = await handleAgentMove({ sb, clientId, client, token, locationId, staffEmail, fromAgent: "confirm", body: b });
+      return res.status(out.status).json(out.body);
     }
 
     // 🔥 Confirm a Reignition: send the (editable) ack now, park the lead in place

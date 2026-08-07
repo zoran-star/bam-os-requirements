@@ -38,6 +38,9 @@ import {
 import { enrollContact, isAutomationLive, resolveContactInfo } from "./automations.js";
 import { moveStage, setStatus, findOpenOpp as findOpenOppStore, resolveStage } from "./agent/_store.js";
 import { routeTransition } from "./agent/_router.js";
+// "Move the lead" -> another sales agent. Shared by all three agent APIs so the
+// six directed pairs behave identically; see api/agent/_agent-move.js.
+import { handleAgentMove } from "./agent/_agent-move.js";
 import { closingAgentMode, modeIsOn, shouldAutoSend } from "./agent/_mode.js";
 import { markUnqualified } from "./agent/_tags.js";
 import { mutedContactIdSet, isMuted } from "./agent/_mutes.js";
@@ -368,6 +371,82 @@ async function draftForContact(token, locationId, clientId, contactId, cfg, opts
     thread_tail: messages.slice(-6).map(m => ({ role: m.role === "agent" ? "agent" : "lead", text: String(m.text).slice(0, 2000), at: toIso(m.date) })),
     reply_count: agentMsgs.length,
   };
+}
+
+/**
+ * Draft the closing agent's first message for a lead who was JUST moved into its
+ * stage by staff, and queue it as a PENDING card. The closing-side twin of
+ * draftAndQueueRebook (api/agent-approvals.js), called inline by the shared
+ * agent-move path so the card is in the Closing tab the moment the modal closes.
+ *
+ * Returns { queued, row?, skipped? }. Never throws: the move has already landed
+ * and must not be undone because a draft failed.
+ *
+ * NOTHING here consults shouldAutoSend. Every card this makes is `pending` and
+ * waits for a human, which is the whole point of moving a lead by hand.
+ */
+export async function draftAndQueueClosing({ token, locationId, client, contactId, contactName = null, createdBy = "agent-move" }) {
+  try {
+    if (!client || !contactId) return { queued: false, skipped: "missing client or contact" };
+    // The CLOSING agent owns this card, so the CLOSING agent's switch decides
+    // whether it exists (same rule draftAndQueueRebook applies for booking).
+    if (!modeIsOn(closingAgentMode(client))) return { queued: false, skipped: "closing agent is off" };
+    const clientId = client.id;
+    // Dedupe on ACTIVE cards only, paused rows included: a frozen follow-up plan
+    // is still this lead's live cadence, and stacking a fresh card on top of it
+    // would give staff two competing next messages.
+    try {
+      const live = await sb(`agent_closing_replies?client_id=eq.${clientId}&ghl_contact_id=eq.${encodeURIComponent(contactId)}&status=in.(pending,approved,paused)&select=id&limit=1`);
+      if (Array.isArray(live) && live.length) return { queued: false, skipped: "a card is already waiting" };
+    } catch (e) { return { queued: false, skipped: `dedup error - ${e.message}` }; }
+
+    const cfg = await loadConfig(clientId);
+    // skipStageGuard: the move just put them in Done-Trial, and the read-back can
+    // lag it. lastDirection is deliberately NOT passed - draftForContact reads the
+    // real thread and decides reactive vs proactive from it.
+    const d = await draftForContact(token, locationId, clientId, contactId, cfg, { skipStageGuard: true });
+    if (d.skip || d.error) return { queued: false, skipped: d.skip || d.error };
+
+    const baseRow = {
+      client_id: clientId, ghl_contact_id: String(contactId), ghl_conversation_id: d.conversation_id || null,
+      contact_name: contactName || null, reasoning: d.reasoning || null, confidence: d.confidence,
+      trial_at: d.trial_at || null, last_message: d.last_message || null, last_outbound: d.last_outbound || null,
+      summary: d.summary || null, thread_tail: d.thread_tail || null, reply_count: d.reply_count,
+      followup_not_before: d.followup_on ? `${d.followup_on}T14:00:00Z` : null,
+      status: "pending", created_by: createdBy,
+    };
+    // The same dispositions the detector recognises, minus its self-drive branches.
+    // Order matches detectForClient: opt-out beats enroll beats lost beats park.
+    let row;
+    if (d.recommend_unqualified) row = { ...baseRow, kind: "closing_unqualified", lost_reason: d.unqualified_reason || "Opted out", draft_message: "" };
+    else if (d.recommend_enroll) {
+      // Same as the detector: the sign-up link is embedded in the editable draft
+      // so the reviewer sees exactly what goes out.
+      let draft = String(d.reply || "").trim();
+      try {
+        const { signupUrl, enrollUrl } = await buildEnrollUrl(clientId, token, locationId, contactId);
+        const base = signupUrl ? signupUrl.split("?")[0] : "";
+        if (enrollUrl && !(base && draft.includes(base))) draft = [draft, enrollUrl].filter(Boolean).join("\n\n");
+      } catch (_) { /* the card is still worth having without the link */ }
+      row = { ...baseRow, kind: "closing_enroll", enroll_note: d.enroll_note || null, draft_message: draft };
+    }
+    else if (d.recommend_lost) row = { ...baseRow, kind: "closing_lost", lost_reason: d.lost_reason || "Other", draft_message: String(d.reply || "").trim() };
+    else if (d.reignite_at && d.reignite_message) row = { ...baseRow, kind: "reignite", reignite_at: d.reignite_at, reignite_message: d.reignite_message, draft_message: String(d.reply || "").trim() };
+    else if (!String(d.reply || "").trim()) {
+      // "Their message needs no answer" is a decision, so it cards with an empty
+      // box (that IS the send-nothing action in Hawkeye). An escalation cards too.
+      // An empty draft that is neither is not worth a card.
+      if (d.no_reply_needed && !d.escalate) row = { ...baseRow, kind: "closing", draft_message: "", reasoning: d.reasoning || "Their message needs no answer - nothing to send." };
+      else if (d.escalate) row = { ...baseRow, kind: "closing", draft_message: "", escalate: true, escalate_reason: d.escalate_reason || null };
+      else return { queued: false, skipped: "empty draft" };
+    } else row = { ...baseRow, kind: "closing", draft_message: d.reply };
+
+    const inserted = await sb(`agent_closing_replies`, { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify([row]) });
+    const saved = Array.isArray(inserted) ? inserted[0] : inserted;
+    return { queued: true, row: saved || null };
+  } catch (e) {
+    return { queued: false, skipped: `draft threw - ${(e && e.message) || e}` };
+  }
 }
 
 async function sendReplyViaGhl(token, contactId, reply, clientId) {
@@ -1435,6 +1514,15 @@ async function handler(req, res) {
     }
 
     // Confirm a Lost suggestion: optional warm closing, then mark the opp Lost.
+    // "Move the lead" -> the Booking or Confirm agent. The closing agent has them
+    // but the trial never actually happened, or they have a fresh one booked, so
+    // pitching a membership is the wrong conversation. Nothing is sent: the
+    // receiving agent's card is drafted inline and waits for a human ✓.
+    if (b.action === "move-agent") {
+      const out = await handleAgentMove({ sb, clientId, client, token, locationId, staffEmail, fromAgent: "closing", body: b });
+      return res.status(out.status).json(out.body);
+    }
+
     if (b.action === "confirm-lost") {
       let row = null, contactId = b.contact_id || null;
       if (b.ready_id) {
