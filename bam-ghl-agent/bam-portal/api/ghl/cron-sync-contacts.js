@@ -253,9 +253,18 @@ async function handler(req, res) {
   const deadline = Date.now() + HARD_DEADLINE_MS;
 
   // All academies with a usable GHL connection
+  // Stalest-first. With ~35 eligible academies and a 270s deadline, a run does
+  // not always reach the end of an unordered list - found 2026-08-08: Pro
+  // Precision (and BTG, BAM NY, Elevate Hoops) sat past whatever position the
+  // deadline landed on and never got a turn, some for weeks. Sorting by
+  // last-synced (nulls = never synced, most overdue) means whichever academies
+  // a run doesn't reach are exactly the ones that synced most recently, so
+  // nobody can be starved run after run - a synced academy drops to the back
+  // of the NEXT run's queue and the previously-starved ones move to the front.
   const clientsList = await sb(
     `clients?or=(ghl_access_token.not.is.null,ghl_location_id.not.is.null)` +
-    `&select=id,business_name,ghl_location_id,ghl_company_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_contacts_last_synced_at,v15_access,v15_config,contact_provider`
+    `&select=id,business_name,ghl_location_id,ghl_company_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_contacts_last_synced_at,v15_access,v15_config,contact_provider` +
+    `&order=ghl_contacts_last_synced_at.asc.nullsfirst`
   ).catch(() => []);
 
   if (!Array.isArray(clientsList) || clientsList.length === 0) {
