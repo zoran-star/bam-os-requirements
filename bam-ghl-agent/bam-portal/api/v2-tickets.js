@@ -51,6 +51,83 @@ const TYPE_ROLE = {
 
 const ASSIGNEE_ROLES = ["systems", "agent_supervision", "marketing", "content", "backlog"];
 
+// ── System-created tickets (no human pressed a button) ───────────────────────
+// The member apply engine (api/workbook.js) queues an archived-price mint for
+// each uncovered member as a v2_tickets row, the same way it mints action items
+// through the shared createSystemActionItem. That queue must be idempotent: apply
+// is rerunnable and an uncovered member stays uncovered until the price side's
+// live mint runs, so the SAME apply produces the SAME mint request every time.
+//
+// sb IS INJECTED (the caller hands in the service-key sb it already trusts), for
+// the same reason api/_action-items.js takes it injected: a route must not open a
+// second transport with its own view of the env. This helper owns only the SHAPE
+// of the write and the dedupe.
+const isDupErr = (e) => /23505|duplicate key/i.test(String((e && e.message) || e || ""));
+// The system_key COLUMN not existing yet (migration 20260807T160000 pending) -
+// PostgREST answers 42703 / PGRST204. Distinguished from any other failure so the
+// member apply degrades to a read-then-write dedupe rather than 500ing.
+const isMissingSystemKeyCol = (e) => {
+  const s = String((e && e.message) || e || "");
+  return /system_key/i.test(s) && /(42703|pgrst204|does not exist|could not find|schema cache)/i.test(s);
+};
+
+// The typed key for an uncovered member's archived-price mint. One ticket per
+// (client, offer, family, amount): client is the index's first column, so the key
+// carries offer + family + amount. offer_id wins when present; otherwise a slug of
+// the owner-named family stands in.
+export const systemKeyForArchivedPriceMint = ({ offer_id, family, amount_cents }) => {
+  const slug = (v) => String(v == null ? "" : v).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "_";
+  const amt = amount_cents == null ? "noamt" : String(amount_cents);
+  return `archived-price-mint:${offer_id ? String(offer_id) : slug(family)}:${amt}`;
+};
+
+// Create a v2_tickets row that NO HUMAN asked for, idempotent on
+// (client_id, system_key). The unique index is the guard: insert, and a second
+// run 23505s and returns the existing row - no read-then-write window. Pre-
+// migration (no system_key column) it degrades to dedupe on intake.system_key so
+// the apply never 500s while the migration is pending.
+export async function createSystemTicket(sb, { client_id, system_key, type, source, title, intake, context, assignee_role }) {
+  const role = assignee_role || TYPE_ROLE[type] || "systems";
+  // system_key is stored on BOTH the column (the unique-index guard) AND in intake
+  // (so the pre-migration degrade path has something to dedupe on).
+  const fullIntake = { ...(intake && typeof intake === "object" ? intake : {}), system_key };
+  const baseRow = {
+    client_id, type, status: "new",
+    assignee_role: role, assigned_to: null,
+    title: String(title || "").slice(0, 200),
+    source: source || "offer-flow",
+    intake: fullIntake,
+    context: context && typeof context === "object" ? context : {},
+    created_by: null, created_by_staff: null,
+  };
+  try {
+    const rows = await sb(`v2_tickets`, {
+      method: "POST", headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ ...baseRow, system_key }),
+    });
+    return { created: true, ticket: Array.isArray(rows) ? rows[0] : rows };
+  } catch (e) {
+    if (isDupErr(e)) {
+      const existing = await sb(
+        `v2_tickets?client_id=eq.${encodeURIComponent(client_id)}&system_key=eq.${encodeURIComponent(system_key)}&select=*&limit=1`
+      ).catch(() => null);
+      return { created: false, ticket: (Array.isArray(existing) && existing[0]) || null };
+    }
+    if (isMissingSystemKeyCol(e)) {
+      const found = await sb(
+        `v2_tickets?client_id=eq.${encodeURIComponent(client_id)}&intake->>system_key=eq.${encodeURIComponent(system_key)}&select=*&limit=1`
+      ).catch(() => null);
+      if (Array.isArray(found) && found[0]) return { created: false, ticket: found[0], degraded: true };
+      const rows = await sb(`v2_tickets`, {
+        method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify(baseRow),   // no system_key column pre-migration
+      });
+      return { created: true, ticket: Array.isArray(rows) ? rows[0] : rows, degraded: true };
+    }
+    throw e;
+  }
+}
+
 // ── Auto-assignment (LOCKED: reuse Cam's V1.5 routing). The resolver logic is
 // ported from api/marketing.js - kept local because serverless entries can't
 // import each other. Every resolver returns null on failure; a null owner

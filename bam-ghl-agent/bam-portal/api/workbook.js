@@ -12,6 +12,12 @@ import {
 import {
   createSystemActionItem, systemKeyForTakeover, systemKeyForMissingPhone,
 } from "./_action-items.js";
+// The deferred archived-price mint (decision E) is a live Stripe write, so apply
+// does NOT run it - it queues a BAM systems-lane v2_ticket for a human. The
+// ticket writer + its typed key live beside the rail (api/v2-tickets.js).
+import {
+  createSystemTicket, systemKeyForArchivedPriceMint,
+} from "./v2-tickets.js";
 
 // Vercel Serverless Function - THE OWNER-FACING WORKBOOK, and the only surface
 // through which an academy owner touches what his academy sells.
@@ -3588,6 +3594,84 @@ async function doApplyMember({ user, wb, wbDegraded }) {
     }
   }
 
+  // ── phase 6: queue the archived-price mint for each uncovered member ─────────
+  // Decision E: the mint is a live Stripe write, so it does NOT auto-happen at
+  // apply - it goes through the BAM review queue (v2_tickets), like the joining
+  // fees. blockerCount === 0 here, so every uncovered member already carries a
+  // named family; this consumes that same `uncovered` list (never recomputes
+  // coverage) and groups it into ONE ticket per (client, offer, family, amount).
+  // A ticketing failure must NOT undo the real member writes already done, so it
+  // is caught per group and reported, never thrown.
+  const mintGroups = new Map();   // system_key -> { payload, members_waiting: [] }
+  for (const u of uncovered) {
+    const m = members.get(u.member_id);
+    if (!m) continue;
+    const offerId = firstDefined(m.fields.offer_id, m.seed.offer_id) || null;
+    const family = u.family;   // non-null past the hard gate
+    const amt = resolvedAmount.get(u.member_id) || null;
+    const amountCents = amt ? amt.amount_cents : null;
+    const currency = amt ? (amt.currency || "cad") : null;
+    const key = systemKeyForArchivedPriceMint({ offer_id: offerId, family, amount_cents: amountCents });
+    let g = mintGroups.get(key);
+    if (!g) { g = { system_key: key, offer_id: offerId, plan_family: family, amount_cents: amountCents, currency, members_waiting: [] }; mintGroups.set(key, g); }
+    g.members_waiting.push({
+      member_id: u.member_id,
+      stripe_price_id: u.stripe_price_id || m.priceId || null,
+      athlete_name: firstDefined(m.fields.athlete_name, m.seed.athlete_name) || null,
+      parent_name: firstDefined(m.fields.parent_name, m.seed.parent_name) || null,
+    });
+  }
+  const deferred_mints = [];
+  for (const g of mintGroups.values()) {
+    const dollars = g.amount_cents != null ? `$${(g.amount_cents / 100).toFixed(2)}` : "amount unknown";
+    const refPrice = g.members_waiting[0] ? g.members_waiting[0].stripe_price_id : null;
+    const intake = {
+      reason: "uncovered_member_archived_price",
+      client_id: wb.client_id,
+      workbook_id: wb.id,
+      offer_id: g.offer_id,
+      plan_family: g.plan_family,
+      amount_cents: g.amount_cents,
+      currency: g.currency,
+      // Cadence is NOT stored on the member shell (see MEMBER_SELECT), so it is
+      // NOT guessed here: the human minting the archived price reads it from the
+      // member's current Stripe price. Stated plainly, never invented.
+      cadence: null,
+      cadence_source_stripe_price_id: refPrice,
+      stripe_price_ref: refPrice,
+      members_waiting: g.members_waiting,
+    };
+    try {
+      const res = await createSystemTicket(sb, {
+        client_id: wb.client_id,
+        system_key: g.system_key,
+        type: "billing_fix",
+        source: "offer-flow",
+        title: `Mint archived price - ${g.plan_family} (${dollars})`,
+        intake,
+        context: { workbook_id: wb.id },
+      });
+      deferred_mints.push({
+        system_key: g.system_key,
+        ticket_id: res.ticket ? res.ticket.id : null,
+        created: res.created,
+        offer_id: g.offer_id,
+        plan_family: g.plan_family,
+        amount_cents: g.amount_cents,
+        currency: g.currency,
+        members_waiting: g.members_waiting.map((x) => x.member_id),
+        ...(res.degraded ? { degraded: "v2_tickets.system_key column absent (migration 20260807T160000 pending); deduped on intake.system_key, not the unique index" } : {}),
+      });
+    } catch (e) {
+      deferred_mints.push({
+        system_key: g.system_key, ticket_id: null, created: false,
+        offer_id: g.offer_id, plan_family: g.plan_family, amount_cents: g.amount_cents,
+        members_waiting: g.members_waiting.map((x) => x.member_id),
+        error: `the mint ticket could not be queued: ${String((e && e.message) || e)}. The member row is seeded; requeue by rerunning apply.`,
+      });
+    }
+  }
+
   return {
     ok: true,
     // DB writes are REAL; only the Stripe seam is deferred. Said plainly so
@@ -3600,6 +3684,10 @@ async function doApplyMember({ user, wb, wbDegraded }) {
     members: memberReports,
     arrangements,
     action_items: items,
+    // The uncovered mints, now QUEUED as BAM systems-lane v2_tickets (one per
+    // client/offer/family/amount). This is the real output of decision E: the
+    // Stripe write stays deferred, but the obligation to make it now has a home.
+    deferred_mints,
     skipped,
   };
 }
