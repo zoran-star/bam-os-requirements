@@ -5,7 +5,8 @@
 // subscription list is a fixture.
 //
 //   node --test api/_seed-member-workbook.test.mjs
-//   MUTATE=noskip node --test api/_seed-member-workbook.test.mjs   (the negative control)
+//   MUTATE=noskip node --test api/_seed-member-workbook.test.mjs        (negative control)
+//   MUTATE=expandtoodeep node --test api/_seed-member-workbook.test.mjs (negative control)
 //
 // WHAT THIS PROVES
 //   1. IDEMPOTENT RE-RUN. A second seed over the same DB creates NO duplicate
@@ -26,16 +27,22 @@
 //      tAgeStrOrEmpty (bare digits 1..99); a padded or out-of-range age proposes
 //      nothing rather than a value apply would refuse.
 //
-// THE CONTROL: MUTATE=noskip disables the "skip a row that already exists" guard,
-// so the second run duplicates. The suite asserts the duplicate appears - proof
-// the guard is what keeps re-runs clean, not luck.
+// THE CONTROLS:
+//   MUTATE=noskip disables the "skip a row that already exists" guard, so the
+//     second run duplicates. The suite asserts the duplicate appears - proof the
+//     guard is what keeps re-runs clean, not luck.
+//   MUTATE=expandtoodeep reverts the live subs read to deep-expanding the product
+//     (data.items.data.price.product, 5 levels). The enforcing Stripe stub rejects
+//     it with property_expansion_max_depth exactly as the real API does, so the
+//     4-level-cap assertion goes red - the seed could not read Stripe at all.
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   seed, computeAnswers, cleanAge, ageFromCustomFields, normalizeSub,
   prefillFromContact, SEEDED_FIELDS, AGE_GHL_KEY,
+  resolvePlanLabel, realListActiveSubscriptions, realFetchProductNames,
 } from "../scripts/seed-member-workbook.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -98,21 +105,25 @@ function reset() {
 
 // The four active subscriptions the fixture Stripe returns. Amount + dates live on
 // the ITEM (docs/plans/sj-price-match-log.md), exactly as the real API ships them.
+// `price.product` is a STRING id (Stripe's default - the name is NOT inline-
+// expandable, it is 5 levels deep and Stripe caps at 4). The name comes from the
+// separate products fetch (PRODUCT_NAMES), mapped in by product id.
 function stripeSubs() {
-  // `product` is the EXPANDED product object (the seed reads .name for plan_label).
-  const sub = (id, customer, priceId, amount, start, end, productName) => ({
+  const sub = (id, customer, priceId, amount, start, end, productId) => ({
     id, customer, status: "active",
-    items: { data: [{ id: `si_${id}`, current_period_start: start, current_period_end: end, price: { id: priceId, unit_amount: amount, product: productName ? { id: `prod_${id}`, name: productName } : null } }] },
+    items: { data: [{ id: `si_${id}`, current_period_start: start, current_period_end: end, price: { id: priceId, unit_amount: amount, product: productId } }] },
   });
   // 2026-09-15 = 1789084800 ; 2026-08-18 = 1786060800 (period start), close enough for a fixture.
   return [
-    sub("sub_a", "cus_a", "price_ele_m", 21875, 1786060800, 1789084800, "Elementary Academy"),
-    sub("sub_b", "cus_b", "price_preseason_1x", 20000, 1786060800, 1789084800, "Old Pre Season 1x"),
-    sub("sub_c", "cus_c", "price_two_m", 27344, 1786060800, 1789084800, "Academy 2x/week"),
-    // No product expansion at all -> plan_label null, never the raw price id.
+    sub("sub_a", "cus_a", "price_ele_m", 21875, 1786060800, 1789084800, "prod_ele"),
+    sub("sub_b", "cus_b", "price_preseason_1x", 20000, 1786060800, 1789084800, "prod_pre"),
+    sub("sub_c", "cus_c", "price_two_m", 27344, 1786060800, 1789084800, "prod_two"),
+    // No product on the sub at all -> product_id null -> plan_label null, never the price id.
     sub("sub_none", "cus_none", "price_ele_m", 21875, 1786060800, 1789084800, null),
   ];
 }
+// product id -> name, as the separate /products fetch returns it.
+const PRODUCT_NAMES = { prod_ele: "Elementary Academy", prod_pre: "Old Pre Season 1x", prod_two: "Academy 2x/week" };
 
 // A compact PostgREST over DB: eq / in filters, loose select projection, POST that
 // appends with a generated id and honours return=representation.
@@ -149,7 +160,12 @@ function makeSb() {
 }
 
 async function runSeed(mutate) {
-  const deps = { sb: makeSb(), listActiveSubscriptions: async () => stripeSubs() };
+  const deps = {
+    sb: makeSb(),
+    listActiveSubscriptions: async () => stripeSubs(),
+    // The separate product-name fetch (id -> name); the seed maps it onto plan_label.
+    fetchProductNames: async () => ({ ...PRODUCT_NAMES }),
+  };
   return seed({ clientId: CLIENT, stripeAccount: null, apply: true, deps, log: () => {}, mutate });
 }
 
@@ -231,6 +247,48 @@ ok(cardNone && cardNone.meta && cardNone.meta.plan_label == null,
 ok(cardNone && Array.isArray(cardNone.meta.plan_options) && cardNone.meta.plan_options.length === 3,
   "and still carries the picker options so a plan can be chosen");
 
+console.log("\n6. STRIPE READ stays within the 4-level expand cap (D3 live-read fix)");
+// A stub Stripe transport that enforces Stripe's REAL cap: any expand[] deeper
+// than 4 levels is refused with property_expansion_max_depth, exactly like the
+// live API. data.items.data.price.product is 5 levels and aborts the whole read;
+// the stub used to accept any depth, which is how this slipped past the tester.
+function enforcingStripeFetch(subs, products) {
+  return async function stripeFetch(pathStr) {
+    const u = new URL("https://api.stripe.com/v1" + pathStr);
+    for (const e of u.searchParams.getAll("expand[]")) {
+      if (String(e).split(".").length > 4) {
+        const err = new Error(`You cannot expand more than 4 levels of a property. Property: ${e}`);
+        err.code = "property_expansion_max_depth";
+        throw err;
+      }
+    }
+    if (u.pathname.endsWith("/subscriptions")) return { data: subs, has_more: false };
+    if (u.pathname.endsWith("/products")) return { data: products, has_more: false };
+    return { data: [], has_more: false };
+  };
+}
+const PRODUCTS_LIST = Object.entries(PRODUCT_NAMES).map(([id, name]) => ({ id, name }));
+
+// resolvePlanLabel: product-name map first, then nickname, then null - NEVER a price id.
+ok(resolvePlanLabel({ product_id: "prod_ele", plan_label: null, price_nickname: null }, PRODUCT_NAMES) === "Elementary Academy"
+  && resolvePlanLabel({ product_id: "gone", plan_label: null, price_nickname: "Nickname" }, {}) === "Nickname"
+  && resolvePlanLabel({ product_id: null, plan_label: null, price_nickname: null }, {}) === null,
+  "resolvePlanLabel resolves the map name, then the nickname, then null - never the raw price id");
+
+// The SHIPPED subs read passes the enforcing stub - it never deep-expands past 4
+// levels. If it ever regresses to expanding the product (5 levels), this goes red
+// in the normal run.
+let subsThrew = false, subsErr = "";
+let gotSubs = [];
+try { gotSubs = await realListActiveSubscriptions(enforcingStripeFetch(stripeSubs(), PRODUCTS_LIST), null); }
+catch (e) { subsThrew = true; subsErr = e.code || e.message; }
+ok(!subsThrew, `the subscriptions read stays within Stripe's 4-level expand cap${subsThrew ? " (rejected: " + subsErr + ")" : ""}`);
+ok(!subsThrew && gotSubs.length === 4, `and returns all active subs (${subsThrew ? "n/a" : gotSubs.length})`);
+// The product NAME comes from the separate /products fetch, not a deep expand.
+const nameMap = await realFetchProductNames(enforcingStripeFetch(stripeSubs(), PRODUCTS_LIST), null);
+ok(nameMap.prod_ele === "Elementary Academy" && nameMap.prod_two === "Academy 2x/week",
+  "product names come from the separate /products fetch, mapped by product id");
+
 console.log("\n1. IDEMPOTENT RE-RUN (no MUTATE)");
 if (MUTATE === "noskip") {
   console.log("  (skipped under MUTATE=noskip; the control block below asserts the opposite)");
@@ -263,6 +321,36 @@ if (MUTATE === "noskip") {
     : `\n❌ NEGATIVE CONTROL FAILED.`);
 } else {
   console.log("  (run `MUTATE=noskip node --test api/_seed-member-workbook.test.mjs` to exercise the control)");
+}
+
+// ── the expand-depth negative control ─────────────────────────────────────────
+console.log("\nNEGATIVE CONTROL (MUTATE=expandtoodeep deep-expands the product, 5 levels)");
+if (MUTATE === "expandtoodeep") {
+  // Revert the fix in a MUTANT copy: add the 5-level product expand back. The
+  // enforcing stub must now reject the read, exactly as live Stripe does - so a
+  // future regression to a deep expand cannot pass this suite again.
+  let src = fs.readFileSync(path.join(HERE, "../scripts/seed-member-workbook.mjs"), "utf8");
+  const FIND = `    qs.append("expand[]", "data.items.data.price");`;
+  const copy = path.join(HERE, "../scripts/.mutant-seed-expand.mjs");
+  let threw = false, errStr = "";
+  if (!src.includes(FIND)) {
+    ok(false, "expandtoodeep pin no longer matches the seed source - re-point it");
+  } else {
+    src = src.replace(FIND, FIND + `\n    qs.append("expand[]", "data.items.data.price.product");   // (control expandtoodeep) 5 levels`);
+    fs.writeFileSync(copy, src);
+    try {
+      const mutant = await import(pathToFileURL(copy).href);
+      await mutant.realListActiveSubscriptions(enforcingStripeFetch(stripeSubs(), PRODUCTS_LIST), null);
+    } catch (e) { threw = true; errStr = e.code || e.message; }
+    fs.rmSync(copy, { force: true });
+    ok(threw && /property_expansion_max_depth|4 levels/.test(errStr),
+      `the 5-level product expand is rejected by Stripe's cap (${errStr || "no error"})`);
+  }
+  console.log(failures.length === 0
+    ? `\n✅ NEGATIVE CONTROL PASSED: MUTATE=expandtoodeep - the enforcing stub rejects the 5-level expand the seed used to send.`
+    : `\n❌ NEGATIVE CONTROL FAILED.`);
+} else {
+  console.log("  (run `MUTATE=expandtoodeep node --test api/_seed-member-workbook.test.mjs` to exercise the control)");
 }
 
 console.log(`\n${failures.length === 0 ? "✅ ALL PASSED" : "❌ FAILURES"}: ${pass} checks passed, ${failures.length} failed.`);

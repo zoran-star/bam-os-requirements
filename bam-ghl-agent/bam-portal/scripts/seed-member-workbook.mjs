@@ -137,14 +137,15 @@ export function normalizeSub(raw) {
     typeof secs === "number" && secs > 0
       ? new Date(secs * 1000).toISOString().slice(0, 10)
       : null;
-  // A readable plan name for the Plan column, so the owner never sees a raw
-  // price id (D3). The Stripe PRODUCT name is what he recognises ("Elementary
-  // Academy"); the price nickname is the fallback. Both are only present when the
-  // read expanded the product - absent, plan_label stays null and the page falls
-  // back to the plan answer, never the price id.
+  // The product ID (returned by default) and the price nickname, for the readable
+  // Plan column name (D3). The product NAME is NOT expanded inline:
+  // data.items.data.price.product is 5 levels deep and Stripe caps expansion at 4
+  // (property_expansion_max_depth aborts the whole read), so the name is fetched
+  // separately and mapped in by product_id (resolvePlanLabel). An already-expanded
+  // product object is still honoured if one is ever passed.
   const product = price.product;
-  const productName =
-    product && typeof product === "object" ? cleanStr(product.name) : null;
+  const productId = typeof product === "string" ? product : (product && product.id) || null;
+  const productName = product && typeof product === "object" ? cleanStr(product.name) : null;
   return {
     id: String(raw.id),
     customer: raw.customer == null ? null : String(raw.customer),
@@ -152,8 +153,21 @@ export function normalizeSub(raw) {
     amount_cents: Number.isInteger(amount) && amount >= 0 ? amount : null,
     last_date: toDay(item.current_period_start),
     next_date: toDay(item.current_period_end),
-    plan_label: productName || cleanStr(price.nickname) || null,
+    product_id: productId,
+    price_nickname: cleanStr(price.nickname),
+    // Set only when a product object was expanded inline (normally null); the
+    // readable name is otherwise filled from the product-name map. NEVER the price id.
+    plan_label: productName || null,
   };
+}
+
+// The readable plan name for a member's card, resolved WITHOUT a deep Stripe
+// expand: the product name from the separately-fetched productId -> name map,
+// then any inline-expanded name, then the price nickname, then null. Null is a
+// clean fallback - the page shows the plan answer, never the raw price id.
+export function resolvePlanLabel(sub, productNames) {
+  const byId = sub && sub.product_id && productNames ? productNames[sub.product_id] : null;
+  return sub.plan_label || cleanStr(byId) || sub.price_nickname || null;
 }
 
 // The prefill facts a contact contributes (matched to a sub by stripe_customer_id).
@@ -273,9 +287,10 @@ export async function readPlanOptions(sb, clientId) {
 
 // The presentation meta a member card carries: a readable plan_label (never the
 // raw price id) and the plan_options picker. One-way, computed - the owner cannot
-// edit these, same as the price card's meta.
-export function memberCardMeta(sub, planOptions) {
-  return { plan_label: sub.plan_label || null, plan_options: planOptions || [] };
+// edit these, same as the price card's meta. plan_label is resolved from the
+// product-name map (fetched separately, not deep-expanded).
+export function memberCardMeta(sub, planOptions, productNames) {
+  return { plan_label: resolvePlanLabel(sub, productNames), plan_options: planOptions || [] };
 }
 
 // Find the client's member workbook to seed into, or create one. A workbook the
@@ -368,6 +383,11 @@ export async function seed({ clientId, stripeAccount, apply, deps, log = console
   const planOptions = await readPlanOptions(sb, clientId);
   if (!planOptions.length) summary.deferred.push("no live pricing_offerings: plan picker seeds empty, cards show the plan label only");
 
+  // Product id -> name, fetched ONCE (not deep-expanded on the subs read, which
+  // would exceed Stripe's 4-level expansion cap). Missing map -> plan_label falls
+  // back to the nickname or null, never the price id.
+  const productNames = (deps.fetchProductNames ? await deps.fetchProductNames(stripeAccount).catch(() => ({})) : {}) || {};
+
   // 4. the member workbook (find-or-create, or refuse).
   const wb = await findOrCreateMemberWorkbook(sb, clientId, apply, log);
 
@@ -423,7 +443,7 @@ export async function seed({ clientId, stripeAccount, apply, deps, log = console
     if (card) {
       summary.cards_found++;
     } else {
-      const row = { workbook_id: wb.id, card_key: cardKey, title: cardTitle(prefill, sub), sort_order: summary.cards_created + summary.cards_found, meta: memberCardMeta(sub, planOptions) };
+      const row = { workbook_id: wb.id, card_key: cardKey, title: cardTitle(prefill, sub), sort_order: summary.cards_created + summary.cards_found, meta: memberCardMeta(sub, planOptions, productNames) };
       if (apply && !wb.dryPlaceholder) {
         const created = await sb("workbook_cards", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify([row]) });
         card = Array.isArray(created) && created[0] ? created[0] : { id: `<new-card:${sub.id}>`, ...row };
@@ -506,15 +526,18 @@ async function realSb(SB_URL, SB_KEY, path, init = {}) {
 
 // Read every active subscription, expanding the item price so amount + item-level
 // period dates are present. READ-ONLY: only GET, no idempotency key, no writes.
-async function realListActiveSubscriptions(stripeFetch, stripeAccount) {
+//
+// EXPAND STOPS AT THE PRICE (4 levels: data.items.data.price). Going one deeper
+// to data.items.data.price.product is 5 levels and Stripe REFUSES it with
+// property_expansion_max_depth, aborting the whole read - the rehearsal defect.
+// The product NAME is fetched separately (realFetchProductNames) and mapped in by
+// product id. Same trap, same fix as the price side (api/offers/match-prices.js).
+export async function realListActiveSubscriptions(stripeFetch, stripeAccount) {
   const out = [];
   let starting_after = null;
   for (let page = 0; page < 50; page++) {
-    // Expand the price AND its product so the readable plan_label (the product
-    // name) is present without a second round trip (D3).
     const qs = new URLSearchParams({ status: "active", limit: "100" });
     qs.append("expand[]", "data.items.data.price");
-    qs.append("expand[]", "data.items.data.price.product");
     if (starting_after) qs.set("starting_after", starting_after);
     const res = await stripeFetch(`/subscriptions?${qs.toString()}`, { method: "GET", stripeAccount });
     const data = (res && res.data) || [];
@@ -523,6 +546,24 @@ async function realListActiveSubscriptions(stripeFetch, stripeAccount) {
     starting_after = data[data.length - 1].id;
   }
   return out;
+}
+
+// Product id -> name, in one paginated pass. READ-ONLY. The product name cannot be
+// expanded inline on the subs read (depth cap above), so it is fetched here and
+// mapped by id - the same shape api/offers/match-prices.js fetchProductNames uses.
+export async function realFetchProductNames(stripeFetch, stripeAccount) {
+  const map = {};
+  let starting_after = null;
+  for (let page = 0; page < 20; page++) {
+    const qs = new URLSearchParams({ limit: "100" });
+    if (starting_after) qs.set("starting_after", starting_after);
+    const res = await stripeFetch(`/products?${qs.toString()}`, { method: "GET", stripeAccount });
+    const data = (res && res.data) || [];
+    for (const p of data) if (p && p.id) map[p.id] = p.name;
+    if (!res || !res.has_more || !data.length) break;
+    starting_after = data[data.length - 1].id;
+  }
+  return map;
 }
 
 async function main() {
@@ -549,8 +590,9 @@ async function main() {
   const { stripeFetch } = await import("../api/_stripe-transport.js");
   const stripeAccount = client.stripe_connect_account_id || null;
   const listActiveSubscriptions = (account) => realListActiveSubscriptions(stripeFetch, account);
+  const fetchProductNames = (account) => realFetchProductNames(stripeFetch, account);
 
-  const { summary } = await seed({ clientId, stripeAccount, apply, deps: { sb, listActiveSubscriptions } });
+  const { summary } = await seed({ clientId, stripeAccount, apply, deps: { sb, listActiveSubscriptions, fetchProductNames } });
   printSummary(console.log, summary, apply);
 }
 
