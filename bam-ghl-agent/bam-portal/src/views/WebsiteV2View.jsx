@@ -15,7 +15,13 @@ import "./websitev2/websitev2.css";
 // ContentV2View.
 
 const SYSTEMS_ROLE = "systems";
-const QUEUE_TYPES = ["website_change", "fix"];
+// website_change opens in the sandbox; fix + billing_fix ride along as read-only
+// chips (worked elsewhere, but they MUST render somewhere in the systems lane).
+// billing_fix is the member-apply deferred-mint queue (api/workbook.js decision
+// E): before this it routed to assignee_role='systems' but matched no staff
+// page's type filter, so it landed where nobody looked - the exact failure
+// docs/plans/v2-action-item-map.md gap #1 names. Widened here, minimally.
+const QUEUE_TYPES = ["website_change", "fix", "billing_fix"];
 const OPEN_STATUSES = ["new", "in_progress", "waiting_client"];
 
 // Client-side search: academy name, page url, note text (+ section + title).

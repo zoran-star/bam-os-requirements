@@ -4,9 +4,12 @@ import { ageShort } from "../contentv2/utils";
 import { pagePath, ticketAnnotations, dominantDevice, initials } from "./utils";
 
 /* Ticket picker (locked frame 3c): the "N open" pill and the search results
-   both render these rows. website_change rows load into the sandbox;
-   type='fix' rows show with a red Fix chip and stay put (they are handled on
-   the Systems page, the sandbox only opens website changes). */
+   both render these rows. website_change rows load into the sandbox; every
+   other systems-lane type (fix, billing_fix) shows with a chip and stays put
+   (they are worked elsewhere, the sandbox only opens website changes). The chip
+   is how a billing_fix mint ticket stays VISIBLE in the systems lane instead of
+   landing where nobody looks. */
+const CHIP_LABEL = { fix: "Fix", billing_fix: "Billing", data_fix: "Data", build_ask: "Build" };
 
 function DeviceIcon({ device }) {
   return device === "mobile" ? (
@@ -18,11 +21,14 @@ function DeviceIcon({ device }) {
 
 // One picker row. Exported so the search-results dropdown reuses it.
 export function PickerRow({ ticket, academy, active, onSelect }) {
-  const isFix = ticket.type === "fix";
+  // Only website_change rows open in the sandbox; every other systems-lane type
+  // is a read-only chip (worked elsewhere, but still rendered here).
+  const isWebsite = ticket.type === "website_change";
+  const chipLabel = CHIP_LABEL[ticket.type] || "Systems";
   const notes = ticketAnnotations(ticket);
   const path = pagePath(ticket.context?.page_url);
   const subParts = [];
-  if (isFix) subParts.push(ticket.title || "Fix request");
+  if (!isWebsite) subParts.push(ticket.title || `${chipLabel} request`);
   else {
     if (path) subParts.push(path);
     subParts.push(`${notes.length} change${notes.length === 1 ? "" : "s"}`);
@@ -30,23 +36,23 @@ export function PickerRow({ ticket, academy, active, onSelect }) {
   return (
     <button
       type="button"
-      className={`w2-prow${isFix ? " is-fix" : ""}${active ? " is-active" : ""}`}
-      onClick={isFix ? undefined : () => onSelect(ticket)}
-      title={isFix ? "Fix tickets are handled on the Systems page" : undefined}
-      tabIndex={isFix ? -1 : 0}
+      className={`w2-prow${!isWebsite ? " is-fix" : ""}${active ? " is-active" : ""}`}
+      onClick={isWebsite ? () => onSelect(ticket) : undefined}
+      title={isWebsite ? undefined : `${chipLabel} tickets are worked on the Systems page`}
+      tabIndex={isWebsite ? 0 : -1}
     >
       <span className="w2-prow-avatar">{initials(academy)}</span>
       <span className="w2-prow-main">
         <span className="w2-prow-academy">{academy}</span>
         <span className="w2-prow-sub">
-          {!isFix && path ? <span className="w2-prow-path">{path}</span> : null}
-          {!isFix && path ? " · " : null}
-          {isFix ? subParts.join(" · ") : `${notes.length} change${notes.length === 1 ? "" : "s"}`}
+          {isWebsite && path ? <span className="w2-prow-path">{path}</span> : null}
+          {isWebsite && path ? " · " : null}
+          {isWebsite ? `${notes.length} change${notes.length === 1 ? "" : "s"}` : subParts.join(" · ")}
         </span>
       </span>
-      {isFix
-        ? <span className="w2-fixchip">Fix</span>
-        : <span className="w2-prow-dev" title={dominantDevice(notes) === "mobile" ? "Noted on phone" : "Noted on computer"}><DeviceIcon device={dominantDevice(notes)} /></span>}
+      {isWebsite
+        ? <span className="w2-prow-dev" title={dominantDevice(notes) === "mobile" ? "Noted on phone" : "Noted on computer"}><DeviceIcon device={dominantDevice(notes)} /></span>
+        : <span className="w2-fixchip">{chipLabel}</span>}
       <StatusPill status={ticket.status} />
       <span className="w2-prow-age">{ageShort(ticket.updated_at || ticket.created_at)}</span>
     </button>
