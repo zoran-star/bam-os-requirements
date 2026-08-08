@@ -51,6 +51,9 @@
 //   MUTATE=takeoveritemmissing  the takeover item is never created, so a foreign
 //       subscription the portal cannot bill or cancel has nothing pointing a
 //       human at it. (measured 2026-08-07: 2 assertions)
+//   MUTATE=stopbillingblocks  a stop-billing member is counted as a coverage
+//      blocker again, so marking a member gone whose price is not in the catalog
+//      409s the whole apply - the D2 rehearsal defect. Section 9 catches it.
 //   MUTATE=offcardnotcreated  the arrangement is never inserted, so an off-card
 //       member is left with no collection obligation - the decorative-flag
 //       failure. (measured 2026-08-07: 3 assertions)
@@ -131,12 +134,21 @@ const OFFCARDNOTCREATED = [[
     }).catch((e) => { console.error("member apply: arrangement insert failed -", String((e && e.message) || e)); return null; });`,
   `    const created = null;   // (control offcardnotcreated) the arrangement is never inserted`]];
 
+// D2: the apply-phase stop_billing exclusion is reverted, so a leaving member with
+// an uncovered price and no family named is counted as a coverage blocker and the
+// apply 409s - the exact rehearsal defect. Section 9's apply-does-not-409 has to
+// catch it.
+const STOPBILLINGBLOCKS = [[
+  `    if (m.fields.outcome === "stop_billing") { m.covered = true; continue; }`,
+  `    if (false && m.fields.outcome === "stop_billing") { m.covered = true; continue; }   // (control stopbillingblocks) a leaving member is counted as a coverage blocker`]];
+
 const EDITS = {
   coveragegateoff: COVERAGEGATEOFF,
   amountmatch: AMOUNTMATCH,
   stopbillingnotfirst: STOPBILLINGNOTFIRST,
   takeoveritemmissing: TAKEOVERITEMMISSING,
   offcardnotcreated: OFFCARDNOTCREATED,
+  stopbillingblocks: STOPBILLINGBLOCKS,
 };
 
 const edits = MUTATE
@@ -376,8 +388,12 @@ console.log("\n── 2. member review: grouped by blast radius ──");
   ok(rv.stop_billing.length === 1 && rv.stop_billing[0].member_id === "m-stop",
     "the not-a-member surfaces in stop_billing, not in the member list");
   ok(!rv.members.some((m) => m.member_id === "m-stop"), "and is NOT also in the ordinary member cards");
-  ok(rv.coverage.total === 5, `coverage counts all 5 members (saw ${rv.coverage.total})`);
-  ok(rv.coverage.covered === 4, `four are covered by identity (saw ${rv.coverage.covered})`);
+  // D2: the stop-billing member (m-stop) is EXCLUDED from coverage - you do not
+  // price someone you are un-billing. So the count is 4, not 5, and the covered
+  // count drops the (covered) leaving member too.
+  ok(rv.coverage.total === 4, `coverage counts the 4 members still being billed, not the stop-billing one (saw ${rv.coverage.total})`);
+  ok(rv.coverage.covered === 3, `three of those are covered by identity (saw ${rv.coverage.covered})`);
+  ok(!rv.coverage.uncovered.some((u) => u.member_id === "m-stop"), "and the stop-billing member is never in the uncovered/mint list");
   ok(rv.coverage.members_with_no_price === 0, "no blocker on this workbook - the one uncovered member has a family named");
   const unc = rv.coverage.uncovered.find((u) => u.member_id === "m-unc");
   ok(!!unc && unc.blocker === false && unc.stripe_price_id === "price_preseason_1x" && unc.amount_cents === 21875,
@@ -465,7 +481,7 @@ console.log("\n── 6. coverage is IDENTITY, never amount ──");
   const r = await staffPost({ action: "review", workbook_id: "wbm" });
   const unc = r.body.review.coverage.uncovered.find((u) => u.member_id === "m-unc");
   ok(!!unc, "Salvador (old $218.75 price) is in the uncovered list");
-  ok(r.body.review.coverage.covered === 4,
+  ok(r.body.review.coverage.covered === 3,
     "he is NOT counted covered even though a live $218.75 plan exists - amount does not decide coverage");
   reset();
 }
@@ -491,6 +507,31 @@ console.log("\n── 8. refuse-first: an unknown member field fails closed ─�
   const r = await staffPost({ action: "apply", workbook_id: "wbm" });
   ok(r.body.ok === false, "an unlisted field refuses the apply rather than writing a guessed column");
   ok(worldState() === before, "and writes nothing");
+  reset();
+}
+
+console.log("\n── 9. D2: a stop-billing member is NOT a coverage blocker ──");
+{
+  // m-block is the uncovered-no-family blocker that 409'd section 5. Mark that
+  // same member as gone: a leaving member needs no price, so apply must proceed
+  // and seed him rather than demand a family + archived-price mint for someone
+  // being un-billed. (The rehearsal defect: he was counted as a blocker.)
+  DB.workbook_answers.find((a) => a.id === "a-blk-out").answered = "not a member";
+  // review first: he is gone from the coverage math entirely.
+  const rv = await staffPost({ action: "review", workbook_id: "wbb" });
+  ok(rv.body.review.coverage.members_with_no_price === 0,
+    "review: the stop-billing member raises no blocker (members_with_no_price stays 0)");
+  ok(!rv.body.review.coverage.uncovered.some((u) => u.member_id === "m-block"),
+    "review: and he is not in the uncovered/mint list");
+  ok(rv.body.review.stop_billing.some((s) => s.member_id === "m-block"),
+    "review: he surfaces in the stop-billing section instead");
+  // apply: no 409, the member is seeded, the stop-billing item created, no mint queued.
+  approveAll("wbb");
+  const r = await staffPost({ action: "apply", workbook_id: "wbb" });
+  ok(r.status === 200 && r.body.ok === true, "apply does NOT 409 - the leaving member is never a members_with_no_price blocker");
+  ok(rowOf("members", "m-block").status === "cancelling", "and the member is seeded to cancelling");
+  ok(hasItem("stop-billing:m-block"), "with a stop-billing action item (his live sub)");
+  ok((r.body.deferred_mints || []).length === 0, "and NO archived-price mint is queued for someone we are un-billing");
   reset();
 }
 

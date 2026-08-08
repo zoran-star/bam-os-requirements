@@ -3198,22 +3198,29 @@ async function doReviewMember(wb) {
     const catAmt = priceId ? coverage.amountByPrice.get(String(priceId)) : null;
     const amt = catAmt || (carriedAmount != null ? { amount_cents: carriedAmount } : null);
 
-    totalCount += 1;
-    if (isCovered) coveredCount += 1;
-    else {
-      const blocker = !familyNamed;
-      if (blocker) blockerCount += 1;
-      uncovered.push({
-        member_id: targetId || null,
-        athlete_name: firstDefined(willOf("athlete_name"), seed.athlete_name) || null,
-        amount_cents: amt ? amt.amount_cents : null,
-        stripe_price_id: priceId || null,
-        family: familyNamed ? String(family) : null,
-        blocker,
-        ...(blocker
-          ? { why: "family not chosen - name the plan family so an archived price can be minted for this member" }
-          : { note: "an archived price under this family will be minted (deferred to the BAM queue); the member seeds now" }),
-      });
+    // A member the owner is un-billing needs no price: a leaving member is never a
+    // coverage blocker and never queues a mint (D2). Excluded from the covered/
+    // total counts and from the uncovered/mint list entirely; they still surface
+    // in the stop_billing section below.
+    const countsForCoverage = outcome !== "stop_billing";
+    if (countsForCoverage) {
+      totalCount += 1;
+      if (isCovered) coveredCount += 1;
+      else {
+        const blocker = !familyNamed;
+        if (blocker) blockerCount += 1;
+        uncovered.push({
+          member_id: targetId || null,
+          athlete_name: firstDefined(willOf("athlete_name"), seed.athlete_name) || null,
+          amount_cents: amt ? amt.amount_cents : null,
+          stripe_price_id: priceId || null,
+          family: familyNamed ? String(family) : null,
+          blocker,
+          ...(blocker
+            ? { why: "family not chosen - name the plan family so an archived price can be minted for this member" }
+            : { note: "an archived price under this family will be minted (deferred to the BAM queue); the member seeds now" }),
+        });
+      }
     }
 
     const g = {
@@ -3382,6 +3389,11 @@ async function doApplyMember({ user, wb, wbDegraded }) {
   const uncovered = [];
   let blockerCount = 0;
   for (const [id, m] of members) {
+    // A member the owner is un-billing needs no price: exclude stop_billing from
+    // coverage entirely (D2). Never a blocker, never a queued mint (phase 6 reads
+    // the `uncovered` list this skips). Marked covered so the report carries no
+    // deferred-mint note for someone we are stopping.
+    if (m.fields.outcome === "stop_billing") { m.covered = true; continue; }
     const priceId = firstDefined(m.fields.stripe_price_id, m.seed.stripe_price_id);
     const family = firstDefined(m.fields.plan, m.fields.offer_id, m.seed.plan);
     const isCovered = memberPriceCovered(coverage, priceId, m.fields.amount_cents);
