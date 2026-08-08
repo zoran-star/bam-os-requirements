@@ -47,3 +47,50 @@ payments, marketing machine health), frequency (daily/weekly/off), channel
 (SMS/email/push), per teammate. Would slot into the existing
 notification_prefs jsonb + Blueprint -> Staff -> Notifications panel pattern.
 Not scoped, not scheduled - parked for a future session.
+
+## ⚠️ It reaches almost nobody (found 2026-08-07)
+
+Zoran got a "New booking" text for **GAME Winner**, an academy that is not his,
+and asking why turned up the state of the whole channel.
+
+**`notifyOwners` sends to the OWNER always, plus anyone in `notification_prefs`.**
+Recipients are picked by *who has a phone on file*, and a recipient with a blank
+phone is silently skipped. Measured across every V1.5/V2 academy:
+
+| | count |
+|---|---|
+| active `client_users` owner rows | 39 |
+| **with a phone number** | **6** |
+| of those, Zoran's | 5 |
+| **real academy owners reachable by SMS** | **1** (Elijah, San Jose) |
+
+`notification_prefs` is `{}` on the academies checked, so no teammates are
+selected either. **The channel runs, returns `ok: true`, and delivers to nobody.**
+`notifyOwners` reports `{ ok: true, recipients: 0 }` when it reached zero people,
+which is why nothing ever surfaced. See [[reference_assurance_without_connection]].
+
+### The role bug that made Zoran the recipient
+Two bulk service-role INSERTs attached his GTA login (`info@byanymeanstoronto.ca`,
+auth user `8dab9ca4-...`) to academies so he could get into them:
+
+- `2026-06-03 13:48:23.484047` - 36 rows, role **`member`**. Harmless.
+- `2026-06-29 17:01:29.989808` - 7 rows, role **`owner`**. ← the bug
+
+Same intent, wrong role the second time. Because `notifyOwners` queries
+`role=eq.owner` and his was the only owner row with a phone, he became the sole
+recipient for four client academies while their real owners (Kyle Randall, Najee
+Fitzgerald, Jeremy Heil, Nathan Poelsma) got nothing.
+
+**Fixed 2026-08-07:** those 6 rows set back to `member` (BAM Internal Ads left as
+owner - Zoran is its only owner and it is V1, so it never notified anyway). He is
+now owner on BAM GTA + Internal Ads only. Being a `member` costs him nothing:
+`_canManageAll` in client-portal.html is `role === 'owner' || _IS_BAM_STAFF`.
+
+**`client_users` has no `created_by` column**, so who ran those INSERTs is not
+recorded anywhere. Worth adding if provenance ever matters.
+
+### Still open
+Stopping the wrong recipient did not create a right one. The four academies now
+notify **zero** people. The real gap is that owner phone is never captured:
+33 owners have none. Fix the capture and backfill before building any opt-out,
+or the opt-out governs a channel that reaches one person.
