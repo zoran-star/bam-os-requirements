@@ -468,3 +468,21 @@ Full plan: docs/plans/member-apply-engine-plan.md. Decisions locked:
 Verified live before planning: members has NO athlete_age / NO next_payment column, HAS contact_id + ghl_contact_id, NO index on stripe_subscription_id. member_field_values exists. KINDS already admits "member"; member_row already legal in the target_kind CHECK.
 
 Apply is REAL for the portal DB (members, arrangements, action items) and DEFERRED at the Stripe seam (archived-price mints, takeover subs) - a deliberate difference from the price workbook whose whole apply is dry. Build behind the same rehearsal loop that caught 14 defects on the price side.
+
+### Member workbook rehearsal round 1 (2026-08-08): 3 defects, all real, restored clean
+First end-to-end run of the member workbook against real Postgres. Seeded SJ's member workbook (20 members from his Stripe, 220 answers, 14 ages to member_field_values, 17 GHL prefills), played Lij through the real page, staff review/approve/apply, restored SJ to zero (verified; price workbook untouched). The three parallel builds (page/engine/seed) were tested against each other's CONTRACTS not each other's running code; the rehearsal found where they did not fit.
+
+**D1 HIGH (reaches Lij): off-card save 404s for every member.** The seed pre-creates billing_mode + next_payment rows but ZERO off_card_method / off_card_method_note rows. The page's setA sends off_card_method with id:null expecting upsert-on-target_field; the API rejects id:null on a member card with "that answer does not belong to this card" (404). The billing_mode save is in the same atomic batch so it also does not persist. WORSE: a pending failed save makes flushAll() fail, so one cash attempt JAMS the whole "Send back to BAM" submit until Lij reverts that member to Card. Cause = contract mismatch: the seed builder assumed "the page mints them when the owner marks off-card"; the page builder had flagged "a member card cannot mint." Neither was reconciled.
+
+**D2 MEDIUM: a stop-billing member is counted as a coverage blocker.** A member Lij marked "not a member anymore" still appears in the uncovered list requiring a family + archived-price mint. A leaving member should be EXCLUDED from the coverage gate - you do not price someone you are un-billing.
+
+**D3 MEDIUM (reaches Lij): the Plan column shows raw Stripe price ids** (price_1SNR95...) instead of a plan name, because pricing_catalog is empty (F dependency) and no readable label/plan_options is provided. Also a visual overlap: the "They pay" dollar amount overlaps the long price-id text.
+
+**Confirmed working:** seed prefill, stop-billing grouped first in review, note-required gate for "something else", no-partial-submit gate (client+server), coverage gate refusing cleanly (409, wrote nothing), zero Stripe calls, staff review + approve-card per card, approval gate.
+
+**Still UNPROVEN (F dependency): the apply WRITE path.** Coverage 409s because SJ's catalog is empty, and there is no in-product way to name a plan family, so member-create / off-card-arrangement / mint-queue writes never ran against real Postgres. Proving them needs the price side's live mint to populate pricing_catalog first (or a staff set-family action). Recorded as the next real gap after the 3 fixes.
+
+FIX DECISIONS (one builder owns all three to keep the contract coherent):
+- D1: the SEED pre-creates off_card_method + off_card_method_note answer rows (answered=null) for every member card, matching decision A (all editable fields pre-seeded, a true confirm). billing_mode already seeded. So the page saves by id, never id:null.
+- D2: coverage resolution EXCLUDES members whose effective outcome=stop_billing.
+- D3: the page renders the plan LABEL (from the seeded plan value / card meta) not the raw price id; the seed populates card meta.plan_options (the offer's pricing_offerings) so a picker renders even with an empty catalog; CSS fix for the dollar/price-id overlap.
