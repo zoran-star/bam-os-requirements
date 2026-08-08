@@ -420,6 +420,20 @@ const PAGE_CONTROLS = {
     `  const t=String(s==null?'':s);                                  // (control monthsmisparse)
   const n=parseFloat(t)||1;
   return /week|wk/i.test(t)?Math.max(1,Math.round(n/4.345)):Math.max(1,Math.round(n));`]],
+  // MEMBER, page. The off-card "something else" note requirement is gone, so a
+  // member flagged as paying another way with "other" and no note confirms - the
+  // decorative-flag failure the off-card system exists to prevent ("$85 other."
+  // on a row nobody can collect). Section K4's refusal has to catch it.
+  offcardnonote: [[
+    `      if(m.method==='other'&&!String(m.methodNote||'').trim()){alert('Tell us what "something else" means here, or nobody will know how to collect it.');return}`,
+    `      // (control offcardnonote) the note requirement on "something else" is gone`]],
+  // MEMBER, page. A dollar INPUT reappears in the money cell on a surface whose
+  // whole ruling is that money is display-only - amount_cents is a carried
+  // read-only fact and must never be editable. Section K's no-dollar-input pin
+  // has to catch it.
+  memberdollarinput: [[
+    `  return '<span class="mmoney">$'+dollars.toLocaleString()+cur+(m.interval?('<span class="ro">'+esc(m.interval)+'</span>'):'')+'</span>';`,
+    `  return '<span class="mmoney">$<input type="number" value="'+dollars+'" oninput="setA(\\''+m.id+'\\',\\'amount_cents\\',+this.value*100)">'+cur+'</span>';   // (control memberdollarinput) a dollar input on a money-is-read-only surface`]],
 };
 
 const API_CONTROLS = {
@@ -1273,6 +1287,10 @@ const RETURNS = [
   "openAdd", "applyEverything", "appliesEverything", "setTax", "drawCodes", "pickCyc",
   "drawLadder", "prevOpts", "TYPES", "TYPES_W", "CYCLES", "CYCLES_W", "AFTER", "AFTER_W",
   "YESNO_W", "CHARGE_W", "DUR", "KIND", "ADDOPEN", "ADDERR", "MAX_ADD_PER_CARD",
+  // member workbook
+  "memberModel", "renderMember", "drawMember", "memberRowHTML", "memMenu", "pickPay",
+  "pickPlan", "markGone", "undoGone", "addMember", "addAthlete", "toggleConfirmMember",
+  "payKey", "memMoney",
 ].join(", ");
 const pageBody = pageSrc + `\nreturn { ${RETURNS}, get CARDS(){return CARDS}, get MODEL(){return MODEL}, get WB(){return WB}, get RO(){return RO}, get SAVE(){return SAVE} };\n`;
 const pageGlobals = {
@@ -2662,6 +2680,187 @@ console.log("\n── J. 25 months on the real page is refused where staff read,
     `and apply refuses the workbook with the same sentence ("${fJ.error}")`);
   check(JSON.stringify(DB.offers.map((o) => ({ id: o.id, data: o.data }))) === offersBeforeJ,
     "so the 25-month claim never reached the offer jsonb");
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// K. THE MEMBER WORKBOOK - the same real page, a different card renderer, against
+// the same real handler. kind='member': the owner confirms his existing paying
+// members. Every editable field targets a PRE-SEEDED answer row (a member card
+// can neither mint nor take server additions), money is DISPLAY-ONLY, off-card
+// "something else" REQUIRES a note before the row can confirm, and the Send gate
+// is the identical no-partial-submit rule. Driven end to end: boot, sort, saves,
+// the off-card follow-up, mark-gone, the gated add, and the gate.
+// ═════════════════════════════════════════════════════════════════════════════
+console.log("\n══ MEMBER WORKBOOK: the member view against the same handler ══");
+{
+  // ── a member fixture on the SAME token the page boots with ────────────────
+  // Rows carry the shapes the member field map (MEMBER_T) and the seeded-shell
+  // contract use: card_key member:<sub>, target_kind member_row, target_table
+  // members, target_id a members.id shell. Every editable field has a seeded row
+  // (current_value the Stripe/GHL prefill, answered null), because the member
+  // card cannot mint - a save with no row to land in would 404.
+  let mSeq = 0;
+  const mrow = (cardId, memberId, field, current, extra = {}) => ({
+    id: `m${++mSeq}`, workbook_id: "wbm", card_id: cardId, client_id: "sj",
+    target_kind: "member_row", target_table: "members", target_id: memberId,
+    target_field: field, current_value: current === undefined ? null : current,
+    proposed: null, answered: null, applied_at: null, apply_error: null,
+    created_at: `2026-08-07T00:00:${String(mSeq).padStart(2, "0")}Z`, ...extra,
+  });
+  // Every editable field, seeded so the page never has to mint on a member card.
+  const memberFields = (cardId, memberId, o) => [
+    mrow(cardId, memberId, "parent_name", o.parent),
+    mrow(cardId, memberId, "parent_phone", o.phone === undefined ? null : o.phone),
+    mrow(cardId, memberId, "athlete_name", o.athlete),
+    mrow(cardId, memberId, "athlete_age", o.age === undefined ? null : o.age),
+    mrow(cardId, memberId, "plan", o.plan === undefined ? null : o.plan),
+    mrow(cardId, memberId, "stripe_price_id", o.priceId === undefined ? null : o.priceId),
+    mrow(cardId, memberId, "offer_id", o.offerId === undefined ? null : o.offerId),
+    mrow(cardId, memberId, "amount_cents", o.cents === undefined ? null : o.cents),
+    mrow(cardId, memberId, "next_payment", o.next === undefined ? null : o.next),
+    mrow(cardId, memberId, "outcome", null),
+    mrow(cardId, memberId, "billing_mode", null),
+    mrow(cardId, memberId, "off_card_method", null),
+    mrow(cardId, memberId, "off_card_method_note", null),
+  ];
+  const PLAN_OPTS = [
+    { plan: "Academy 1x/week", price_id: "price_1x", offer_id: "off-1x" },
+    { plan: "Academy 2x/week", price_id: "price_2x", offer_id: "off-2x" },
+    { plan: "Academy Unlimited", price_id: "price_unl", offer_id: "off-unl" },
+  ];
+  const mMeta = (extra) => ({ interval_label: "every 4 wks", currency: "usd", plan_options: PLAN_OPTS, ...extra });
+
+  DB = {
+    clients: [{ id: "sj", public_name: "By Any Means San Jose", business_name: "BAM San Jose", tax_config: null }],
+    staff: [{ id: "staff-1", user_id: "user-1", name: "Zoran", email: "zoran@byanymeansbball.com" }],
+    offers: [], pricing_catalog: [], offer_prices: [],
+    workbooks: [{ id: "wbm", client_id: "sj", kind: "member", token: TOKEN, status: "sent", submitted_at: null, reviewed_at: null, snapshot: null, created_at: "2026-08-07T00:00:00Z", updated_at: "2026-08-07T00:00:00Z" }],
+    // sort_order is DELIBERATELY not next-payment order, so the page's own sort is
+    // what produces the final order (cov is first by sort_order, last by date).
+    workbook_cards: [
+      { id: "c-cov", workbook_id: "wbm", card_key: "member:sub_cov", title: "May Chung", sort_order: 0, state: "untouched", confirmed_at: null, meta: mMeta({ last_payment: "Aug 18", prefill: { athlete_name: true, athlete_age: true, parent_name: true } }) },
+      { id: "c-amb", workbook_id: "wbm", card_key: "member:sub_amb", title: "Christy Hang", sort_order: 1, state: "untouched", confirmed_at: null, meta: mMeta({ last_payment: "Jul 22", flag: true, flag_note: "Stripe calls this plan Christopher. Is Matt right?", prefill: { athlete_name: true, athlete_age: true } }) },
+      { id: "c-alt", workbook_id: "wbm", card_key: "member:sub_alt", title: "Sue Ito", sort_order: 2, state: "untouched", confirmed_at: null, meta: mMeta({ last_payment: "Jul 25", prefill: { athlete_name: true, athlete_age: true } }) },
+      { id: "c-stop", workbook_id: "wbm", card_key: "member:sub_stop", title: "Anna Park", sort_order: 3, state: "untouched", confirmed_at: null, meta: mMeta({ last_payment: "Aug 5", prefill: { athlete_name: true } }) },
+      { id: "c-notes", workbook_id: "wbm", card_key: "notes", title: "Anything else", sort_order: 4, state: "untouched", confirmed_at: null, meta: {} },
+    ],
+    workbook_answers: [
+      ...memberFields("c-cov", "m-cov", { parent: "May Chung", phone: "408-555-0100", athlete: "Jenny Chung", age: "9", plan: "Elementary Academy", priceId: "price_ele", offerId: "off-ele", cents: 20000, next: "2026-09-15" }),
+      ...memberFields("c-amb", "m-amb", { parent: "Christy Hang", phone: "408-555-0111", athlete: "Matt Hang", age: "13", plan: null, priceId: "price_199", offerId: null, cents: 19900, next: "2026-08-19" }),
+      ...memberFields("c-alt", "m-alt", { parent: "Sue Ito", phone: "408-555-0104", athlete: "Ken Ito", age: "11", plan: "Academy 2x/week", priceId: "price_2x", offerId: "off-2x", cents: 25000, next: "2026-09-01" }),
+      ...memberFields("c-stop", "m-stop", { parent: "Anna Park", phone: "408-555-0102", athlete: "Leo Park", age: "10", plan: "Elementary Academy", priceId: "price_ele", offerId: "off-ele", cents: 20000, next: "2026-09-02" }),
+      { id: "m-notes", workbook_id: "wbm", card_id: "c-notes", client_id: "sj", target_kind: "member_row", target_table: "members", target_id: null, target_field: "notes", current_value: null, proposed: null, answered: null, applied_at: null, apply_error: null, created_at: "2026-08-07T00:00:99Z" },
+    ],
+  };
+
+  // A fresh page instance: its own RO=false, booted off the member GET.
+  const mpage = new Function(...Object.keys(pageGlobals), pageBody)(...Object.values(pageGlobals));
+  const mLid = (key) => (mpage.CARDS.find((c) => c.card_key === key) || {}).lid;
+  const mAns = (cardId, field) => DB.workbook_answers.find((r) => r.card_id === cardId && r.target_field === field);
+  const mDbCard = (id) => DB.workbook_cards.find((c) => c.id === id);
+  const orow = (lid) => { const e = byId("card_" + lid); return e ? String(e.outerHTML || e.innerHTML || "") : ""; };
+  async function mflush() { await mpage.flushAll(); await settle(); }
+  async function mtype(key, field, value) { mpage.setA(mLid(key), field, value); TIMERS.clear(); await mpage.flushAll(); await settle(); }
+  async function mconfirm(key) { await mpage.confirmCard(mLid(key)); await settle(); }
+  async function mSubmitDirect() { const r = await router("/api/workbook", { method: "POST", body: JSON.stringify({ token: TOKEN, action: "submit" }) }); return r.json(); }
+
+  // ── K1. SHAPE + BOOT ──────────────────────────────────────────────────────
+  console.log("\n── K1. the member GET, and the page boots the grid off it ──");
+  const mwire = await getApi();
+  check(mwire.ok === true && mwire.workbook.kind === "member" && mwire.cards.length === 5, "the API answers the member GET with 5 cards");
+  const covFields = new Set(mwire.cards.find((c) => c.card_key === "member:sub_cov").answers.map((a) => a.target_field));
+  const MEMBER_READS = ["parent_name", "parent_phone", "athlete_name", "athlete_age", "plan", "stripe_price_id", "offer_id", "amount_cents", "next_payment", "outcome", "billing_mode", "off_card_method", "off_card_method_note"];
+  const missM = MEMBER_READS.filter((f) => !covFields.has(f));
+  check(missM.length === 0, `every member field the page edits has a seeded row (${MEMBER_READS.length} fields${missM.length ? ", MISSING " + missM.join(", ") : ""})`);
+  check(mwire.cards.every((c) => Array.isArray(c.can_add) && c.can_add.length === 0), "a member card takes no server additions (can_add is empty), so + Add is a request, not a silent write");
+  await mpage.boot(); await settle();
+  check(mpage.WB.kind === "member" && mpage.CARDS.length === 5, "the page boots the member workbook and holds 5 cards");
+  check(txt("wbh1") === "Your members", `the header becomes "${txt("wbh1")}"`);
+
+  const grid = inner("cards");
+  // ── K2. NO DOLLAR INPUT (money is display-only) - the pin for MUTATE=memberdollarinput
+  check(/class="mmoney">\$200/.test(grid), "the amount renders as read-only text ($200)");
+  check(!/amount_cents/.test(grid), "no control anywhere on the member view writes amount_cents");
+  check(!/<span class="mmoney">[^<]*<input/.test(grid), "and there is no dollar INPUT in a money cell - money is display-only (locked ruling)");
+
+  // ── K3. SORTED BY NEXT PAYMENT ASCENDING ──────────────────────────────────
+  const order = [...grid.matchAll(/mnmin" value="([^"]*)"/g)].map((m) => m[1]);
+  // dates: amb 08-19, alt 09-01, stop 09-02, cov 09-15 - NOT the sort_order the server sent.
+  check(order.join(" | ") === "Christy Hang | Sue Ito | Anna Park | May Chung",
+    `rows are sorted by next payment ascending, not by the server's sort_order (order: ${order.join(", ")})`);
+
+  // ── K4. SAVES: an in-place edit lands on the seeded row ────────────────────
+  console.log("\n── K4. edits save onto the pre-seeded rows ──");
+  await mtype("member:sub_cov", "athlete_name", "Jenny Chung Luu");
+  check(mAns("c-cov", "athlete_name").answered === "Jenny Chung Luu", "editing the athlete name saves onto the members row");
+  await mtype("member:sub_cov", "next_payment", "2026-09-20");
+  check(mAns("c-cov", "next_payment").answered === "2026-09-20", "editing next payment saves");
+  mpage.pickPlan(mLid("member:sub_amb"), 0); await mflush();
+  check(mAns("c-amb", "plan").answered === "Academy 1x/week" && mAns("c-amb", "offer_id").answered === "off-1x",
+    "picking a plan for the ambiguous member saves the family and its offer id");
+
+  // ── K5. OFF-CARD: "something else" REQUIRES a note before confirm (gap #6) ──
+  console.log("\n── K5. off-card 'something else' refuses to confirm without a note ──");
+  const altLid = mLid("member:sub_alt");
+  mpage.memMenu(altLid);
+  mpage.pickPay(altLid, "other"); await mflush();
+  check(mAns("c-alt", "billing_mode").answered === "alternate" && mAns("c-alt", "off_card_method").answered === "other",
+    "picking 'something else' saves billing_mode alternate + method other");
+  ALERTS = [];
+  await mpage.confirmCard(altLid); await settle();
+  check(ALERTS.length === 1 && /something else/.test(ALERTS[0]) && !mDbCard("c-alt").confirmed_at,
+    `the row refuses to confirm until the note is filled ("${ALERTS[0]}")`);
+  await mtype("member:sub_alt", "off_card_method_note", "pays by Venmo on the 1st");
+  ALERTS = [];
+  await mconfirm("member:sub_alt");
+  check(mAns("c-alt", "off_card_method_note").answered === "pays by Venmo on the 1st" && !!mDbCard("c-alt").confirmed_at,
+    "with the note, the off-card row saves it and confirms");
+  // Card on file clears the off-card flag on a DIFFERENT member, proving both ways.
+  mpage.memMenu(mLid("member:sub_cov"));
+  mpage.pickPay(mLid("member:sub_cov"), "card"); await mflush();
+  check(mAns("c-cov", "billing_mode").answered === "card", "'Card on file' writes billing_mode card");
+
+  // ── K6. MARK GONE -> outcome stop_billing ─────────────────────────────────
+  console.log("\n── K6. 'not a member anymore' sets stop_billing, and needs no off-card ──");
+  const stopLid = mLid("member:sub_stop");
+  mpage.memMenu(stopLid);
+  mpage.markGone(stopLid); await mflush();
+  check(mAns("c-stop", "outcome").answered === "stop_billing", "'not a member anymore' writes outcome stop_billing");
+  check(/mrow[^"]*gone/.test(orow(stopLid)), "the row is drawn as gone");
+  ALERTS = [];
+  await mconfirm("member:sub_stop");
+  check(ALERTS.length === 0 && !!mDbCard("c-stop").confirmed_at, "a gone member confirms with no off-card follow-up demanded");
+
+  // ── K7. + ADD A MEMBER is a gated request, never a silent create ───────────
+  console.log("\n── K7. + Add a member is an honest request, not a silent write ──");
+  const ansBefore = DB.workbook_answers.length;
+  mpage.addMember();
+  check(/not in Stripe/i.test(inner("maddcapbox")) && DB.workbook_answers.length === ansBefore,
+    "clicking + Add a member shows what BAM will do and writes no member row");
+  mpage.addAthlete(mLid("member:sub_amb"));
+  check(/added by BAM/.test(orow(mLid("member:sub_amb"))) && DB.workbook_answers.length === ansBefore,
+    "and + athlete says a sibling is set up by BAM, writing nothing");
+
+  // ── K8. THE GATE: no partial submit; every card confirmed before Send ──────
+  console.log("\n── K8. the Send gate: every card confirmed, page number == server number ──");
+  mpage.updProg();
+  const refused = await mSubmitDirect();
+  check(refused.ok === false && refused.remaining === mpage.remainingCount() && refused.remaining > 0,
+    `with cards still unconfirmed, submit refuses and remaining agrees (server ${refused.remaining}, page ${mpage.remainingCount()})`);
+  check(DB.workbooks[0].status === "sent", "and nothing was submitted");
+  // Confirm the rest (alt + stop already confirmed above).
+  await mconfirm("member:sub_cov");
+  await mconfirm("member:sub_amb");
+  await mconfirm("notes");
+  mpage.updProg();
+  check(mpage.remainingCount() === 0 && txt("lefttxt") === "all done, press Send", "every card confirmed, the page says all done");
+  ALERTS = [];
+  await mpage.doSubmit(); await settle();
+  check(DB.workbooks[0].status === "submitted", `the member workbook sends${ALERTS.length ? " (alerts: " + ALERTS.join(" | ") + ")" : ""}`);
+  check(mpage.RO === true, "and the page goes read-only");
+  const covRO = orow(mLid("member:sub_cov"));
+  check(!/mnmin/.test(covRO) && !/<input/.test(covRO) && !/mdots/.test(covRO),
+    "the sent copy has no inputs, no dollar field and no three-dot menu - read-only");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

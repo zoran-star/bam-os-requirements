@@ -306,6 +306,103 @@
     .afterrow,.rmore{grid-template-columns:minmax(0,1fr);gap:4px 0}
     .afterrow .al,.rmore .ml{padding-top:9px}
   }
+
+  /* ══ THE MEMBER WORKBOOK (kind='member') ══════════════════════════════════
+     A grid the owner reads DOWN, not a stack of cards. Same light product
+     family as the price side (same tokens), the layout carried from the
+     approved mockup docs/plans/member-workbook-seeded.html. Money is
+     display-only here on purpose (locked ruling): there is no dollar INPUT
+     anywhere in this view, and the contract harness asserts its absence. */
+  .mbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 12px}
+  .maddbtn{margin-left:auto;background:var(--ink);color:#fff;border:none;border-radius:9px;padding:8px 15px;font-weight:700;font-size:12.5px;cursor:pointer}
+  .maddbtn:hover{opacity:.92}
+  .mplans{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 8px}
+  .mplans .mp{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:8px 12px;font-size:11.5px;min-width:150px}
+  .mplans .mp b{display:block;font-size:12.5px;margin-bottom:2px}
+  .mplans .mp .r{color:var(--mut)}
+  .mtable{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:4px}
+  .mtable th,.mtable td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+  .mtable th{background:#faf9f5;color:var(--mut);font-size:9.5px;text-transform:uppercase;letter-spacing:.9px;font-weight:700}
+  .mtable tr:last-child td{border-bottom:none}
+  .mtable tr.flag{background:#fefaf4}
+  .mtable tr.gone{opacity:.62}
+  .mtable tr.gone .mnm{text-decoration:line-through}
+  .mck{width:20px;height:20px;border:2px solid #d2cfc4;border-radius:6px;display:inline-block;cursor:pointer;flex-shrink:0}
+  .mck.on{background:var(--good);border-color:var(--good);position:relative}
+  .mck.on::after{content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  body.ro .mck{cursor:default}
+  .mnm{font-weight:650}
+  .mem{font-size:10.5px;color:var(--mut);margin-top:1px}
+  .mphone input{font:inherit;font-size:11px;border:1px solid transparent;border-radius:6px;padding:2px 4px;margin-left:-4px;background:none;color:var(--mut);max-width:130px}
+  .mphone input:hover{border-color:var(--line)}
+  .mphone input:focus{border-color:var(--gold);background:var(--paper);color:var(--ink);outline:none}
+  .mphone.miss input{color:var(--bad)}
+  .math{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+  .mtable input[type=text]{font:inherit;font-size:11.5px;border:1px solid var(--line);border-radius:7px;padding:4px 6px;background:var(--paper);color:var(--ink);max-width:100%}
+  .mtable input[type=text]:focus{border-color:var(--gold);outline:none}
+  .mtable input.msm{width:120px}
+  .mtable input.mage{width:46px}
+  .mtable input.pre{background:var(--good-bg);border-color:#bfddc9}
+  .maddath{font-size:10.5px;color:var(--gold-ink);border:1px dashed var(--gold);border-radius:6px;padding:2px 7px;cursor:pointer;background:var(--gold-bg)}
+  .mtable select{font:inherit;font-size:11.5px;border:1px solid var(--line);border-radius:7px;padding:4px 6px;background:var(--paper);color:var(--ink);max-width:100%}
+  .mtable select:focus{border-color:var(--gold);outline:none}
+  .mnote{font-size:10.5px;color:var(--bad);margin-top:3px;line-height:1.4}
+  /* MONEY, DISPLAY ONLY. A span, never an input. The read-only tag under it is
+     part of the promise: this is what a parent already pays, we do not change it. */
+  .mmoney{font-variant-numeric:tabular-nums;font-weight:650;color:var(--ink)}
+  .mmoney .ro{font-size:9px;color:#b4b0a5;font-weight:600;display:block;letter-spacing:.4px}
+  .mdt{font-variant-numeric:tabular-nums;font-size:11.5px}
+  .mdt.past{color:var(--mut)}
+  .mdt .src{font-size:9px;color:#9bbfa6;font-weight:700;display:block;letter-spacing:.3px}
+  .mdt input[type=date]{font:inherit;font-size:11px;border:1px solid var(--line);border-radius:6px;padding:3px 5px;background:var(--paper);color:var(--ink);max-width:140px}
+  .mdt input[type=date]:focus{border-color:var(--gold);outline:none}
+  .mdots{width:27px;height:27px;border:1px solid var(--line);border-radius:7px;background:var(--paper);cursor:pointer;font-size:15px;line-height:1;color:var(--mut);font-weight:800}
+  .mdots:hover{background:var(--bg)}
+  body.ro .mdots,body.ro .maddath,body.ro .maddbtn,body.ro .mgo{display:none}
+  .paytag{font-size:9.5px;color:var(--mut);display:block;margin-top:3px}
+  /* The inline per-row menu. Rendered INTO the row (not a floating overlay) so
+     it is testable and never sits over another row: how they pay, plus mark gone. */
+  .mmenu{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-top:6px}
+  .mmenu .sec{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);font-weight:800;margin:2px 0 5px}
+  .mmenu .prow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .mmenu .mchip{border:1px solid var(--line);background:var(--paper);border-radius:20px;padding:4px 11px;font-size:11.5px;cursor:pointer;color:var(--ink)}
+  .mmenu .mchip.sel{background:var(--gold-bg);border-color:var(--gold);color:var(--gold-ink);font-weight:700}
+  .mmenu .mnotebox{margin-top:7px}
+  .mmenu .mnotebox input{width:100%;max-width:320px;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;font-size:12px;background:var(--paper);color:var(--ink)}
+  .mmenu .mnotereq{font-size:10.5px;color:var(--gold-ink);margin-top:3px}
+  .mmenu hr{border:none;border-top:1px solid var(--line);margin:8px 0}
+  .mmenu .gone{border:none;background:none;color:var(--bad);font:inherit;font-size:12px;cursor:pointer;padding:2px 0}
+  .mmenu .gone:hover{text-decoration:underline}
+  .mmenu .undo{border:none;background:none;color:var(--gold-ink);font:inherit;font-size:12px;cursor:pointer;padding:2px 0}
+  .mlegend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin:12px 0 0}
+  .mlegend .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+  .maddcap{border:1px dashed var(--gold);background:var(--gold-bg);border-radius:10px;padding:11px 13px;margin-top:10px;font-size:12px;color:var(--gold-ink);line-height:1.5}
+  .maddcap b{color:var(--gold-ink)}
+  .mnmin{font:inherit;font-weight:650;border:1px solid transparent;border-radius:6px;padding:2px 4px;margin-left:-4px;background:none;color:var(--ink);max-width:160px}
+  .mnmin:hover{border-color:var(--line)}
+  .mnmin:focus{border-color:var(--gold);background:var(--paper);outline:none}
+
+  /* The grid IS the table. One DIV per member (id card_<lid>) so the inline
+     "how they pay" menu can live inside the row without a table cell fighting
+     it, and so reopen() can replace exactly one member by id. The header is a
+     row of the same grid so the columns line up with no shared width guessing. */
+  .mgrid{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:4px}
+  .mghead,.mrow>.mcells{
+    display:grid;
+    grid-template-columns:26px minmax(120px,1.3fr) minmax(150px,1.7fr) minmax(130px,1.5fr) 92px 76px 100px 34px;
+    gap:8px 10px;align-items:center;padding:8px 12px;
+  }
+  .mghead{background:#faf9f5;color:var(--mut);font-size:9.5px;text-transform:uppercase;letter-spacing:.9px;font-weight:700;border-bottom:1px solid var(--line)}
+  .mrow{border-bottom:1px solid var(--line2)}
+  .mrow:last-child{border-bottom:none}
+  .mrow.flag{background:#fefaf4}
+  .mrow.gone{opacity:.62}
+  .mrow.gone .mnmin{text-decoration:line-through}
+  @media(max-width:720px){
+    .mgrid{overflow-x:auto}
+    .mghead,.mrow>.mcells{min-width:720px}
+    .mrow .mmenu{min-width:0}
+  }
 </style>
 </head>
 <body>
@@ -323,8 +420,8 @@
 <header>
   <a class="backlink" id="backlink" href="#" style="display:none">&larr; Back to your member workbook</a>
   <div class="brand" id="brandname"></div>
-  <h1>Confirm your pricing</h1>
-  <div class="sub">These are the plans your new system will sell, built from what your members actually pay today. Open each one, fix anything that's wrong, then press <b>This is right</b>. Old members keep their current rate no matter what, this only sets prices for new signups.</div>
+  <h1 id="wbh1">Confirm your pricing</h1>
+  <div class="sub" id="wbsub">These are the plans your new system will sell, built from what your members actually pay today. Open each one, fix anything that's wrong, then press <b>This is right</b>. Old members keep their current rate no matter what, this only sets prices for new signups.</div>
 </header>
 
 <div id="donebar"></div>
@@ -629,6 +726,7 @@ function rebuild(id){
   if(c.type==='plan')MODEL[id]=planModel(c);
   else if(c.type==='tax')MODEL[id]=taxModel(c);
   else if(c.type==='codes')MODEL[id]=codeModel(c);
+  else if(c.type==='member')MODEL[id]=memberModel(c);
   else MODEL[id]={};
 }
 function planModel(c){
@@ -906,6 +1004,21 @@ async function confirmCard(lid){
     const untargeted=(MODEL[lid]||[]).find(x=>String(x.code).trim()&&!(x.applies||[]).some(k=>String(k).trim()));
     if(untargeted){alert('Say what '+untargeted.code+' applies to first. Tick the prices it covers, or choose "Everything, including the joining fee".');return}
   }
+  if(c.type==='member'){
+    /* The off-card follow-ups, refused in the same direction the apply engine
+       refuses them (api/workbook.js phase 0, api/_off-card.js validateMethod).
+       A member marked as paying another way with no method, or "something else"
+       with no note, or no next-payment date to anchor a collection, is the
+       decorative-flag failure the off-card system exists to prevent: the flag
+       excludes them from auto-charge, so without these nobody could ever
+       collect. A member marked gone (stop_billing) skips all of it. */
+    const m=MODEL[lid];
+    if(m&&m.outcome!=='stop_billing'&&m.mode==='alternate'){
+      if(!m.method){alert('Choose how they pay: cash, e-transfer, or something else, so we know how to collect from them.');return}
+      if(m.method==='other'&&!String(m.methodNote||'').trim()){alert('Tell us what "something else" means here, or nobody will know how to collect it.');return}
+      if(!String(m.nextPayment||'').trim()){alert('Add their next payment date so we know when the off-card payment is due.');return}
+    }
+  }
   // Confirm after the edits it is confirming, never before, or the server would
   // record an approval of a value it has not been told about yet.
   if(!await flushAll()){alert('Your last change has not saved yet, so we did not confirm this card. Check the message at the top of the page and try again.');return}
@@ -916,6 +1029,7 @@ async function confirmCard(lid){
     if(r.card)applyCard(c,r);
     else{c.state='confirmed';c.confirmed_at=new Date().toISOString()}
     paintPill(lid); updProg();
+    if(c.type==='member')drawMember(lid);
   }catch(e){
     alert('We could not save that confirmation. '+(e.message==='offline'?'You look offline. Try again when you have signal.':e.message));
   }
@@ -1776,6 +1890,7 @@ function classify(key){
   if(k.startsWith('plan:'))return 'plan';
   if(k==='plans'||k.startsWith('plans:'))return 'plansadd';
   if(k==='codes')return 'codes';
+  if(k.startsWith('member:'))return 'member';
   if(k==='notes')return 'notes';
   return 'other';
 }
@@ -1798,6 +1913,12 @@ function render(){
   document.getElementById('boot').style.display='none';
   document.getElementById('app').style.display='';
   document.getElementById('brandname').textContent=WB.academy_name||'';
+
+  // The member workbook is a different surface on the same spine: a grid the
+  // owner confirms, not a stack of pricing cards. Branch before any price
+  // container is touched.
+  if(WB.kind==='member'){renderMember();return}
+
   document.title=(WB.academy_name?WB.academy_name+' · ':'')+'Confirm your pricing';
 
   const tax=CARDS.filter(c=>c.type==='tax');
@@ -1860,6 +1981,10 @@ function goReadOnly(){
      <div class="dd">Your answers are in and this page is now read only, so nothing can change under you while we work from it. You can still open every card to see exactly what you sent. Nothing is live yet: BAM checks it with you before any of it starts selling.</div></div>`;
   document.getElementById('autonote').textContent='This is the copy you sent. If something is wrong, message BAM and we will reopen it for you.';
   document.querySelectorAll('.bcard').forEach(lockCard);
+  // Member rows are not .bcard: repaint each so its inputs become plain text, the
+  // three-dot menu and the "+ athlete" / "+ Add a member" controls disappear
+  // (body.ro hides them), and nothing on the sent copy is editable.
+  if(WB&&WB.kind==='member')CARDS.filter(c=>c.type==='member').forEach(c=>drawMember(c.lid));
   paintSave();
   updProg();
 }
@@ -1911,6 +2036,250 @@ async function boot(){
   }
   ingest(json);
   render();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE MEMBER WORKBOOK  (kind='member')
+   A grid where an academy owner confirms his existing paying members. Same
+   spine as the price workbook (setA/flush/confirm/gate/submit/read-only), a
+   different card renderer. The apply engine (api/workbook.js member_row branch)
+   is already built; this page feeds it, to the field map that engine defines
+   (MEMBER_T). Every editable field targets a PRE-SEEDED answer row: the member
+   card carries card_key member:<sub>, target_kind member_row, target_table
+   members, target_id a seeded members.id shell, so this is a true CONFIRM.
+
+   MONEY IS DISPLAY-ONLY (locked ruling). There is no dollar INPUT anywhere in
+   this view: amount_cents is a carried, read-only pre-seed fact, never edited,
+   never used to change what a parent pays. verify-workbook-contract.mjs asserts
+   the absence of any money input.
+
+   A member card CANNOT mint answer rows (canMint returns false for member:
+   cards) and CANNOT take server additions (addableOn returns [] for member
+   cards). So: every field this page edits must already have a seeded row, and
+   "+ Add a member" / "+ athlete" are REQUESTS a person at BAM acts on, never
+   silent writes - the same request-not-configuration philosophy the price
+   workbook's additions carry, and never a dead control.
+   ══════════════════════════════════════════════════════════════════════════ */
+const MEMMENU={};     // lid -> menu open
+const ADDATH={};      // lid -> "tell us about a second athlete" note open
+
+function setIfRow(lid,field,v){const c=card(lid);if(ansOf(c,field)){setA(lid,field,v);return true}return false}
+
+function memberModel(c){
+  const meta=c.meta||{};
+  const amtRaw=val(c,'amount_cents',null);
+  const amount=(amtRaw==null||amtRaw==='')?(has(meta.amount_cents)?+meta.amount_cents:null):+amtRaw;
+  return {
+    id:c.lid,
+    parentName:val(c,'parent_name',meta.parent_name||''),
+    parentPhone:val(c,'parent_phone',meta.parent_phone||''),
+    athleteName:val(c,'athlete_name',meta.athlete_name||''),
+    athleteAge:val(c,'athlete_age',''),
+    plan:val(c,'plan',''),
+    priceId:val(c,'stripe_price_id',''),
+    offerId:val(c,'offer_id',''),
+    amountCents:isFinite(amount)?amount:null,
+    nextPayment:String(val(c,'next_payment','')||''),
+    outcome:String(val(c,'outcome','confirmed')||'confirmed').toLowerCase(),
+    /* billing_mode/off_card_method arrive lowercase from the offer's vocabulary;
+       an untouched member has billing_mode null -> mode '', which reads as the
+       "Card on file" default (writing nothing until he picks otherwise). */
+    mode:String(val(c,'billing_mode','')||'').toLowerCase(),
+    method:String(val(c,'off_card_method','')||'').toLowerCase(),
+    methodNote:val(c,'off_card_method_note',''),
+    // FACTS THE OWNER CANNOT EDIT, computed by the seed and rendered, never
+    // written back (same reason the price card's meta is one-way).
+    lastPayment:meta.last_payment||'',
+    interval:meta.interval_label||meta.interval||'',
+    currency:meta.currency||'',
+    planOptions:Array.isArray(meta.plan_options)?meta.plan_options:[],
+    live:meta.live,
+    flag:meta.flag===true||meta.needs_eye===true,
+    flagNote:meta.flag_note||meta.note||'',
+    prefill:meta.prefill||{}
+  };
+}
+/* Which pay chip is lit. An alternate member reads its method; everyone else
+   reads as card-on-file, the default that writes nothing. */
+function payKey(m){return m.mode==='alternate'?(m.method||'other'):'card'}
+function payTagLabel(k){return k==='cash'?'Cash':k==='e_transfer'?'e-Transfer':k==='other'?'Something else':''}
+function memMoney(m){
+  if(m.amountCents==null)return '<span class="mmoney">-</span>';
+  const cur=(m.currency&&['cad','usd',''].indexOf(String(m.currency).toLowerCase())<0)?(' '+String(m.currency).toUpperCase()):'';
+  const dollars=Math.round(m.amountCents/100);
+  return '<span class="mmoney">$'+dollars.toLocaleString()+cur+(m.interval?('<span class="ro">'+esc(m.interval)+'</span>'):'')+'</span>';
+}
+/* A date-only string, shown the way the mockup shows it. Split rather than
+   `new Date(s)`, which parses YYYY-MM-DD as UTC and can render a day early. */
+function prettyDate(s){
+  const mm=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||''));
+  if(!mm)return String(s||'');
+  const d=new Date(+mm[1],+mm[2]-1,+mm[3]);
+  if(isNaN(d))return String(s||'');
+  const now=new Date();
+  return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+(d.getFullYear()!==now.getFullYear()?(' '+d.getFullYear()):'');
+}
+function planLabel(m){
+  if(m.plan)return m.plan;
+  const o=(m.planOptions||[]).find(x=>x.price_id&&x.price_id===m.priceId);
+  return (o&&(o.label||o.plan))||m.priceId||'';
+}
+function planCellHTML(lid,m){
+  const opts=m.planOptions||[];
+  if(RO||!opts.length)return `<span>${esc(planLabel(m)||'-')}</span>`;
+  const selIdx=opts.findIndex(o=>(o.price_id&&o.price_id===m.priceId)||(o.plan&&o.plan===m.plan)||(o.label&&o.label===m.plan));
+  const ph=selIdx<0?`<option value="-1" selected>${esc(m.plan||'Which plan is this?')}</option>`:'';
+  const body=opts.map((o,i)=>`<option value="${i}" ${i===selIdx?'selected':''}>${esc(o.label||o.plan||'plan')}</option>`).join('');
+  return `<select onchange="pickPlan('${lid}',this.value)">${ph}${body}</select>`;
+}
+function pickPlan(lid,v){
+  const i=+v;if(!(i>=0))return;
+  const opt=(MODEL[lid].planOptions||[])[i];if(!opt)return;
+  // `plan` (the family) is the primary signal the coverage step resolves on; it
+  // must have a seeded row. price_id / offer_id are written only when the option
+  // carries them AND a row exists, so a pick can never try to mint on a member
+  // card (which the engine refuses).
+  setA(lid,'plan',opt.plan||opt.label||'');
+  if(opt.offer_id!=null)setIfRow(lid,'offer_id',String(opt.offer_id));
+  if(opt.price_id!=null)setIfRow(lid,'stripe_price_id',String(opt.price_id));
+  drawMember(lid);
+}
+function memMenu(lid){if(RO)return;MEMMENU[lid]=!MEMMENU[lid];drawMember(lid)}
+function memberMenuHTML(lid,m,pk){
+  const gone=m.outcome==='stop_billing';
+  const chip=(k,label)=>`<button class="mchip ${pk===k?'sel':''}" onclick="pickPay('${lid}','${k}')">${label}</button>`;
+  const noteBox=(m.mode==='alternate'&&m.method==='other')
+    ? `<div class="mnotebox"><input type="text" value="${esc(m.methodNote)}" placeholder="e.g. pays by Venmo on the 1st" oninput="setA('${lid}','off_card_method_note',this.value)"><div class="mnotereq">Needed before this row can be confirmed: tell us what "something else" means, or nobody will know how to collect it.</div></div>`
+    : '';
+  return `<div class="mmenu">
+    <div class="sec">How they pay</div>
+    <div class="prow">${chip('card','Card on file')}${chip('cash','Cash')}${chip('e_transfer','e-Transfer')}${chip('other','Something else')}</div>
+    ${noteBox}
+    <hr>
+    ${gone
+      ? `<button class="undo" onclick="undoGone('${lid}')">Still a member - keep charging them</button>`
+      : `<button class="gone" onclick="markGone('${lid}')">Not a member anymore (stop charging them)</button>`}
+  </div>`;
+}
+/* Card on file clears any off-card method (the flag and its follow-ups go away);
+   cash / e-transfer / something else set alternate + the method. billing_mode
+   and the two off_card_* fields are seeded rows, so these never mint. */
+function pickPay(lid,k){
+  if(k==='card'){setA(lid,'billing_mode','card');setIfRow(lid,'off_card_method','');setIfRow(lid,'off_card_method_note','')}
+  else{setA(lid,'billing_mode','alternate');setA(lid,'off_card_method',k);if(k!=='other')setIfRow(lid,'off_card_method_note','')}
+  drawMember(lid);
+}
+/* Not a member -> outcome stop_billing. The engine turns this into a stop-billing
+   action item (with the amount and subscription id) rather than a silent cancel. */
+function markGone(lid){setA(lid,'outcome','stop_billing');MEMMENU[lid]=false;drawMember(lid)}
+function undoGone(lid){setA(lid,'outcome','confirmed');drawMember(lid)}
+/* A second athlete on one subscription is two members rows sharing the sub
+   (engine decision C), which is a CREATE - and the member card cannot mint or
+   add through this no-login link. So it is a request BAM sets up, said plainly,
+   never a dead "+". */
+function addAthlete(lid){if(RO)return;ADDATH[lid]=!ADDATH[lid];drawMember(lid)}
+function toggleConfirmMember(lid){if(RO)return;const c=card(lid);if(isReady(c))return;confirmCard(lid)}
+
+function memberRowHTML(lid){
+  const c=card(lid);const m=MODEL[lid]||memberModel(c);
+  const gone=m.outcome==='stop_billing';
+  const flagged=m.flag&&!gone;
+  const confirmed=isReady(c);
+  const pk=payKey(m);const tag=payTagLabel(pk);
+  const preN=m.prefill&&m.prefill.athlete_name?'pre':'';
+  const preA=m.prefill&&m.prefill.athlete_age?'pre':'';
+  const nextCell=RO
+    ? `${esc(prettyDate(m.nextPayment)||'-')}<span class="src">from Stripe</span>`
+    : `<input type="date" value="${esc((m.nextPayment||'').slice(0,10))}" oninput="setA('${lid}','next_payment',this.value)"><span class="src">from Stripe</span>`;
+  const parentCell=RO
+    ? `<span class="mnm">${esc(m.parentName||'-')}</span>${m.flagNote?`<div class="mem">${esc(m.flagNote)}</div>`:''}${m.parentPhone?`<div class="mem">${esc(m.parentPhone)}</div>`:''}`
+    : `<input class="mnmin" value="${esc(m.parentName)}" placeholder="parent name" oninput="setA('${lid}','parent_name',this.value)">
+       ${m.flagNote?`<div class="mem">${esc(m.flagNote)}</div>`:''}
+       <div class="mphone ${m.parentPhone?'':'miss'}"><input type="text" value="${esc(m.parentPhone)}" placeholder="add phone" oninput="setA('${lid}','parent_phone',this.value)"></div>`;
+  const athCell=RO
+    ? `<span>${esc(m.athleteName||'-')}${m.athleteAge?` &middot; ${esc(m.athleteAge)}`:''}</span>`
+    : `<div class="math">
+        <input type="text" class="msm ${preN}" value="${esc(m.athleteName)}" placeholder="athlete" oninput="setA('${lid}','athlete_name',this.value)">
+        <input type="text" class="mage ${preA}" value="${esc(m.athleteAge)}" placeholder="age" inputmode="numeric" oninput="setA('${lid}','athlete_age',this.value)">
+        <span class="maddath" onclick="addAthlete('${lid}')">+ athlete</span>
+       </div>
+       ${ADDATH[lid]?`<div class="mnote" style="color:var(--gold-ink)">A second athlete on this membership is added by BAM (siblings share one subscription). Reply to BAM with the second name, or leave it in the note under the three dots.</div>`:''}`;
+  return `<div class="mrow ${flagged?'flag':''} ${gone?'gone':''}" id="card_${lid}">
+   <div class="mcells">
+    <span class="mck ${confirmed?'on':''}" title="${confirmed?'Confirmed by you':'Tap when this row is right'}" onclick="toggleConfirmMember('${lid}')"></span>
+    <div>${parentCell}</div>
+    <div>${athCell}</div>
+    <div>${planCellHTML(lid,m)}</div>
+    ${memMoney(m)}
+    <span class="mdt past">${esc(m.lastPayment||'-')}</span>
+    <span class="mdt">${nextCell}</span>
+    <span>${RO?'':`<button class="mdots" onclick="memMenu('${lid}')">&#8942;</button>`}${tag?`<span class="paytag">${esc(tag)}</span>`:''}</span>
+   </div>
+   ${MEMMENU[lid]?memberMenuHTML(lid,m,pk):''}
+  </div>`;
+}
+function drawMember(lid){reopen(lid,()=>memberRowHTML(lid))}
+
+function plansStripHTML(){
+  const ps=Array.isArray(WB.plans)?WB.plans:[];
+  if(!ps.length)return '';
+  return `<div class="mplans">${ps.map(p=>`<div class="mp"><b>${esc(p.name||'')}</b><span class="r">${esc(p.detail||'')}</span></div>`).join('')}</div>`;
+}
+function addMember(){
+  const box=document.getElementById('maddcapbox');if(!box)return;
+  if(box.innerHTML){box.innerHTML='';return}
+  // The apply engine seeds members from Stripe BEFORE the workbook opens and only
+  // ever confirms them: a no-login link that could mint member rows is a hole, so
+  // there is no create path here. Someone not in Stripe - a cash family - is a
+  // request a person at BAM sets up. Said out loud, never a silent write.
+  box.innerHTML=`<div class="maddcap"><b>Someone who trains with you but is not in Stripe?</b> Reply to BAM with their parent name, athlete, and what they pay, and we will add them and set up how they pay. We never start charging a new member from this page on our own.</div>`;
+}
+
+function renderMember(){
+  document.title=(WB.academy_name?WB.academy_name+' · ':'')+'Your members';
+  const h=document.getElementById('wbh1');if(h)h.textContent='Your members';
+  const sub=document.getElementById('wbsub');
+  if(sub)sub.innerHTML='These are the people paying you today. We filled in everything we could find. Check each row, fix anything that is wrong, then send it back. <b>The money column is what a parent already pays and you cannot change it here.</b>';
+  ['sh_tax','sh_plans','sh_extras'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'});
+  const clr=id=>{const e=document.getElementById(id);if(e)e.innerHTML=''};
+  clr('taxcard');clr('addplans');clr('legacy');
+  const an=document.getElementById('autonote');if(an)an.textContent='Changes save automatically. Nothing changes for any parent until BAM confirms everything with you.';
+
+  const members=CARDS.filter(c=>c.type==='member');
+  // ROWS SORTED BY NEXT PAYMENT, soonest first, blanks last (mockup order).
+  members.sort((a,b)=>{
+    const ka=(MODEL[a.lid]&&MODEL[a.lid].nextPayment)||'';
+    const kb=(MODEL[b.lid]&&MODEL[b.lid].nextPayment)||'';
+    if(!ka&&!kb)return (a.sort_order||0)-(b.sort_order||0);
+    if(!ka)return 1;if(!kb)return -1;
+    return ka<kb?-1:ka>kb?1:0;
+  });
+  const flagged=members.filter(c=>{const m=MODEL[c.lid];return m&&m.flag&&m.outcome!=='stop_billing'}).length;
+
+  const head=`<div class="mghead"><span></span><span>Parent</span><span>Athlete + age</span><span>Plan</span><span>They pay</span><span>Last payment</span><span>Next payment</span><span></span></div>`;
+  const rows=members.map(c=>memberRowHTML(c.lid)).join('');
+  document.getElementById('cards').innerHTML=`<div class="mbar">
+     ${flagged?`<span class="pill attn">${flagged} need your eye</span>`:''}
+     ${RO?'':`<button class="maddbtn" onclick="addMember()">+ Add a member</button>`}
+   </div>
+   ${plansStripHTML()}
+   <div class="mgrid">${head}${rows}</div>
+   <div id="maddcapbox"></div>
+   <div class="mlegend">
+     <span><span class="sw" style="background:#fefaf4;border:1px solid #e8cfa8"></span>Needs your eye</span>
+     <span><span class="sw" style="background:var(--good-bg);border:1px solid #bfddc9"></span>Green boxes are ones we already found, just check them</span>
+   </div>`;
+
+  // Everything that is not a member row (the notes card, any unknown card) still
+  // renders and still has to be confirmed, so the Send gate is complete.
+  const extras=CARDS.filter(c=>c.type!=='member');
+  document.getElementById('extras').innerHTML=extras.map(c=>drawCard(c.lid)).join('');
+
+  if(WB.status==='submitted'||WB.status==='reviewed'||WB.status==='applied'||WB.submitted_at)goReadOnly();
+  updProg();
+
+  const q=new URLSearchParams(location.search);
+  if(q.get('from')){const b=document.getElementById('backlink');if(b){b.style.display='inline-block';b.textContent='← Back';b.href=safeReturn(q.get('return'))}}
 }
 boot();
 </script>
