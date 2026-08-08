@@ -160,11 +160,21 @@ const mt = memberTKeys();
 const seededSet = new Set(SEEDED_FIELDS);
 ok(SEEDED_FIELDS.every((f) => mt.includes(f)), "every seeded field is an own MEMBER_T leaf");
 const notSeeded = mt.filter((f) => !seededSet.has(f)).sort();
-ok(notSeeded.length === 2 && notSeeded[0] === "off_card_method" && notSeeded[1] === "off_card_method_note",
-  `the only MEMBER_T leaves not seeded are the two off_card_* fields (got: ${notSeeded.join(", ") || "none"})`);
+// D1: EVERY editable member field is pre-seeded now, off_card_* included - a
+// member card cannot mint, so a field with no seeded row could never be saved.
+ok(notSeeded.length === 0,
+  `every MEMBER_T leaf is seeded, off_card_* included (unseeded: ${notSeeded.join(", ") || "none"})`);
+ok(seededSet.has("off_card_method") && seededSet.has("off_card_method_note"),
+  "the two off_card_* fields are seeded, so the page saves an off-card member by id, never a null-id mint");
 const sampleAnswers = computeAnswers({ dbMember: {}, dbAge: null, prefill: prefillFromContact(DB.contacts[0]), sub: nsub });
 ok(sampleAnswers.length === SEEDED_FIELDS.length && sampleAnswers.every((a) => seededSet.has(a.target_field)),
   "computeAnswers emits exactly the seeded field set");
+// off_card_* seed EMPTY: the row exists but has no value until the owner marks the
+// member off-card.
+const offA = sampleAnswers.find((a) => a.target_field === "off_card_method");
+const offN = sampleAnswers.find((a) => a.target_field === "off_card_method_note");
+ok(offA && offA.proposed == null && offA.current_value == null && offN && offN.proposed == null && offN.current_value == null,
+  "the off_card_* answers seed empty (proposed and current_value both null)");
 ok(sampleAnswers.every((a) => a.answered === undefined || a.answered == null) || sampleAnswers.every((a) => !("answered" in a)),
   "computeAnswers leaves answered unset (the seed row sets answered=null on the wire)");
 

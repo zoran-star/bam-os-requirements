@@ -31,11 +31,14 @@
 //      inferred, current_value = the DB value (the members column, the seeded
 //      age, or null for a carried fact with no column), answered = null.
 //
-// The seeded answer target_fields are EXACTLY the non-off-card fields of the
-// engine's MEMBER_T map (api/workbook.js) - the apply engine is the source of
-// truth and a field this seed writes that MEMBER_T does not know would be refused
-// at apply. The two off_card_* fields are deliberately NOT seeded: they only
-// exist once the owner marks a member as paying off-card, so the page mints them.
+// The seeded answer target_fields are EXACTLY the leaves of the engine's MEMBER_T
+// map (api/workbook.js) - the apply engine is the source of truth and a field this
+// seed writes that MEMBER_T does not know would be refused at apply. EVERY editable
+// member field is pre-seeded, off_card_method / off_card_method_note included, so
+// the workbook is a true confirm and the page never has to mint on a member card.
+// (A member card cannot mint - mintableOn("member:*") is empty - so a null-id save
+// of off_card_method 404s; seeding the rows here is what lets the page save an
+// off-card member by id. This is the D1 rehearsal fix, matching decision A.)
 //
 // APPLY BOUNDARY. Everything here is a PORTAL-DB write (members, member_field_values,
 // workbooks/cards/answers). There is NO Stripe write at all - the seed only READS
@@ -62,10 +65,11 @@ export const SJ_CLIENT_ID = "5576acf0-acd3-4c05-9f9f-ebfde8618154";
 // (from the brief; 14/20 SJ contacts carry it).
 export const AGE_GHL_KEY = "7pFORuEEtAW2en6U3NMi";
 
-// The fields this seed writes as answers. EXACTLY the non-off-card leaves of
-// MEMBER_T in api/workbook.js; api/_seed-member-workbook.test.mjs pins this list
-// against that map so the two cannot drift. off_card_method / off_card_method_note
-// are intentionally absent (see header).
+// The fields this seed writes as answers. EXACTLY the leaves of MEMBER_T in
+// api/workbook.js; api/_seed-member-workbook.test.mjs pins this list against that
+// map so the two cannot drift. off_card_method / off_card_method_note ARE seeded
+// (empty), because a member card cannot mint a row and the page must be able to
+// save an off-card member by id (D1).
 export const SEEDED_FIELDS = [
   "athlete_name",
   "athlete_age",
@@ -78,6 +82,8 @@ export const SEEDED_FIELDS = [
   "billing_mode",
   "parent_name",
   "parent_phone",
+  "off_card_method",
+  "off_card_method_note",
 ];
 
 const enc = encodeURIComponent;
@@ -187,12 +193,15 @@ export function buildShell({ clientId, sub, contact, prefill }) {
   };
 }
 
-// The 11 seeded answers for one member. proposed = what we inferred; current_value
+// The 13 seeded answers for one member. proposed = what we inferred; current_value
 // = the DB value (the members column, the age already in member_field_values, or
 // null for a carried fact that has no column: amount_cents and next_payment);
 // answered = null. For a freshly-created shell the column values ARE the inferred
 // ones, so current_value == proposed and review renders a clean confirm; for an
 // existing member whose stored value differs, review honestly shows a change.
+// off_card_method / off_card_method_note seed EMPTY (proposed=null, current_value=
+// null): there is no method until the owner marks a member off-card, but the ROWS
+// must exist so the page can save that choice by id (a member card cannot mint).
 export function computeAnswers({ dbMember, dbAge, prefill, sub }) {
   const m = dbMember || {};
   return [
@@ -207,6 +216,8 @@ export function computeAnswers({ dbMember, dbAge, prefill, sub }) {
     { target_field: "billing_mode",    current_value: billingModeOf(m.billing_mode),    proposed: billingModeOf(m.billing_mode) },
     { target_field: "parent_name",     current_value: orNull(cleanStr(m.parent_name)),  proposed: prefill.parent_name ?? orNull(cleanStr(m.parent_name)) },
     { target_field: "parent_phone",    current_value: orNull(cleanStr(m.parent_phone)), proposed: prefill.parent_phone ?? orNull(cleanStr(m.parent_phone)) },
+    { target_field: "off_card_method",      current_value: null, proposed: null },
+    { target_field: "off_card_method_note", current_value: null, proposed: null },
   ];
 }
 

@@ -650,7 +650,22 @@ const cardIsReady = (card) => READY_STATES_BACK.has(card && card.state);`]],
     `      return true; // (control phantomrungmints) the sibling-existence check is gone - a phantom rung mints`]],
 };
 
-const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS };
+// SEED controls break the PRE-SEED (scripts/seed-member-workbook.mjs), whose
+// output section K's member fixture is built from. A member card cannot mint, so
+// a field the seed does not pre-create has no row for the page to save into.
+const SEED_CONTROLS = {
+  // D1 reverted: the seed drops the two off_card_* rows (the pre-fix state, where
+  // the builder assumed the page would mint them). The page's pickPay then saves
+  // off_card_method with a null id, the member card refuses the mint, and the
+  // whole batch 404s - jamming the off-card member. K5 has to catch it.
+  offcardnotseeded: [[
+    `  "off_card_method",
+  "off_card_method_note",
+];`,
+    `];   // (control offcardnotseeded) the seed omits the off_card rows, so the page's null-id save 404s`]],
+};
+
+const ALL_CONTROLS = { ...PAGE_CONTROLS, ...API_CONTROLS, ...SEED_CONTROLS };
 if (MUTATE && !Object.prototype.hasOwnProperty.call(ALL_CONTROLS, MUTATE)) {
   // An unknown control name used to die with a TypeError, which exits non-zero -
   // indistinguishable from a control that bit. Say it out loud instead, so a
@@ -668,6 +683,23 @@ function applyPins(src, pins, where) {
   }
   return out;
 }
+
+// The pre-seed's field list, read FROM SOURCE so section K's member fixture is
+// exactly the set of answer rows scripts/seed-member-workbook.mjs would create -
+// and so the offcardnotseeded control, which strips the off_card rows out of the
+// seed, strips them out of the fixture too: the page's null-id save then 404s the
+// way it did in the rehearsal, and K5 catches it.
+const SEED_FILE = path.join(ROOT, "scripts", "seed-member-workbook.mjs");
+let seedSrc = fs.readFileSync(SEED_FILE, "utf8");
+if (MUTATE && SEED_CONTROLS[MUTATE]) {
+  seedSrc = applyPins(seedSrc, SEED_CONTROLS[MUTATE], "scripts/seed-member-workbook.mjs");
+  console.log(`!! MUTATED (seed): ${MUTATE}\n`);
+}
+const SEEDED_FIELDS = (() => {
+  const m = seedSrc.match(/export const SEEDED_FIELDS = \[([\s\S]*?)\];/);
+  if (!m) die("could not find SEEDED_FIELDS in scripts/seed-member-workbook.mjs");
+  return [...m[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
+})();
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 1. THE PAGE, EXTRACTED WHOLE
@@ -2707,22 +2739,25 @@ console.log("\n══ MEMBER WORKBOOK: the member view against the same handler 
     proposed: null, answered: null, applied_at: null, apply_error: null,
     created_at: `2026-08-07T00:00:${String(mSeq).padStart(2, "0")}Z`, ...extra,
   });
-  // Every editable field, seeded so the page never has to mint on a member card.
-  const memberFields = (cardId, memberId, o) => [
-    mrow(cardId, memberId, "parent_name", o.parent),
-    mrow(cardId, memberId, "parent_phone", o.phone === undefined ? null : o.phone),
-    mrow(cardId, memberId, "athlete_name", o.athlete),
-    mrow(cardId, memberId, "athlete_age", o.age === undefined ? null : o.age),
-    mrow(cardId, memberId, "plan", o.plan === undefined ? null : o.plan),
-    mrow(cardId, memberId, "stripe_price_id", o.priceId === undefined ? null : o.priceId),
-    mrow(cardId, memberId, "offer_id", o.offerId === undefined ? null : o.offerId),
-    mrow(cardId, memberId, "amount_cents", o.cents === undefined ? null : o.cents),
-    mrow(cardId, memberId, "next_payment", o.next === undefined ? null : o.next),
-    mrow(cardId, memberId, "outcome", null),
-    mrow(cardId, memberId, "billing_mode", null),
-    mrow(cardId, memberId, "off_card_method", null),
-    mrow(cardId, memberId, "off_card_method_note", null),
-  ];
+  // Every editable field the SEED pre-creates, so the page never has to mint on a
+  // member card. The list comes from the seed's own SEEDED_FIELDS (read above), so
+  // dropping the off_card rows there (control offcardnotseeded) drops them here too
+  // and the page's null-id off-card save 404s - the D1 rehearsal defect, live.
+  const FIELDVAL = (o, f) => {
+    switch (f) {
+      case "parent_name": return o.parent;
+      case "parent_phone": return o.phone === undefined ? null : o.phone;
+      case "athlete_name": return o.athlete;
+      case "athlete_age": return o.age === undefined ? null : o.age;
+      case "plan": return o.plan === undefined ? null : o.plan;
+      case "stripe_price_id": return o.priceId === undefined ? null : o.priceId;
+      case "offer_id": return o.offerId === undefined ? null : o.offerId;
+      case "amount_cents": return o.cents === undefined ? null : o.cents;
+      case "next_payment": return o.next === undefined ? null : o.next;
+      default: return null;   // outcome, billing_mode, off_card_method, off_card_method_note seed empty
+    }
+  };
+  const memberFields = (cardId, memberId, o) => SEEDED_FIELDS.map((f) => mrow(cardId, memberId, f, FIELDVAL(o, f)));
   const PLAN_OPTS = [
     { plan: "Academy 1x/week", price_id: "price_1x", offer_id: "off-1x" },
     { plan: "Academy 2x/week", price_id: "price_2x", offer_id: "off-2x" },
@@ -2804,8 +2839,11 @@ console.log("\n══ MEMBER WORKBOOK: the member view against the same handler 
   const altLid = mLid("member:sub_alt");
   mpage.memMenu(altLid);
   mpage.pickPay(altLid, "other"); await mflush();
-  check(mAns("c-alt", "billing_mode").answered === "alternate" && mAns("c-alt", "off_card_method").answered === "other",
-    "picking 'something else' saves billing_mode alternate + method other");
+  // Null-safe reads: under offcardnotseeded the off_card row does not exist and the
+  // null-id save 404s the whole batch, so billing_mode never lands either - the
+  // save-through fails exactly as the rehearsal found, and this catches it.
+  check((mAns("c-alt", "billing_mode") || {}).answered === "alternate" && (mAns("c-alt", "off_card_method") || {}).answered === "other",
+    "picking 'something else' saves billing_mode alternate + method other onto the pre-seeded off_card rows");
   ALERTS = [];
   await mpage.confirmCard(altLid); await settle();
   check(ALERTS.length === 1 && /something else/.test(ALERTS[0]) && !mDbCard("c-alt").confirmed_at,
@@ -2813,7 +2851,7 @@ console.log("\n══ MEMBER WORKBOOK: the member view against the same handler 
   await mtype("member:sub_alt", "off_card_method_note", "pays by Venmo on the 1st");
   ALERTS = [];
   await mconfirm("member:sub_alt");
-  check(mAns("c-alt", "off_card_method_note").answered === "pays by Venmo on the 1st" && !!mDbCard("c-alt").confirmed_at,
+  check((mAns("c-alt", "off_card_method_note") || {}).answered === "pays by Venmo on the 1st" && !!mDbCard("c-alt").confirmed_at,
     "with the note, the off-card row saves it and confirms");
   // Card on file clears the off-card flag on a DIFFERENT member, proving both ways.
   mpage.memMenu(mLid("member:sub_cov"));
