@@ -434,6 +434,12 @@ const PAGE_CONTROLS = {
   memberdollarinput: [[
     `  return '<span class="mmoney">$'+dollars.toLocaleString()+cur+(m.interval?('<span class="ro">'+esc(m.interval)+'</span>'):'')+'</span>';`,
     `  return '<span class="mmoney">$<input type="number" value="'+dollars+'" oninput="setA(\\''+m.id+'\\',\\'amount_cents\\',+this.value*100)">'+cur+'</span>';   // (control memberdollarinput) a dollar input on a money-is-read-only surface`]],
+  // MEMBER, page. D3 reverted: planLabel falls back to the raw stripe_price_id
+  // again, so a member with no readable plan name renders "price_1SNR95..." in the
+  // Plan column - the exact defect a non-technical owner saw. K9 has to catch it.
+  planidshown: [[
+    `  return (o&&(o.label||o.plan))||'';`,
+    `  return (o&&(o.label||o.plan))||m.priceId||'';   // (control planidshown) the raw price id leaks into the Plan column`]],
 };
 
 const API_CONTROLS = {
@@ -1322,7 +1328,7 @@ const RETURNS = [
   // member workbook
   "memberModel", "renderMember", "drawMember", "memberRowHTML", "memMenu", "pickPay",
   "pickPlan", "markGone", "undoGone", "addMember", "addAthlete", "toggleConfirmMember",
-  "payKey", "memMoney",
+  "payKey", "memMoney", "planLabel", "planCellHTML",
 ].join(", ");
 const pageBody = pageSrc + `\nreturn { ${RETURNS}, get CARDS(){return CARDS}, get MODEL(){return MODEL}, get WB(){return WB}, get RO(){return RO}, get SAVE(){return SAVE} };\n`;
 const pageGlobals = {
@@ -2878,6 +2884,23 @@ console.log("\n══ MEMBER WORKBOOK: the member view against the same handler 
   mpage.addAthlete(mLid("member:sub_amb"));
   check(/added by BAM/.test(orow(mLid("member:sub_amb"))) && DB.workbook_answers.length === ansBefore,
     "and + athlete says a sibling is set up by BAM, writing nothing");
+
+  // ── K9. PLAN COLUMN shows a readable name, never the raw price id (D3) ──────
+  console.log("\n── K9. the Plan column renders a plan name, not the raw stripe_price_id ──");
+  const RAWPID = "price_1SNR95rawStripeId";
+  // The readable seed label (Stripe product name) renders.
+  check(mpage.planLabel({ plan: "", planLabelMeta: "Elementary Academy", priceId: RAWPID, planOptions: [] }) === "Elementary Academy",
+    "planLabel shows the readable plan name from the seed (meta.plan_label)");
+  // The owner's own plan answer wins over everything.
+  check(mpage.planLabel({ plan: "Academy 2x/week", planLabelMeta: "", priceId: RAWPID, planOptions: [] }) === "Academy 2x/week",
+    "and the owner's own plan answer wins when present");
+  // With nothing readable, it stays BLANK - never the raw price id (the defect).
+  check(mpage.planLabel({ plan: "", planLabelMeta: "", priceId: RAWPID, planOptions: [] }) === "",
+    "with no readable name it renders blank, never the raw stripe_price_id");
+  // Through the real cell renderer (empty options => the label path, not a picker):
+  // the rendered Plan cell carries no raw price id.
+  const rawCell = String(mpage.planCellHTML("x", { plan: "", planLabelMeta: "", priceId: RAWPID, planOptions: [] }));
+  check(!rawCell.includes(RAWPID), `the rendered Plan cell carries no raw price id (cell: ${rawCell})`);
 
   // ── K8. THE GATE: no partial submit; every card confirmed before Send ──────
   console.log("\n── K8. the Send gate: every card confirmed, page number == server number ──");

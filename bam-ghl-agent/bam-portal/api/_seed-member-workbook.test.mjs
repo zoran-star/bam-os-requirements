@@ -79,6 +79,17 @@ function reset() {
     members: [],
     member_field_values: [],
     custom_field_defs: [{ id: "def-age", client_id: CLIENT, key: "athlete_age", label: "Athlete age", archived: false }],
+    // One live offer with three plan families + one archived family (skipped), so
+    // plan_options seeds the three live titles and never the archived one (D3).
+    offers: [{
+      id: "off-sj", client_id: CLIENT, status: "active",
+      data: { pricing: { pricing_offerings: [
+        { title: "Elementary Academy" },
+        { title: "Academy 2x/week" },
+        { title: "Academy Unlimited" },
+        { title: "Old Pre Season", archived: true },
+      ] } },
+    }],
     workbooks: [],
     workbook_cards: [],
     workbook_answers: [],
@@ -88,16 +99,18 @@ function reset() {
 // The four active subscriptions the fixture Stripe returns. Amount + dates live on
 // the ITEM (docs/plans/sj-price-match-log.md), exactly as the real API ships them.
 function stripeSubs() {
-  const sub = (id, customer, priceId, amount, start, end) => ({
+  // `product` is the EXPANDED product object (the seed reads .name for plan_label).
+  const sub = (id, customer, priceId, amount, start, end, productName) => ({
     id, customer, status: "active",
-    items: { data: [{ id: `si_${id}`, current_period_start: start, current_period_end: end, price: { id: priceId, unit_amount: amount } }] },
+    items: { data: [{ id: `si_${id}`, current_period_start: start, current_period_end: end, price: { id: priceId, unit_amount: amount, product: productName ? { id: `prod_${id}`, name: productName } : null } }] },
   });
   // 2026-09-15 = 1789084800 ; 2026-08-18 = 1786060800 (period start), close enough for a fixture.
   return [
-    sub("sub_a", "cus_a", "price_ele_m", 21875, 1786060800, 1789084800),
-    sub("sub_b", "cus_b", "price_preseason_1x", 20000, 1786060800, 1789084800),
-    sub("sub_c", "cus_c", "price_two_m", 27344, 1786060800, 1789084800),
-    sub("sub_none", "cus_none", "price_ele_m", 21875, 1786060800, 1789084800),
+    sub("sub_a", "cus_a", "price_ele_m", 21875, 1786060800, 1789084800, "Elementary Academy"),
+    sub("sub_b", "cus_b", "price_preseason_1x", 20000, 1786060800, 1789084800, "Old Pre Season 1x"),
+    sub("sub_c", "cus_c", "price_two_m", 27344, 1786060800, 1789084800, "Academy 2x/week"),
+    // No product expansion at all -> plan_label null, never the raw price id.
+    sub("sub_none", "cus_none", "price_ele_m", 21875, 1786060800, 1789084800, null),
   ];
 }
 
@@ -200,6 +213,23 @@ const mfvA = DB.member_field_values.find((v) => v.member_id === memberA.id);
 ok(mfvA && mfvA.field_id === "def-age" && mfvA.value === "9", "age is written to member_field_values, typed by the Age def");
 ok(DB.members.every((m) => !("athlete_age" in m)), "no members row carries an athlete_age column");
 ok(r1.summary.ages_written === 3, "summary reports 3 ages written (the sub with no contact has none)");
+
+console.log("\n5. CARD meta: plan_label (readable) + plan_options (picker) - D3");
+// The seed paints each card's meta so the page never renders the raw price id and
+// can offer a plan picker even with an empty pricing_catalog.
+const cardA = DB.workbook_cards.find((c) => c.card_key === "member:sub_a");
+const cardNone = DB.workbook_cards.find((c) => c.card_key === "member:sub_none");
+ok(cardA && cardA.meta && cardA.meta.plan_label === "Elementary Academy",
+  "a member's plan_label is the Stripe product name, not the price id");
+ok(cardA && Array.isArray(cardA.meta.plan_options) && cardA.meta.plan_options.length === 3
+  && cardA.meta.plan_options.every((o) => o.plan && o.label && o.offer_id === "off-sj"),
+  "plan_options carries the 3 LIVE families (archived skipped), each with plan/label/offer_id");
+ok(cardA && !cardA.meta.plan_options.some((o) => o.plan === "Old Pre Season"),
+  "the archived family is NOT offered as a plan option");
+ok(cardNone && cardNone.meta && cardNone.meta.plan_label == null,
+  "a sub with no expanded product seeds plan_label null (the page falls back to the plan answer, never the price id)");
+ok(cardNone && Array.isArray(cardNone.meta.plan_options) && cardNone.meta.plan_options.length === 3,
+  "and still carries the picker options so a plan can be chosen");
 
 console.log("\n1. IDEMPOTENT RE-RUN (no MUTATE)");
 if (MUTATE === "noskip") {

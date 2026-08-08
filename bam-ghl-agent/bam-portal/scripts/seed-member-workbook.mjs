@@ -137,6 +137,14 @@ export function normalizeSub(raw) {
     typeof secs === "number" && secs > 0
       ? new Date(secs * 1000).toISOString().slice(0, 10)
       : null;
+  // A readable plan name for the Plan column, so the owner never sees a raw
+  // price id (D3). The Stripe PRODUCT name is what he recognises ("Elementary
+  // Academy"); the price nickname is the fallback. Both are only present when the
+  // read expanded the product - absent, plan_label stays null and the page falls
+  // back to the plan answer, never the price id.
+  const product = price.product;
+  const productName =
+    product && typeof product === "object" ? cleanStr(product.name) : null;
   return {
     id: String(raw.id),
     customer: raw.customer == null ? null : String(raw.customer),
@@ -144,6 +152,7 @@ export function normalizeSub(raw) {
     amount_cents: Number.isInteger(amount) && amount >= 0 ? amount : null,
     last_date: toDay(item.current_period_start),
     next_date: toDay(item.current_period_end),
+    plan_label: productName || cleanStr(price.nickname) || null,
   };
 }
 
@@ -235,6 +244,40 @@ export async function resolveAgeDef(sb, clientId) {
     || null;
 }
 
+// The academy's plan FAMILIES, for the Plan picker on each member card (D3). Read
+// from the offer's pricing_offerings so the picker renders even when
+// pricing_catalog is empty (San Jose's state until the price side's live mint
+// runs). One option per LIVE family: { plan, label, offer_id }. `plan` is the
+// family name the coverage step resolves on. Archived families are skipped (they
+// are out of everything that sells). A read failure or no offer -> [], and the
+// page falls back to the plan label with no picker rather than 500ing.
+export async function readPlanOptions(sb, clientId) {
+  const offers = await sb(`offers?client_id=eq.${enc(clientId)}&status=neq.archived&select=id,data`).catch(() => null);
+  if (!Array.isArray(offers)) return [];
+  const opts = [];
+  const seen = new Set();
+  for (const o of offers) {
+    const offerings = (((o.data || {}).pricing) || {}).pricing_offerings || [];
+    for (const off of Array.isArray(offerings) ? offerings : []) {
+      if (!off || off.archived) continue;
+      const title = cleanStr(off.title);
+      if (!title) continue;
+      const key = `${o.id}::${title}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      opts.push({ plan: title, label: title, offer_id: o.id });
+    }
+  }
+  return opts;
+}
+
+// The presentation meta a member card carries: a readable plan_label (never the
+// raw price id) and the plan_options picker. One-way, computed - the owner cannot
+// edit these, same as the price card's meta.
+export function memberCardMeta(sub, planOptions) {
+  return { plan_label: sub.plan_label || null, plan_options: planOptions || [] };
+}
+
 // Find the client's member workbook to seed into, or create one. A workbook the
 // owner already submitted (submitted/reviewed/applied) is REFUSED - seeding rows
 // under a reviewer is the late-write defect. A draft/sent one is reused (so the
@@ -320,6 +363,11 @@ export async function seed({ clientId, stripeAccount, apply, deps, log = console
   const ageDef = await resolveAgeDef(sb, clientId);
   if (!ageDef) summary.deferred.push("no Age custom_field_def: ages seeded as workbook proposals only, member_field_values write skipped");
 
+  // The plan-family picker options, read once (D3). Empty when there is no offer
+  // yet; the card still shows the readable plan_label, never the price id.
+  const planOptions = await readPlanOptions(sb, clientId);
+  if (!planOptions.length) summary.deferred.push("no live pricing_offerings: plan picker seeds empty, cards show the plan label only");
+
   // 4. the member workbook (find-or-create, or refuse).
   const wb = await findOrCreateMemberWorkbook(sb, clientId, apply, log);
 
@@ -375,7 +423,7 @@ export async function seed({ clientId, stripeAccount, apply, deps, log = console
     if (card) {
       summary.cards_found++;
     } else {
-      const row = { workbook_id: wb.id, card_key: cardKey, title: cardTitle(prefill, sub), sort_order: summary.cards_created + summary.cards_found };
+      const row = { workbook_id: wb.id, card_key: cardKey, title: cardTitle(prefill, sub), sort_order: summary.cards_created + summary.cards_found, meta: memberCardMeta(sub, planOptions) };
       if (apply && !wb.dryPlaceholder) {
         const created = await sb("workbook_cards", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify([row]) });
         card = Array.isArray(created) && created[0] ? created[0] : { id: `<new-card:${sub.id}>`, ...row };
@@ -462,7 +510,11 @@ async function realListActiveSubscriptions(stripeFetch, stripeAccount) {
   const out = [];
   let starting_after = null;
   for (let page = 0; page < 50; page++) {
-    const qs = new URLSearchParams({ status: "active", limit: "100", "expand[]": "data.items.data.price" });
+    // Expand the price AND its product so the readable plan_label (the product
+    // name) is present without a second round trip (D3).
+    const qs = new URLSearchParams({ status: "active", limit: "100" });
+    qs.append("expand[]", "data.items.data.price");
+    qs.append("expand[]", "data.items.data.price.product");
     if (starting_after) qs.set("starting_after", starting_after);
     const res = await stripeFetch(`/subscriptions?${qs.toString()}`, { method: "GET", stripeAccount });
     const data = (res && res.data) || [];

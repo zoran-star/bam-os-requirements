@@ -392,6 +392,13 @@
     grid-template-columns:26px minmax(120px,1.3fr) minmax(150px,1.7fr) minmax(130px,1.5fr) 92px 76px 100px 34px;
     gap:8px 10px;align-items:center;padding:8px 12px;
   }
+  /* Every grid cell may shrink below its content (default min-width:auto lets a
+     long unbreakable string - a raw price id - overflow into the money column,
+     the D3 overlap). The plan cell clips with an ellipsis so its text and the
+     "They pay" amount never sit on top of each other. */
+  .mghead>*,.mrow>.mcells>*{min-width:0}
+  .mplan{overflow:hidden}
+  .mplan>span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mghead{background:#faf9f5;color:var(--mut);font-size:9.5px;text-transform:uppercase;letter-spacing:.9px;font-weight:700;border-bottom:1px solid var(--line)}
   .mrow{border-bottom:1px solid var(--line2)}
   .mrow:last-child{border-bottom:none}
@@ -2092,6 +2099,9 @@ function memberModel(c){
     lastPayment:meta.last_payment||'',
     interval:meta.interval_label||meta.interval||'',
     currency:meta.currency||'',
+    // A readable plan name from the seed (Stripe product name). Shown instead of
+    // the raw stripe_price_id when there is no plan answer yet (D3).
+    planLabelMeta:meta.plan_label||'',
     planOptions:Array.isArray(meta.plan_options)?meta.plan_options:[],
     live:meta.live,
     flag:meta.flag===true||meta.needs_eye===true,
@@ -2119,10 +2129,17 @@ function prettyDate(s){
   const now=new Date();
   return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+(d.getFullYear()!==now.getFullYear()?(' '+d.getFullYear()):'');
 }
+/* The readable plan name. The owner's own answer wins; then the seed's readable
+   label (the Stripe product name); then a plan_options match. NEVER the raw
+   stripe_price_id - a non-technical owner reading "price_1SNR95..." is the D3
+   defect (and the long id also overlapped the money column). A member with no
+   name resolved yet reads blank, and the picker's "Which plan is this?" prompt
+   asks for it. */
 function planLabel(m){
   if(m.plan)return m.plan;
+  if(m.planLabelMeta)return m.planLabelMeta;
   const o=(m.planOptions||[]).find(x=>x.price_id&&x.price_id===m.priceId);
-  return (o&&(o.label||o.plan))||m.priceId||'';
+  return (o&&(o.label||o.plan))||'';
 }
 function planCellHTML(lid,m){
   const opts=m.planOptions||[];
@@ -2209,7 +2226,7 @@ function memberRowHTML(lid){
     <span class="mck ${confirmed?'on':''}" title="${confirmed?'Confirmed by you':'Tap when this row is right'}" onclick="toggleConfirmMember('${lid}')"></span>
     <div>${parentCell}</div>
     <div>${athCell}</div>
-    <div>${planCellHTML(lid,m)}</div>
+    <div class="mplan">${planCellHTML(lid,m)}</div>
     ${memMoney(m)}
     <span class="mdt past">${esc(m.lastPayment||'-')}</span>
     <span class="mdt">${nextCell}</span>
